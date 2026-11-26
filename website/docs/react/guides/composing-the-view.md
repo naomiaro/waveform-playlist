@@ -332,7 +332,7 @@ In development a part that is not where it can work says so once in the console,
 
 ## Recording
 
-`<WaveformRecordingPreview>` draws the take while it is recorded. It only draws: call `useRecordingSession` so that the provider mutes what the armed track already holds and keeps playback running past the end of the audio. See the [Recording guide](/docs/react/guides/recording#keeping-preview-and-clip-in-sync).
+`<WaveformRecordingPreview>` draws the take while it is recorded. It only draws: call `useRecordingSession` so that the provider mutes what the take's track already holds and keeps playback running past the end of the audio. See the [Recording guide](/docs/react/guides/recording#keeping-preview-and-clip-in-sync).
 
 ## Upgrading
 

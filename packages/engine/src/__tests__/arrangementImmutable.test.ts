@@ -9,6 +9,8 @@ import type { AudioClip, ClipTrack } from '@waveform-playlist/core';
 import { ArrangementImpl as Arrangement } from '../arrangement/Arrangement';
 import { PlaylistEngine } from '../PlaylistEngine';
 import { pushStep, undoStep, redoStep, beginBase, EMPTY_HISTORY } from '../arrangement/history';
+import type { SavedState } from '../arrangement/history';
+import { EMPTY_MIXER } from '../arrangement/mixer';
 import { recordingAdapter } from './helpers/recordingAdapter';
 import { loaded } from './helpers/loadedTracks';
 
@@ -362,9 +364,12 @@ describe('the engine hands out the arrangement’s array', () => {
 });
 
 describe('history helpers', () => {
-  const one: readonly ClipTrack[] = [track('A', [])];
-  const two: readonly ClipTrack[] = [track('A', []), track('B', [])];
-  const three: readonly ClipTrack[] = [];
+  // Rule (#843): a step is a saved state, the tracks and the mix; before,
+  // each of these was a tracks array.
+  const state = (tracks: readonly ClipTrack[]): SavedState => ({ tracks, mixer: EMPTY_MIXER });
+  const one = state([track('A', [])]);
+  const two = state([track('A', []), track('B', [])]);
+  const three = state([]);
 
   it('pushStep adds a step, clears redo, drops the oldest past the limit, and returns a new history', () => {
     const first = pushStep(EMPTY_HISTORY, one, 2);
@@ -388,7 +393,7 @@ describe('history helpers', () => {
     expect(undoStep(EMPTY_HISTORY, one)).toBeNull();
     const history = pushStep(EMPTY_HISTORY, one, 10);
     const result = undoStep(history, two);
-    expect(result?.tracks).toBe(one);
+    expect(result?.state).toBe(one); // Rule (#843): `state`; before, `tracks`
     expect(result?.history.undo).toHaveLength(0);
     expect(result?.history.redo[0]).toBe(two);
     expect(history.undo).toHaveLength(1);
@@ -398,13 +403,14 @@ describe('history helpers', () => {
     expect(redoStep(EMPTY_HISTORY, one)).toBeNull();
     const undone = undoStep(pushStep(EMPTY_HISTORY, one, 10), two)!;
     const result = redoStep(undone.history, one);
-    expect(result?.tracks).toBe(two);
+    expect(result?.state).toBe(two); // Rule (#843): `state`; before, `tracks`
     expect(result?.history.undo[0]).toBe(one);
     expect(result?.history.redo).toHaveLength(0);
   });
 
-  it('beginBase holds the tracks a transaction started from, unchanged so far', () => {
-    expect(beginBase(one)).toEqual({ tracks: one, changed: false });
-    expect(beginBase(one).tracks).toBe(one);
+  it('beginBase holds the state a transaction started from, unchanged so far', () => {
+    // Rule (#843): the base is a saved state; before, `{ tracks: one, changed: false }`.
+    expect(beginBase(one)).toEqual({ state: one, changed: false });
+    expect(beginBase(one).state).toBe(one);
   });
 });

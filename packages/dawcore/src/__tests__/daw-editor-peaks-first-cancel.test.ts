@@ -41,6 +41,7 @@ function setupEditor(): any {
     terminate: vi.fn(),
   };
   editor._engine = {
+    recordingTrackIds: new Set<string>(),
     setTracks: vi.fn(),
     removeTrack: vi.fn(),
     updateTrack: vi.fn(),

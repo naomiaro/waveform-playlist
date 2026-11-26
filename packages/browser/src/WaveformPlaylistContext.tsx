@@ -81,6 +81,7 @@ export type { TrackDragPreview };
 
 export interface TrackState {
   name: string;
+  /** The track's own mute, or true while a take is recording onto it (#843). */
   muted: boolean;
   soloed: boolean;
   volume: number;
@@ -112,7 +113,7 @@ import {
   SelectionContext,
   TrackReorderPreviewContext,
   TrimPreviewContext,
-  RecordingArmContext,
+  RecordingTrackContext,
   TrimPreviewPeaksContext,
   UndoRedoContext,
   type ActiveAnnotationContextValue,
@@ -1513,11 +1514,11 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
                                                       <PlaylistTimelineContext
                                                         value={timelineValue}
                                                       >
-                                                        <RecordingArmContext
-                                                          value={editing.recordingArm}
+                                                        <RecordingTrackContext
+                                                          value={editing.recordingTrack}
                                                         >
                                                           {children}
-                                                        </RecordingArmContext>
+                                                        </RecordingTrackContext>
                                                       </PlaylistTimelineContext>
                                                     </PlaylistMixerContext>
                                                   </TrackReorderPreviewContext>

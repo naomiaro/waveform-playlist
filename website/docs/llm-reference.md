@@ -445,12 +445,15 @@ interface EditorControlsContextValue {
 
   // Track mixer, by track id (#687; by index until then). An id no track has
   // is ignored. They change the arrangement's mix, also while no engine is
-  // attached (#812). Inside a track's control panel, `useTrack()` has the
-  // same actions already bound to that track.
-  setTrackMute: (trackId: string, muted: boolean) => void;
-  setTrackSolo: (trackId: string, soloed: boolean) => void;
-  setTrackVolume: (trackId: string, volume: number) => void;
-  setTrackPan: (trackId: string, pan: number) => void;
+  // attached (#812). Each call is an undo step of the arrangement (#843);
+  // `options` (the engine's `MixerChangeOptions`) makes calls with one
+  // `gesture` id one step, or a value with `undoable: false` no step. Inside
+  // a track's control panel, `useTrack()` has the same actions already bound
+  // to that track.
+  setTrackMute: (trackId: string, muted: boolean, options?: MixerChangeOptions) => void;
+  setTrackSolo: (trackId: string, soloed: boolean, options?: MixerChangeOptions) => void;
+  setTrackVolume: (trackId: string, volume: number, options?: MixerChangeOptions) => void;
+  setTrackPan: (trackId: string, pan: number, options?: MixerChangeOptions) => void;
 
   /** Move a track to a new index in the vertical track order. Purely
    *  organizational — playback is not interrupted. An undo step of the
@@ -484,18 +487,21 @@ interface EditorControlsContextValue {
   // Recording
   /** Mark a recording session active/inactive. While active: (1) the
    *  end-of-audio auto-stop is suppressed so overdub playback runs past the
-   *  end of existing material, and (2) with an `armedTrackId`, that track is
-   *  muted in the arrangement's mix for the session (#812): punch-in
-   *  recording replaces whatever the take overlaps (#579), so the doomed
-   *  material must not play under the overdub. The mixer and the track's Mute
-   *  button show it muted, the built-in `<TrackMuteButton />` of that track
-   *  is disabled, and `useTrack().isRecordingArmed` is true for it. The mute
-   *  from before the session is written back when it ends or the armed track
-   *  changes, whatever was set in between; nothing is written for a track
-   *  that is no longer in the arrangement. `useRecordingSession` calls it for
-   *  the length of a take; overdub flows should also call it eagerly (before
-   *  `play()`). */
-  setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
+   *  end of existing material, and (2) with a `recordingTrackId`, that track
+   *  is marked in the arrangement as the one the take is recording onto
+   *  (`setTrackRecording`, #843): punch-in recording replaces whatever the
+   *  take overlaps (#579), so the doomed material must not play under the
+   *  overdub. The take's mute plays the track muted and is no undo step.
+   *  `trackStates` and the track's Mute button show it muted, the built-in
+   *  `<TrackMuteButton />` of that track is disabled, and
+   *  `useTrack().isRecording` is true for it, while
+   *  `arrangement.getMixer()` keeps the track's own mute: nothing is written
+   *  to it, so a mute changed during the take stays after it. One track is
+   *  recorded onto at a time: naming one clears any other, and
+   *  `setRecordingActive(false)` clears every track. `useRecordingSession`
+   *  calls it for the length of a take; overdub flows should also call it
+   *  eagerly (before `play()`). */
+  setRecordingActive: (active: boolean, recordingTrackId?: string | null) => void;
 }
 ```
 
@@ -573,7 +579,8 @@ interface PlaylistMixerContextValue {
    *  Every track has an entry from the moment it enters the arrangement, also
    *  while its audio loads (no `undefined` entries, #812). The values are the
    *  arrangement's mix (`arrangement.getMixer()`), by track id: a track keeps
-   *  its state while its id is in the arrangement; an undo never changes it;
+   *  its state while its id is in the arrangement; an undo, a redo or an
+   *  abort brings back the mix of the state it returns to (#843);
    *  an id with no mix yet starts from the track's own fields, which after
    *  that are only the values it entered with. The array keeps its identity
    *  while no entry changed. */
@@ -768,6 +775,7 @@ A track whose clips do not match its kind is rejected: the arrangement's `setTra
 ```typescript
 interface TrackState {
   name: string;
+  /** The track's own mute, or true while a take is recording onto it (#843). */
   muted: boolean;
   soloed: boolean;
   volume: number;
@@ -1642,6 +1650,7 @@ import type {
   ClipBounds,
   CreateArrangementOptions,
   LoadSource,
+  MixerChangeOptions,
   RemoveTrackOptions,
   TrackMixerValues,
 } from '@waveform-playlist/engine';
@@ -1707,6 +1716,22 @@ interface RemoveTrackOptions {
   undoable?: boolean;             // false: no undo step, and the track is taken out of every undo and redo state
 }
 
+/** How a mixer setter's change goes into the undo history. */
+interface MixerChangeOptions {
+  /** Changes with the same id, one after another, are one undo step. */
+  gesture?: string;
+  /** Not an undo step: the value is written into every saved state as well. */
+  undoable?: false;
+}
+// No options: each call is an undo step. With both, undoable: false wins. Inside an open transaction an undoable
+// mixer change is part of it (gesture ignored) and an abort takes it back; an undoable: false change is written into
+// the transaction's base too, so an abort keeps it. A gesture step ends at another step, an undo, a redo,
+// clearHistory, setTracks or a transaction (not at a take's mute, a call that changes nothing, or an undoable: false call
+// that leaves the step); a gesture that ends where its step began leaves no step, and the history it found comes
+// back (the redo states its first call cleared, and a step the undo limit evicted for it).
+
+// The gesture ids of one slider: createMixerGesture() from @waveform-playlist/core (below).
+
 interface TrackMixerValues {
   volume: number;
   muted: boolean;
@@ -1724,10 +1749,10 @@ interface ClipBounds {
 interface Arrangement {
   // read
   getTracks(): readonly ArrangementTrack[];             // Loaded clips (AudioClip) and clips still loading (LoadingClip; isLoadingClip). The same array until the tracks change. A track's mixer fields are the values it entered with
-  getMixer(): ReadonlyMap<string, TrackMixerValues>;    // Current volume, mute, solo, pan by track id. The same Map until a value changes, an entry is added or entries are dropped
+  getMixer(): ReadonlyMap<string, TrackMixerValues>;    // Current volume, mute, solo, pan by track id (the stored mute: the take's track's is not forced). The same Map until a value changes, an entry is added or dropped, or an undo, a redo or an abort brings back another state's
   subscribe(listener: () => void): () => void;          // Once per change (tracks, mix or history), in order; returns the function that stops it
   readonly tracksVersion: number;                       // Counts changes to the tracks
-  readonly mixerVersion: number;                        // Counts the changes made by the four mixer setters (not entries added or dropped)
+  readonly mixerVersion: number;                        // Counts the changes of the current mix: the four mixer setters, an undo/redo/abort that brings back other values, the start or end of a take's mute on a current track (not entries added or dropped)
 
   // whole set
   setTracks(tracks: readonly ArrangementTrack[]): void; // Replace every track. Clears the undo history. An id that is in the tracks being replaced keeps its mix; any other id is seeded from the new track's fields
@@ -1755,11 +1780,35 @@ interface Arrangement {
     deltaSamples: number
   ): number;
 
-  // mixer (not undo steps; an undo never changes them). Only for a track that is in the current tracks
-  setTrackVolume(trackId: string, volume: number): void;
-  setTrackMute(trackId: string, muted: boolean): void;
-  setTrackSolo(trackId: string, soloed: boolean): void;
-  setTrackPan(trackId: string, pan: number): void;
+  // mixer (each call is an undo step, or a part of an open transaction; see
+  // `MixerChangeOptions` for one step made of many calls, and for a value
+  // that is no step. An undo, a redo or an abort brings back the mix of the
+  // state it returns to. A value that does not change, or a track that is
+  // not in the current tracks, changes nothing)
+  setTrackVolume(trackId: string, volume: number, options?: MixerChangeOptions): void;
+  setTrackMute(trackId: string, muted: boolean, options?: MixerChangeOptions): void;
+  setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
+  setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
+
+  // recording mute (the track a take is recording onto)
+  /**
+   * The ids of the tracks a take is recording onto. The same Set until one
+   * is added or removed; never write to it.
+   */
+  readonly recordingTrackIds: ReadonlySet<string>;
+  /**
+   * Mark a track as the one a take is recording onto, or clear it when the
+   * take ends. Such a track plays muted: the engine's `getState().tracks`
+   * and its adapter have it muted, while its mute in `getMixer()` stays as
+   * it is and comes back when the take ends. This is not an undo step, and
+   * undo, redo, an abort, `setTracks` and `clearHistory` do not change which
+   * tracks are recording. An id that is not in the current tracks is
+   * recorded too, and mutes nothing until a track of that id enters. The
+   * same value changes nothing.
+   */
+  setTrackRecording(trackId: string, recording: boolean): void;
+  /** The tracks a take is recording onto, read from the arrangement (the same set object until it changes; never write to it). */
+  readonly recordingTrackIds: ReadonlySet<string>;
 
   // history
   readonly canUndo: boolean;
@@ -1768,8 +1817,8 @@ interface Arrangement {
   redo(): void;                                         // With a transaction open: aborts it first
   clearHistory(): void;
   beginTransaction(): void;                             // Changes made until commitTransaction are one undo step
-  commitTransaction(): void;                            // No step when the tracks are back where the transaction began
-  abortTransaction(): void;                             // Put the tracks back as they were when the transaction began
+  commitTransaction(): void;                            // No step when the tracks and the mix are back where the transaction began
+  abortTransaction(): void;                             // Put the tracks and the mix back as they were when the transaction began
 
   // loading
   readonly sources: ValueSource<ArrangementSourcesValue>;  // Where each source is. Read with getSnapshot() or subscribe(); published after the tracks notification,
@@ -1783,13 +1832,14 @@ interface Arrangement {
 // plus the src of a loaded clip that carries BOTH src and audioBuffer (its buffer is used; nothing is fetched).
 // A loaded clip with src and no audioBuffer is not fetched and not in `sources` (it never gets audio from the arrangement). A source no state names any more is dropped
 // (its load aborted); named again, it is fetched again.
-// The engine recognises an arrangement by a versioned Symbol.for key ('@waveform-playlist/engine/arrangement/time-base/v1'),
-// not by instanceof, so an arrangement made by another installed copy of the package is accepted.
+// The engine recognises an arrangement by a versioned Symbol.for key ('@waveform-playlist/engine/arrangement/time-base/v2'),
+// not by instanceof, so an arrangement made by another installed copy of the package is accepted when both use the same
+// key version (v1 until the mixer became undoable: a v1 engine and a v2 arrangement refuse each other).
 
 interface EngineState {
-  tracks: readonly ClipTrack[]; // Each track with its current mixer values and without clips that are still loading. Shared, not a copy: never write to it. Frozen outside production builds
+  tracks: readonly ClipTrack[]; // Each track with its current mixer values (muted while a take records onto it) and without clips that are still loading. Shared, not a copy: never write to it. Frozen outside production builds
   tracksVersion: number;        // Monotonic counter; increments on structural track changes only
-  mixerVersion: number;         // Monotonic counter; increments on per-track mixer edits (volume/mute/solo/pan)
+  mixerVersion: number;         // Monotonic counter; increments on every change of the current mix (the setters, an undo/redo/abort of the mix, the start or end of a take's mute on a current track)
   duration: number;             // Of the loaded clips
   currentTime: number;
   isPlaying: boolean;
@@ -1814,7 +1864,8 @@ interface EngineState {
 // Key methods on PlaylistEngine:
 // Track management: setTracks(tracks: readonly ClipTrack[]), addTrack(), removeTrack(), updateTrack(), reorderTrack(), selectTrack()
 // Clip editing: moveClip(), trimClip(), splitClip(), getClipBounds(), constrainTrimDelta()
-// Track mix: setTrackVolume(), setTrackMute(), setTrackSolo(), setTrackPan()
+// Track mix (undo steps): setTrackVolume(trackId, volume, options?: MixerChangeOptions), setTrackMute(), setTrackSolo(), setTrackPan()
+// The take's mute (not an undo step; the track a take records onto plays muted): setTrackRecording(trackId: string, recording: boolean)
 // History: undo(), redo(), clearHistory(), beginTransaction(), commitTransaction(), abortTransaction(), canUndo, canRedo
 // Playback: play(), pause(), stop(), seek()
 // State: setSelection(), setLoopRegion(), setLoopEnabled(), setMasterVolume(), setTempo()
@@ -1825,6 +1876,65 @@ interface EngineState {
 // Pure operations (also exported for use without PlaylistEngine):
 import { constrainClipDrag, constrainBoundaryTrim, canSplitAt, splitClip, calculateSplitPoint } from '@waveform-playlist/engine';
 import { calculateDuration, clampSeekPosition, findClosestZoomIndex } from '@waveform-playlist/engine';
+```
+
+### Mixer gestures (`@waveform-playlist/core`)
+
+```typescript
+import { createMixerGesture } from '@waveform-playlist/core';
+import type { MixerGesture } from '@waveform-playlist/core';
+// The gesture ids of one control (one helper per slider). attach() ends the gesture on the input's `change`
+// (the end of a pointer drag), except while an arrow, PageUp/PageDown, Home or End key is down: then on that
+// key's `keyup` (a held key is one step). `blur` ends it too. Ids are unique per helper, also across two
+// installed copies of the package. Mute and solo buttons need no helper: each click is a step.
+function createMixerGesture(): MixerGesture;
+
+interface MixerGesture {
+  /** The id to pass while a gesture is going on. */
+  readonly id: string;
+  /** The gesture is over: the next change starts a new one. */
+  end(): void;
+  /** Ends the gesture on the input's own events; returns the detach function. */
+  attach(input: HTMLInputElement): () => void;
+}
+
+const gesture = createMixerGesture();
+const detach = gesture.attach(slider);
+slider.addEventListener('input', () =>
+  engine.setTrackVolume(trackId, slider.valueAsNumber, { gesture: gesture.id })
+);
+```
+
+### Track events of `<daw-editor>` (`@dawcore/components`)
+
+```typescript
+import type { DawTrackUpdateDetail, DawTrackControlDetail } from '@dawcore/components';
+
+// 'daw-track-update', fired by <daw-track> after a property changes.
+interface DawTrackUpdateDetail {
+  trackId: string;
+  /**
+   * The `<daw-track>` properties this update changed, by property name
+   * (`'volume'`, `'pan'`, `'muted'`, `'soloed'`, `'src'`, `'name'`, `'kind'`,
+   * `'renderMode'`, `'spectrogramConfig'`). The editor sends a mixer property
+   * to the engine only when it is in this list, and one update is one undo
+   * step (#843).
+   */
+  changed: readonly string[];
+}
+
+// 'daw-track-control', fired by <daw-track-controls> when a control moves.
+interface DawTrackControlDetail {
+  trackId: string;
+  prop: string;
+  value: number | boolean;
+  /**
+   * The slider's gesture id (#843): events of one volume or pan drag, or of
+   * one key press, carry the same id and are one undo step. Mute and solo
+   * send none: each click is a step.
+   */
+  gesture?: string;
+}
 ```
 
 ---
@@ -2290,6 +2400,7 @@ interface TrackContextValue {
 
   /** The track's name, or "Track N" (N is the position, from 1) when it has none. */
   name: string;
+  /** The track's own mute, or true while a take is recording onto it (`isRecording`). */
   muted: boolean;
   soloed: boolean;
   /** 0 to 1. */
@@ -2308,21 +2419,26 @@ interface TrackContextValue {
   hasSpectrogram: boolean;
   /**
    * True while a take is being recorded onto this track (`setRecordingActive`,
-   * `useRecordingSession`). The track is muted for the take and its mute from
-   * before is written back when the take ends, so a change made meanwhile does
-   * not stay: the built-in `<TrackMuteButton />` is disabled while this is
-   * true, and an app's own mute control can do the same.
+   * `useRecordingSession`). The track plays muted for the take and `muted` is
+   * true, while the track's own mute (`arrangement.getMixer()`) is not
+   * changed by the take: a mute set meanwhile stays after it (#843). The
+   * built-in `<TrackMuteButton />` is disabled while this is true; an app's
+   * own mute control can do the same, since toggling from `muted` here would
+   * set the track's own mute from the take's mute.
    */
-  isRecordingArmed: boolean;
+  isRecording: boolean;
   // Removed (#812): isLoading. The values above are the arrangement's mix also while
   // the track's audio loads, the actions work then, and the pieces are enabled.
 
   // Actions. Each keeps its identity while the track's slot is mounted and a
-  // track menu neither becomes available nor stops being so.
-  setMuted: (muted: boolean) => void;
-  setSoloed: (soloed: boolean) => void;
-  setVolume: (volume: number) => void;
-  setPan: (pan: number) => void;
+  // track menu neither becomes available nor stops being so. The four mixer
+  // actions are undo steps (#843); `options` (the engine's
+  // `MixerChangeOptions`) makes calls with one `gesture` id one step, or a
+  // value with `undoable: false` no step.
+  setMuted: (muted: boolean, options?: MixerChangeOptions) => void;
+  setSoloed: (soloed: boolean, options?: MixerChangeOptions) => void;
+  setVolume: (volume: number, options?: MixerChangeOptions) => void;
+  setPan: (pan: number, options?: MixerChangeOptions) => void;
   /** Makes this the selected track. */
   select: () => void;
   /** Moves the track one position up. Nothing happens for the first track. */
@@ -2502,11 +2618,13 @@ interface WaveformPlayheadProps {   // either provider
 
 // The view only draws a take. This tells the provider one is running
 // (WaveformPlaylistProvider only): playback runs past the end of the audio and
-// the armed track is muted in the arrangement's mix for the take (#812): the
-// mixer and its Mute button show it, its <TrackMuteButton /> is disabled,
-// useTrack().isRecordingArmed is true. The mute from before is written back
-// when the take ends, the track changes, this component unmounts or the
-// provider unmounts, whatever was set in between. play() does nothing before
+// the track is marked in the arrangement as the take's (setTrackRecording,
+// #843), which plays it muted and is no undo step: trackStates and its Mute
+// button show it muted, its <TrackMuteButton /> is disabled,
+// useTrack().isRecording is true, and arrangement.getMixer() keeps the
+// track's own mute (a mute changed during the take stays after it). The
+// take's mute is cleared when the take ends, the track changes, this
+// component unmounts or the provider unmounts. play() does nothing before
 // the first ready, so a take started during the first load records without
 // playback.
 function useRecordingSession(options: RecordingSessionOptions): void;

@@ -349,9 +349,13 @@ describe('removeTrack with undoable: false', () => {
     arrangement.addTrack(track('D', [], { pan: 0.75 }));
     arrangement.undo(); // D is held by the redo stack only
     arrangement.removeTrack('C', { undoable: false });
-    expect(arrangement.getMixer().get('D')?.pan).toBe(0.75);
+    // Rule (#843): the redo state holds D's entry in its own Map, and the
+    // current Map holds the current tracks only; before, the current Map had
+    // D with pan 0.75 here.
+    expect(arrangement.getMixer().has('D')).toBe(false);
     arrangement.redo();
     expect(ids(arrangement)).toEqual(['A', 'B', 'D']);
+    expect(arrangement.getMixer().get('D')?.pan).toBe(0.75);
   });
 
   it('a track that only an undo step holds is taken out of it', () => {
@@ -372,7 +376,9 @@ describe('removeTrack with undoable: false', () => {
     arrangement.addTrack(C());
     arrangement.removeTrack('B'); // an ordinary removal: an undo step still holds B
     arrangement.removeTrack('C', { undoable: false });
-    expect([...arrangement.getMixer().keys()]).toEqual(['A', 'B']);
+    // Rule (#843): the current Map holds the current tracks only (the undo
+    // step holds B's entry in its own Map); before, `['A', 'B']`.
+    expect([...arrangement.getMixer().keys()]).toEqual(['A']);
     // The same id entering again is a new track: its own fields seed its mix.
     arrangement.addTrack(track('C', [], { pan: -1 }));
     expect(arrangement.getMixer().get('C')?.pan).toBe(-1);
@@ -564,6 +570,15 @@ describe('an engine given an arrangement', () => {
     expect(state.canUndo).toBe(true);
     expect((adapter.rawCalls[0].args[0] as ClipTrack[])[1].pan).toBe(-0.5);
 
+    // Rule (#843): the pan change is an undo step of its own, so the first
+    // undo takes it back by its setter and the second the move by a track
+    // call. Before #843, one undo took back the move (`[['updateTrack',
+    // 'A']]`) and the pan stayed at -0.5.
+    adapter.reset();
+    second.undo();
+    expect(startOf(arrangement, 'A', 'a1')).toBe(1000);
+    expect(adapter.calls.map((c) => [c.method, c.args[0]])).toEqual([['setTrackPan', 'B']]);
+    expect(second.getState().tracks[1].pan).toBe(0);
     adapter.reset();
     second.undo();
     expect(startOf(arrangement, 'A', 'a1')).toBe(0);

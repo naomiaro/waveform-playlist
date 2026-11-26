@@ -222,7 +222,7 @@ Under `MediaElementWaveformRoot` it draws nothing.
 |------|------|-------------|
 | `recordingState` | `WaveformRecordingState` | The take: `isRecording`, `trackId`, `startSample`, `progress` (from `useIntegratedRecording` / `useRecording`), `bits`, optional `latencyOffset` |
 
-It only draws the take. Call [`useRecordingSession`](/docs/react/api/hooks#userecordingsession) so the provider mutes the armed track for the take (the mixer shows it muted and its `<TrackMuteButton />` is disabled until the take ends). See the [Recording guide](/docs/react/guides/recording).
+It only draws the take. Call [`useRecordingSession`](/docs/react/api/hooks#userecordingsession) so the provider mutes the take's track for the take (the mixer shows it muted and its `<TrackMuteButton />` is disabled until the take ends). See the [Recording guide](/docs/react/guides/recording).
 
 #### WaveformAnnotationBoxes
 
@@ -594,7 +594,7 @@ The master volume is a number from 0 (silent) to 1 (full): that is what `usePlay
 
 ### Track volume
 
-`<TrackVolumeSlider />`, among the children of `<WaveformTrackControls>`: see [Track Controls](#track-controls). For a slider outside the controls column, read the value from `usePlaylistMixer().trackStates[i].volume` (the entry of `tracks[i]`; every track has one, also while its audio loads) and set it with `useEditorControls().setTrackVolume(tracks[i].id, volume)`.
+`<TrackVolumeSlider />`, among the children of `<WaveformTrackControls>`: see [Track Controls](#track-controls). For a slider outside the controls column, read the value from `usePlaylistMixer().trackStates[i].volume` (the entry of `tracks[i]`; every track has one, also while its audio loads) and set it with `useEditorControls().setTrackVolume(tracks[i].id, volume, { gesture: gesture.id })`, with one `createMixerGesture()` (from `@waveform-playlist/core`) per slider so that a drag is one undo step (see [Undo of Mixer Moves](/docs/react/guides/track-management#undo-of-mixer-moves)).
 
 ---
 
@@ -724,7 +724,7 @@ import {
 } from '@waveform-playlist/browser';
 ```
 
-The pieces work while a track's audio is still loading: the values are the arrangement's mix, and a change made then is kept. While a take is recorded onto a track (`useTrack().isRecordingArmed`), its mute button is disabled: the track is muted for the take and its mute from before is written back when the take ends.
+The pieces work while a track's audio is still loading: the values are the arrangement's mix, and a change made then is kept. While a take is recorded onto a track (`useTrack().isRecording`), its mute button is disabled and shown pressed: the take plays the track muted, while its own mute is left as it is. Every change the pieces make is an undo step: a click on mute or solo is one, and a drag of `<TrackVolumeSlider />` or `<TrackPanSlider />`, or a held arrow key on it, is one.
 
 ### DefaultTrackControls
 
@@ -751,15 +751,15 @@ The track's name on one line, cut off with an ellipsis; "Track N" (N is the posi
 
 ### TrackMuteButton and TrackSoloButton
 
-Toggle buttons labelled "Mute" and "Solo", with `aria-pressed`. No props. The mute button is disabled while a take is recorded onto the track.
+Toggle buttons labelled "Mute" and "Solo", with `aria-pressed`. No props. Each click is an undo step. The mute button is disabled, and pressed, while a take is recorded onto the track.
 
 ### TrackVolumeSlider
 
-The track's volume, 0 to 1 in steps of 0.01, between two speaker icons. The input is labelled "Volume". No props.
+The track's volume, 0 to 1 in steps of 0.01, between two speaker icons. The input is labelled "Volume". No props. A drag, or a held arrow, Page, Home or End key, is one undo step.
 
 ### TrackPanSlider
 
-The track's pan, -1 (left) to 1 (right) in steps of 0.01, between "L" and "R". The input is labelled "Pan". No props.
+The track's pan, -1 (left) to 1 (right) in steps of 0.01, between "L" and "R". The input is labelled "Pan". No props. A drag, or a held key, is one undo step, as for the volume slider.
 
 ### TrackMenuButton
 

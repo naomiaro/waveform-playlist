@@ -46,6 +46,28 @@ describe('DawTrackControlsElement', () => {
     document.body.removeChild(el);
   });
 
+  it('the mute button is disabled while a take records onto the track; a click sends nothing', async () => {
+    const el = document.createElement('daw-track-controls') as any;
+    el.trackId = 'track-1';
+    el.muted = true;
+    el.recording = true;
+    document.body.appendChild(el);
+    await el.updateComplete;
+
+    const events: CustomEvent[] = [];
+    el.addEventListener('daw-track-control', (e: CustomEvent) => events.push(e));
+    const muteBtn = el.shadowRoot.querySelector('button[title="Mute"]');
+    expect(muteBtn.disabled).toBe(true);
+    muteBtn.click();
+    el['_onMuteClick']();
+    expect(events).toHaveLength(0);
+
+    el.recording = false;
+    await el.updateComplete;
+    expect(muteBtn.disabled).toBe(false);
+    document.body.removeChild(el);
+  });
+
   it('dispatches daw-track-control on solo toggle', async () => {
     const el = document.createElement('daw-track-controls') as any;
     el.trackId = 'track-1';
@@ -167,7 +189,12 @@ describe('DawTrackControlsElement', () => {
     slider.dispatchEvent(new Event('input', { bubbles: true }));
 
     expect(events).toHaveLength(1);
-    expect(events[0].detail).toEqual({ trackId: 'track-1', prop: 'volume', value: 0.5 });
+    expect(events[0].detail).toEqual({
+      trackId: 'track-1',
+      prop: 'volume',
+      value: 0.5,
+      gesture: expect.any(String),
+    });
     document.body.removeChild(el);
   });
 
@@ -185,7 +212,12 @@ describe('DawTrackControlsElement', () => {
     slider.dispatchEvent(new Event('input', { bubbles: true }));
 
     expect(events).toHaveLength(1);
-    expect(events[0].detail).toEqual({ trackId: 'track-1', prop: 'pan', value: -0.3 });
+    expect(events[0].detail).toEqual({
+      trackId: 'track-1',
+      prop: 'pan',
+      value: -0.3,
+      gesture: expect.any(String),
+    });
     document.body.removeChild(el);
   });
 
@@ -205,6 +237,84 @@ describe('DawTrackControlsElement', () => {
 
     expect(composed).toBe(true);
     document.body.removeChild(el);
+  });
+
+  // #843: one gesture id per slider, so the editor makes one undo step of
+  // a drag or a key press. Mute and solo send none: each click is a step.
+  describe('slider gestures (#843)', () => {
+    async function mount() {
+      const el = document.createElement('daw-track-controls') as any;
+      el.trackId = 'track-1';
+      document.body.appendChild(el);
+      await el.updateComplete;
+      const details: any[] = [];
+      el.addEventListener('daw-track-control', (e: CustomEvent) => details.push(e.detail));
+      const [volume, pan] = el.shadowRoot.querySelectorAll('input[type="range"]');
+      return { el, details, volume, pan };
+    }
+    function move(input: HTMLInputElement, value: string) {
+      input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    function release(input: HTMLInputElement) {
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    function key(input: HTMLInputElement, type: 'keydown' | 'keyup', k: string) {
+      input.dispatchEvent(new KeyboardEvent(type, { key: k, bubbles: true }));
+    }
+
+    it("the event detail carries the slider's gesture id", async () => {
+      const { el, details, volume, pan } = await mount();
+      move(volume, '0.9');
+      move(volume, '0.8');
+      release(volume);
+      move(volume, '0.7');
+      move(pan, '0.2');
+      el.shadowRoot.querySelector('button[title="Mute"]').click();
+
+      const [first, second, third, panDetail, muteDetail] = details;
+      expect(typeof first.gesture).toBe('string');
+      // One drag, one id; the change ended it, so the next drag has another.
+      expect(second.gesture).toBe(first.gesture);
+      expect(third.gesture).not.toBe(first.gesture);
+      // Each slider has its own.
+      expect(typeof panDetail.gesture).toBe('string');
+      expect(panDetail.gesture).not.toBe(third.gesture);
+      expect(muteDetail).not.toHaveProperty('gesture');
+      el.remove();
+    });
+
+    it('a held key is one gesture, ended by its keyup', async () => {
+      const { el, details, volume } = await mount();
+      key(volume, 'keydown', 'ArrowUp');
+      move(volume, '0.9');
+      release(volume);
+      key(volume, 'keydown', 'ArrowUp');
+      move(volume, '0.8');
+      release(volume);
+      key(volume, 'keyup', 'ArrowUp');
+      move(volume, '0.7');
+
+      expect(details[1].gesture).toBe(details[0].gesture);
+      expect(details[2].gesture).not.toBe(details[0].gesture);
+      el.remove();
+    });
+
+    it('detaches on disconnect and attaches again on reconnect', async () => {
+      const { el, details, volume } = await mount();
+      move(volume, '0.9');
+      el.remove();
+      release(volume); // not listened to while disconnected
+      document.body.appendChild(el);
+      await el.updateComplete;
+      move(volume, '0.8');
+      expect(details[1].gesture).toBe(details[0].gesture);
+
+      release(volume); // listened to again
+      move(volume, '0.7');
+      expect(details[2].gesture).not.toBe(details[1].gesture);
+      el.remove();
+    });
   });
 
   describe('compact modes', () => {

@@ -1,7 +1,8 @@
 /**
  * The mixer part: volume, mute, solo and pan live in the arrangement by
- * track id, apart from the tracks. A fader move replaces no track object,
- * and undo restores structure, never the mix (#812).
+ * track id, apart from the tracks. A fader move replaces no track object
+ * (#812). A saved state holds the mix with the tracks, so undo, redo and
+ * abort restore both (#843; arrangementMixerHistory.test.ts).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createClip, createTrack } from '@waveform-playlist/core';
@@ -110,12 +111,14 @@ describe('seeding', () => {
     expect(arrangement.getMixer().get('C')).toEqual({ ...DEFAULT_MIX, pan: 0.5 });
   });
 
-  it('an id that already has an entry keeps it: addTrack of a removed track whose removal can be undone', () => {
+  it('addTrack of a removed track whose removal can be undone is seeded from its own fields', () => {
     const { arrangement } = setup();
     arrangement.setTrackVolume('A', 0.3);
     arrangement.removeTrack('A');
     arrangement.addTrack(track('A', [], { volume: 1 }));
-    expect(arrangement.getMixer().get('A')?.volume).toBe(0.3);
+    // Rule (#843): the current Map holds the current tracks only, so the id
+    // has no entry to find again; before, 0.3 (the kept entry).
+    expect(arrangement.getMixer().get('A')?.volume).toBe(1);
   });
 
   it('updateTrack does not change the entry', () => {
@@ -140,9 +143,12 @@ describe('seeding', () => {
     const { arrangement } = setup();
     const mixer = arrangement.getMixer();
     arrangement.setTracks(fixture());
-    arrangement.removeTrack('A');
-    arrangement.addTrack(track('A', []));
     expect(arrangement.getMixer()).toBe(mixer);
+    // Rule (#843): a removal drops the entry from the current Map and the
+    // add seeds a new one, so the Map is another object; before, the same
+    // Map after `removeTrack('A')` and `addTrack(A)`.
+    arrangement.removeTrack('A');
+    expect(arrangement.getMixer()).not.toBe(mixer);
   });
 
   it('seeding does not count as a mixer change', () => {
@@ -183,7 +189,8 @@ describe('setters', () => {
       expect(trackA.volume).toBe(0.8); // the value the track entered with
       expect(arrangement.tracksVersion).toBe(1);
       expect(arrangement.mixerVersion).toBe(1);
-      expect(arrangement.canUndo).toBe(false);
+      // Rule (#843): a setter call is an undo step; before, it was none (`false`).
+      expect(arrangement.canUndo).toBe(true);
       expect(changes).toEqual([{ type: 'mixer', trackId: 'A', values: patch }]);
     }
   );
@@ -208,15 +215,24 @@ describe('setters', () => {
   });
 });
 
-describe('undo restores structure, never the mix', () => {
-  it('undo of a move after a volume change keeps the volume', () => {
+describe('undo restores the tracks and the mix of the state it returns to', () => {
+  it('a volume change after a move is a step of its own: the first undo takes it back, the second the move', () => {
     const { arrangement } = setup();
     arrangement.moveClip('A', 'a1', 1000);
+    const moved = arrangement.getTracks();
     arrangement.setTrackVolume('A', 0.2);
     const mixer = arrangement.getMixer();
     arrangement.undo();
-    expect(arrangement.getMixer()).toBe(mixer);
-    expect(arrangement.getMixer().get('A')?.volume).toBe(0.2);
+    // Rule (#843): the volume change is an undo step, and the move's step
+    // holds the mix from before it. Before #843, one undo took back the move
+    // and kept the same Map, with 0.2.
+    expect(arrangement.getMixer()).not.toBe(mixer);
+    expect(arrangement.getMixer().get('A')?.volume).toBe(0.8);
+    expect(arrangement.getTracks()).toBe(moved);
+    arrangement.undo();
+    expect(arrangement.getTracks()).not.toBe(moved);
+    expect(arrangement.getMixer().get('A')?.volume).toBe(0.8);
+    arrangement.redo();
     arrangement.redo();
     expect(arrangement.getMixer().get('A')?.volume).toBe(0.2);
   });
@@ -226,44 +242,50 @@ describe('undo restores structure, never the mix', () => {
     arrangement.setTrackPan('A', 0.9);
     arrangement.setTrackMute('A', true);
     arrangement.removeTrack('A');
+    // Rule (#843): the current Map holds the current tracks only; the undo
+    // step holds A's entry. Before, the current Map still had A's entry here.
+    expect(arrangement.getMixer().has('A')).toBe(false);
+    arrangement.undo();
+    expect(arrangement.getTracks().map((t) => t.id)).toEqual(['A', 'B']);
     expect(arrangement.getMixer().get('A')).toEqual({
       volume: 0.8,
       muted: true,
       soloed: false,
       pan: 0.9,
     });
-    arrangement.undo();
-    expect(arrangement.getTracks().map((t) => t.id)).toEqual(['A', 'B']);
-    expect(arrangement.getMixer().get('A')?.pan).toBe(0.9);
   });
 
-  it('abortTransaction keeps a mixer change made during the transaction', () => {
+  it('abortTransaction takes back a mixer change made during the transaction', () => {
     const { arrangement } = setup();
     arrangement.beginTransaction();
     arrangement.moveClip('A', 'a1', 1000);
     arrangement.setTrackVolume('A', 0.2);
     arrangement.abortTransaction();
-    expect(arrangement.getMixer().get('A')?.volume).toBe(0.2);
+    // Rule (#843): the base holds the mix; before, 0.2 (the change survived the abort).
+    expect(arrangement.getMixer().get('A')?.volume).toBe(0.8);
   });
 
-  it('a mixer change is not an undo step and does not clear redo', () => {
+  it('a mixer change is an undo step and clears redo', () => {
     const { arrangement } = setup();
     arrangement.moveClip('A', 'a1', 1000);
     arrangement.undo();
     arrangement.setTrackVolume('A', 0.2);
-    expect(arrangement.canUndo).toBe(false);
-    expect(arrangement.canRedo).toBe(true);
+    // Rule (#843): a setter call is an undo step like any other edit; before,
+    // it was none and left the redo state (`canUndo` false, `canRedo` true).
+    expect(arrangement.canUndo).toBe(true);
+    expect(arrangement.canRedo).toBe(false);
   });
 });
 
-describe('retention', () => {
-  it('the entry of a removed track is kept while the history holds the track', () => {
+describe('the current Map holds the current tracks', () => {
+  it('the entry of a removed track leaves the current Map; the undo step keeps it', () => {
     const { arrangement } = setup();
     arrangement.removeTrack('A');
-    expect(arrangement.getMixer().has('A')).toBe(true);
+    // Rule (#843): the saved state holds A's entry; before, the current Map kept it (`true`).
+    expect(arrangement.getMixer().has('A')).toBe(false);
   });
 
-  it('clearHistory drops the entries of tracks that no state holds', () => {
+  it('clearHistory leaves only the entries of the current tracks', () => {
     const { arrangement, changes } = setup();
     arrangement.removeTrack('A');
     const version = arrangement.mixerVersion;
@@ -290,13 +312,15 @@ describe('retention', () => {
     expect([...arrangement.getMixer().keys()]).toEqual(['C']);
   });
 
-  it('an entry is kept for a track that only an open transaction’s base holds', () => {
+  it('an open transaction’s base keeps the entry of a track it holds', () => {
     const { arrangement } = setup();
     arrangement.setTrackVolume('A', 0.3);
     arrangement.beginTransaction();
     arrangement.removeTrack('A');
     arrangement.clearHistory();
-    expect(arrangement.getMixer().has('A')).toBe(true);
+    // Rule (#843): the base holds A's entry in its own Map; before, the
+    // current Map kept it (`true`).
+    expect(arrangement.getMixer().has('A')).toBe(false);
     arrangement.abortTransaction();
     expect(arrangement.getMixer().get('A')?.volume).toBe(0.3);
   });
@@ -305,8 +329,15 @@ describe('retention', () => {
     const { arrangement } = setup();
     arrangement.addTrack(track('C', [], { pan: 0.5 }));
     arrangement.setTrackPan('C', -1);
+    // Rule (#843): the pan change is a step of its own, so two undos (the
+    // pan, then the add) leave C to the redo stack; before, one.
+    arrangement.undo();
     arrangement.undo(); // C is now held by the redo stack only
-    expect(arrangement.getMixer().get('C')?.pan).toBe(-1);
+    // Rule (#843): the redo state holds C's entry in its own Map; before, the
+    // current Map kept it (pan -1).
+    expect(arrangement.getMixer().has('C')).toBe(false);
+    arrangement.redo();
+    expect(arrangement.getMixer().get('C')?.pan).toBe(0.5);
     arrangement.redo();
     expect(arrangement.getMixer().get('C')?.pan).toBe(-1);
   });
@@ -421,7 +452,7 @@ describe('the engine’s projection: tracks with the current mix', () => {
         expect(sent.volume).toBe(0.7);
       });
 
-      it('addTrack of an id that still has an entry sends the mix it has, not the given fields', () => {
+      it('addTrack of the id of a removed track sends the mix seeded from the given fields', () => {
         const { adapter, engine } = setupEngine({ incremental });
         engine.setTrackVolume('A', 0.4);
         engine.removeTrack('A');
@@ -432,7 +463,9 @@ describe('the engine’s projection: tracks with the current mix', () => {
           call.method === 'setTracks'
             ? (call.args[0] as ClipTrack[]).find((t) => t.id === 'A')
             : (call.args[0] as ClipTrack);
-        expect(sent?.volume).toBe(0.4);
+        // Rule (#843): the removed track's entry is not kept in the current
+        // Map; before, 0.4 (the kept entry).
+        expect(sent?.volume).toBe(1);
       });
 
       it('setTracks sends an id that was already there with the mix it has, not the given fields', () => {
@@ -443,20 +476,27 @@ describe('the engine’s projection: tracks with the current mix', () => {
         expect((adapter.rawCalls[0].args[0] as ClipTrack[])[0].volume).toBe(0.4);
       });
 
-      it('undo of a move after a fader move: the track is sent with the fader where it is now', () => {
+      it('undo of a move and a fader move in one step: the track is sent with the mix from before, and the setter is called', () => {
         const { adapter, engine, stateTrack } = setupEngine({ incremental });
+        // Rule (#843): a fader move is a step of its own, so the two are one
+        // step only inside a transaction. Before #843 they were two calls
+        // with no transaction, and the undo of the move sent volume 0.4 (in
+        // the state too) and called no mixer setter.
+        engine.beginTransaction();
         engine.moveClip('A', 'a1', 1000);
         engine.setTrackVolume('A', 0.4);
+        engine.commitTransaction();
         adapter.reset();
         engine.undo();
         const sent = firstTrackOf(adapter.rawCalls[0]);
         expect(sent.clips[0].startSample).toBe(0);
-        expect(sent.volume).toBe(0.4);
-        expect(stateTrack('A').volume).toBe(0.4);
-        // No mixer setter is called: an undo does not touch the mix.
+        // The step holds the mix from before. A track call does not carry
+        // the mix to every adapter, so the setter follows.
+        expect(sent.volume).toBe(0.8);
+        expect(stateTrack('A').volume).toBe(0.8);
         expect(
           adapter.calls.filter((c) => c.method.startsWith('setTrack') && c.method !== 'setTracks')
-        ).toEqual([]);
+        ).toEqual([{ method: 'setTrackVolume', args: ['A', 0.8] }]);
       });
 
       // Review Focus 3: an undo that changes the number of tracks.
@@ -481,16 +521,26 @@ describe('the engine’s projection: tracks with the current mix', () => {
         expect((adapter.rawCalls[0].args[0] as ClipTrack[]).map((t) => t.id)).toEqual(['A', 'B']);
       });
 
-      it('an undo after only a fader move on another track sends that track nothing', () => {
+      it('an undo of a move with a fader move on another track in one step sends that track its setter, no track call', () => {
         const { adapter, engine } = setupEngine({ incremental });
+        // Rule (#843): a fader move is a step of its own, so the two are one
+        // step only inside a transaction (before #843: two calls, no
+        // transaction).
+        engine.beginTransaction();
         engine.moveClip('A', 'a1', 1000);
         engine.setTrackVolume('B', 0.4);
+        engine.commitTransaction();
         adapter.reset();
         engine.undo();
+        // Rule (#843): the undo step holds B's volume from before (1), so the
+        // setter follows the track call. Before: the track call only.
         if (incremental) {
-          expect(adapter.calls.map((c) => [c.method, c.args[0]])).toEqual([['updateTrack', 'A']]);
+          expect(adapter.calls.map((c) => [c.method, c.args[0]])).toEqual([
+            ['updateTrack', 'A'],
+            ['setTrackVolume', 'B'],
+          ]);
         } else {
-          expect(adapter.calls.map((c) => c.method)).toEqual(['setTracks']);
+          expect(adapter.calls.map((c) => c.method)).toEqual(['setTracks', 'setTrackVolume']);
         }
       });
     }

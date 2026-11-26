@@ -387,7 +387,7 @@ describe('the template and useTrack()', () => {
         'isFirst',
         'isLast',
         'hasSpectrogram',
-        'isRecordingArmed',
+        'isRecording',
         'setMuted',
         'setSoloed',
         'setVolume',
@@ -1063,6 +1063,101 @@ describe('the removed props', () => {
     expect(screen.getByRole('button', { name: 'Mute' })).toBeTruthy();
     expect(screen.queryByTitle('Remove track')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Drag to reorder track' })).toBeNull();
+  });
+});
+
+describe('a slider gesture is one undo step (#843)', () => {
+  const SLIDERS = (
+    <WaveformTrackControls>
+      <Spy />
+      <TrackVolumeSlider />
+      <TrackPanSlider />
+    </WaveformTrackControls>
+  );
+  const slider = (name: string) =>
+    within(slotOf('a')).getByRole('slider', { name }) as HTMLInputElement;
+  const volumeOf = () => probe.trackStates[0].volume;
+  // React's onChange is the native `input` event; the native `change` ends a drag.
+  const move = (el: HTMLInputElement, value: string) => fireEvent.input(el, { target: { value } });
+  const release = (el: HTMLInputElement) => fireEvent(el, new Event('change', { bubbles: true }));
+  const press = (el: HTMLInputElement, key: string, value: string) => {
+    fireEvent.keyDown(el, { key });
+    move(el, value);
+    release(el);
+    fireEvent.keyUp(el, { key });
+  };
+
+  it('a drag is one step', async () => {
+    mount({ tracks: [A], controls: SLIDERS });
+    await ready();
+    const el = slider('Volume');
+    move(el, '0.8');
+    move(el, '0.6');
+    move(el, '0.4');
+    release(el);
+    expect(volumeOf()).toBe(0.4);
+    act(() => probe.controls.undo());
+    expect(volumeOf()).toBe(1);
+  });
+
+  it('two key presses are two steps', async () => {
+    mount({ tracks: [A], controls: SLIDERS });
+    await ready();
+    const el = slider('Volume');
+    press(el, 'ArrowLeft', '0.9');
+    press(el, 'ArrowLeft', '0.8');
+    act(() => probe.controls.undo());
+    expect(volumeOf()).toBe(0.9);
+    act(() => probe.controls.undo());
+    expect(volumeOf()).toBe(1);
+  });
+
+  // A held key repeats keydown, and each repeat moves the slider: an `input`
+  // and a native `change`. The gesture ends only on the keyup.
+  it('a held arrow key is one step', async () => {
+    mount({ tracks: [A], controls: SLIDERS });
+    await ready();
+    const el = slider('Volume');
+    fireEvent.keyDown(el, { key: 'ArrowLeft' });
+    move(el, '0.9');
+    release(el);
+    for (const value of ['0.8', '0.7', '0.6']) {
+      fireEvent.keyDown(el, { key: 'ArrowLeft', repeat: true });
+      move(el, value);
+      release(el);
+    }
+    fireEvent.keyUp(el, { key: 'ArrowLeft' });
+    expect(volumeOf()).toBe(0.6);
+    act(() => probe.controls.undo());
+    expect(volumeOf()).toBe(1);
+  });
+
+  it('volume then pan are two steps', async () => {
+    mount({ tracks: [A], controls: SLIDERS });
+    await ready();
+    move(slider('Volume'), '0.5');
+    release(slider('Volume'));
+    move(slider('Pan'), '0.5');
+    release(slider('Pan'));
+    act(() => probe.controls.undo());
+    expect(probe.trackStates[0].pan).toBe(0);
+    expect(volumeOf()).toBe(0.5);
+    act(() => probe.controls.undo());
+    expect(volumeOf()).toBe(1);
+  });
+
+  it('the gesture survives a re-render', async () => {
+    const m = mount({ tracks: [A], controls: SLIDERS });
+    await ready();
+    const el = slider('Volume');
+    move(el, '0.8');
+    m.update({});
+    move(el, '0.6');
+    m.update({});
+    move(el, '0.4');
+    release(el);
+    act(() => probe.controls.undo());
+    expect(volumeOf()).toBe(1);
   });
 });
 

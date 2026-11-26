@@ -24,6 +24,14 @@ export interface RemoveTrackOptions {
   undoable?: boolean;
 }
 
+/** How a mixer setter's change goes into the undo history. */
+export interface MixerChangeOptions {
+  /** Changes with the same id, one after another, are one undo step. */
+  gesture?: string;
+  /** Not an undo step: the value is written into every saved state as well. */
+  undoable?: false;
+}
+
 /**
  * The owner of the tracks, of the mix and of the undo history. Everything
  * else reads it (`getTracks`, `getMixer`, `subscribe`) and changes it by
@@ -41,11 +49,15 @@ export interface Arrangement {
    */
   getTracks(): readonly ArrangementTrack[];
   /**
-   * The current volume, mute, solo and pan by track id. The same Map until a
-   * value changes, a track with a new id enters, or entries of tracks that
-   * are gone are dropped (`mixerVersion` counts value changes only). A
-   * track's own mixer fields in `getTracks()` are the values it entered
-   * with; the current ones are here.
+   * The current volume, mute, solo and pan by track id (the stored mute: the
+   * mute of the track a take is recording onto is not forced here). The same
+   * Map until a value changes, a track with a new id enters, entries of
+   * tracks that are gone are dropped, or an undo, a redo or an abort brings
+   * back another state's Map. `mixerVersion` counts the value changes of
+   * current tracks, and also the start or end of a take's mute on a current
+   * track, which leaves this Map as it is; an entry seeded, carried or
+   * dropped with its track is not counted. A track's own mixer fields in
+   * `getTracks()` are the values it entered with; the current ones are here.
    */
   getMixer(): ReadonlyMap<string, TrackMixerValues>;
   /**
@@ -98,12 +110,33 @@ export interface Arrangement {
     deltaSamples: number
   ): number;
 
-  // mixer (not undo steps; an undo never changes them; a track that is not
-  // in the current tracks is left alone)
-  setTrackVolume(trackId: string, volume: number): void;
-  setTrackMute(trackId: string, muted: boolean): void;
-  setTrackSolo(trackId: string, soloed: boolean): void;
-  setTrackPan(trackId: string, pan: number): void;
+  // mixer (each call is an undo step, or a part of an open transaction; see
+  // `MixerChangeOptions` for one step made of many calls, and for a value
+  // that is no step. An undo, a redo or an abort brings back the mix of the
+  // state it returns to. A value that does not change, or a track that is
+  // not in the current tracks, changes nothing)
+  setTrackVolume(trackId: string, volume: number, options?: MixerChangeOptions): void;
+  setTrackMute(trackId: string, muted: boolean, options?: MixerChangeOptions): void;
+  setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
+  setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
+
+  // recording mute (the track a take is recording onto)
+  /**
+   * The ids of the tracks a take is recording onto. The same Set until one
+   * is added or removed; never write to it.
+   */
+  readonly recordingTrackIds: ReadonlySet<string>;
+  /**
+   * Mark a track as the one a take is recording onto, or clear it when the
+   * take ends. Such a track plays muted: the engine's `getState().tracks`
+   * and its adapter have it muted, while its mute in `getMixer()` stays as
+   * it is and comes back when the take ends. This is not an undo step, and
+   * undo, redo, an abort, `setTracks` and `clearHistory` do not change which
+   * tracks are recording. An id that is not in the current tracks is
+   * recorded too, and mutes nothing until a track of that id enters. The
+   * same value changes nothing.
+   */
+  setTrackRecording(trackId: string, recording: boolean): void;
 
   // history
   readonly canUndo: boolean;
@@ -116,7 +149,7 @@ export interface Arrangement {
   /** Changes made until `commitTransaction` are one undo step. */
   beginTransaction(): void;
   commitTransaction(): void;
-  /** Put the tracks back as they were when the transaction began. */
+  /** Put the tracks and the mix back as they were when the transaction began. */
   abortTransaction(): void;
 
   // loading

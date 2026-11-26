@@ -59,6 +59,16 @@ export function trackDescriptorRenderMode(
   return kind === 'midi' ? 'waveform' : requested;
 }
 
+/** The mixer fields of a `TrackDescriptor`. */
+export type TrackMixFields = 'volume' | 'pan' | 'muted' | 'soloed';
+
+/**
+ * What `<daw-editor>` stores per track (internal, not exported from the
+ * package): a `TrackDescriptor` without its mix. The mix is the arrangement's
+ * (#843); `editor.tracks` fills the four fields in from it.
+ */
+export type StoredTrackDescriptor = Omit<TrackDescriptor, TrackMixFields>;
+
 /** A `TrackDescriptor` plus its `trackId` — the shape returned by `editor.tracks`
  *  so consumers can map a track's name to the `trackId` the per-track APIs
  *  (`addTrackEffect`, `removeTrack`, `updateTrack`, …) are keyed by. */

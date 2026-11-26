@@ -31,22 +31,24 @@ The central orchestrator. Manages the audio engine, loads tracks, renders wavefo
 
 **JS Properties:**
 
-| Property          | Type                   | Description                                                                      |
-| ----------------- | ---------------------- | -------------------------------------------------------------------------------- |
-| `audioContext`    | `AudioContext \| null` | Custom AudioContext for decode, playback, and recording. Set before tracks load. |
-| `recordingStream` | `MediaStream \| null`  | Mic stream for recording. Consumer provides via `getUserMedia`.                  |
-| `samplesPerPixel` | number                 | Zoom level (same as attribute, but with validation and clamping)                 |
+| Property          | Type                   | Description                                                                                                                                                              |
+| ----------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `audioContext`    | `AudioContext \| null` | Custom AudioContext for decode, playback, and recording. Set before tracks load.                                                                                         |
+| `recordingStream` | `MediaStream \| null`  | Mic stream for recording. Consumer provides via `getUserMedia`.                                                                                                          |
+| `tracks`          | `TrackWithId[]`        | Read-only. Every track's id, descriptor and mix. The mix is the arrangement's, so it follows Undo and Redo; a track still loading reports the values it will enter with. |
+| `samplesPerPixel` | number                 | Zoom level (same as attribute, but with validation and clamping)                                                                                                         |
 
 **Methods:**
 
-| Method                           | Returns                    | Description                                                                                                                                                                                                                                    |
-| -------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `loadFiles(files)`               | `Promise<LoadFilesResult>` | Load audio files as new tracks                                                                                                                                                                                                                 |
-| `startRecording(stream?)`        | `Promise<void>`            | Start recording on selected track                                                                                                                                                                                                              |
-| `stopRecording()`                | `void`                     | Stop recording                                                                                                                                                                                                                                 |
-| `pauseRecording()`               | `void`                     | Pause recording                                                                                                                                                                                                                                |
-| `resumeRecording()`              | `void`                     | Resume recording                                                                                                                                                                                                                               |
-| `reorderTrack(trackId, toIndex)` | `void`                     | Move a track to a new position in the vertical order (0-based, among `<daw-track>` elements). Element-backed tracks move their DOM element (the MutationObserver syncs the engine); element-less tracks reorder the engine directly. Undoable. |
+| Method                           | Returns                    | Description                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `loadFiles(files)`               | `Promise<LoadFilesResult>` | Load audio files as new tracks                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `startRecording(stream?)`        | `Promise<void>`            | Start recording on selected track                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `stopRecording()`                | `void`                     | Stop recording                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `pauseRecording()`               | `void`                     | Pause recording                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `resumeRecording()`              | `void`                     | Resume recording                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `updateTrack(trackId, partial)`  | `void`                     | Change a track's `name`, `renderMode`, `volume`, `pan`, `muted` or `soloed`. The mixer fields go to the track's mix directly, so a value takes effect also when a `<daw-track>` element already holds it (after an Undo); a track with an element gets the values written to the element too. The mixer fields of one call are one undo step; while the track is loading they set the values it enters with, which is not a step. |
+| `reorderTrack(trackId, toIndex)` | `void`                     | Move a track to a new position in the vertical order (0-based, among `<daw-track>` elements). Element-backed tracks move their DOM element (the MutationObserver syncs the engine); element-less tracks reorder the engine directly. Undoable.                                                                                                                                                                                    |
 
 **Events:**
 
@@ -61,7 +63,7 @@ The central orchestrator. Manages the audio engine, loads tracks, renders wavefo
 | `daw-track-connected`    | `{ trackId }`                                                           | Track element connected to DOM                                                                                 |
 | `daw-track-ready`        | `{ trackId }`                                                           | Track audio loaded and peaks rendered                                                                          |
 | `daw-track-error`        | `{ trackId, error }`                                                    | Track failed to load                                                                                           |
-| `daw-track-control`      | `{ trackId, property, value }`                                          | Track control changed (volume, pan, mute, solo)                                                                |
+| `daw-track-control`      | `{ trackId, prop, value, gesture? }`                                    | Volume, pan, mute or solo changed; `gesture`: the slider's id (one drag or key press is one undo step)         |
 | `daw-track-remove`       | `{ trackId }`                                                           | Track removed                                                                                                  |
 | `daw-track-reorder`      | `{ trackId, fromIndex, toIndex }`                                       | Move up/down button clicked on `<daw-track-controls>` (bubbles to the editor, which calls `reorderTrack`)      |
 | `daw-track-reorder-grab` | `{ trackId, pointerEvent, gripElement }`                                | Drag grip pointerdown on `<daw-track-controls>` (bubbles to the editor, which starts the pointer-drag handler) |
@@ -87,19 +89,23 @@ Declares a track. Must be a direct child of `<daw-editor>`.
 
 **Attributes:**
 
-| Attribute     | Type    | Default      | Description                                                                                                                       |
-| ------------- | ------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------- |
-| `src`         | string  | —            | Audio file URL (single-clip shorthand)                                                                                            |
-| `peaks-src`   | string  | —            | Pre-computed peaks URL (`.dat` or `.json`)                                                                                        |
-| `name`        | string  | `''`         | Track display name                                                                                                                |
-| `volume`      | number  | `1`          | Track volume (0.0 to 1.0+)                                                                                                        |
-| `pan`         | number  | `0`          | Stereo pan (-1.0 left, 0 center, 1.0 right)                                                                                       |
-| `muted`       | boolean | `false`      | Whether track is muted                                                                                                            |
-| `soloed`      | boolean | `false`      | Whether track is soloed                                                                                                           |
+| Attribute     | Type    | Default      | Description                                                                                                                                                                                                                                                                                                                                               |
+| ------------- | ------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src`         | string  | —            | Audio file URL (single-clip shorthand)                                                                                                                                                                                                                                                                                                                    |
+| `peaks-src`   | string  | —            | Pre-computed peaks URL (`.dat` or `.json`)                                                                                                                                                                                                                                                                                                                |
+| `name`        | string  | `''`         | Track display name                                                                                                                                                                                                                                                                                                                                        |
+| `volume`      | number  | `1`          | Track volume (0.0 to 1.0+)                                                                                                                                                                                                                                                                                                                                |
+| `pan`         | number  | `0`          | Stereo pan (-1.0 left, 0 center, 1.0 right)                                                                                                                                                                                                                                                                                                               |
+| `muted`       | boolean | `false`      | Whether track is muted                                                                                                                                                                                                                                                                                                                                    |
+| `soloed`      | boolean | `false`      | Whether track is soloed                                                                                                                                                                                                                                                                                                                                   |
 | `kind`        | string  | `'audio'`    | `'audio'` or `'midi'`. What the track holds: every `<daw-clip>` must be of this kind (a clip with `src` is audio, a clip without is MIDI). A clip of the other kind is not added and is reported with `daw-clip-error`. A MIDI track mounts `<daw-piano-roll>` for each clip. Set it before the track is added; a later change is ignored with a warning. |
-| `render-mode` | string  | `'waveform'` | How an audio track is drawn: `'waveform'` or `'spectrogram'`. Ignored on a MIDI track, which is always a piano roll. Any other value (the former `'piano-roll'` included) warns and is treated as `'waveform'`. |
+| `render-mode` | string  | `'waveform'` | How an audio track is drawn: `'waveform'` or `'spectrogram'`. Ignored on a MIDI track, which is always a piano roll. Any other value (the former `'piano-roll'` included) warns and is treated as `'waveform'`.                                                                                                                                           |
 
 When `src` is set without child `<daw-clip>` elements, a single clip spanning the full audio is created automatically.
+
+**Events:** `daw-track-update` `{ trackId, changed }` after a reflected property changes (not on the first render). `changed` names the properties of that update (`'volume'`, `'pan'`, `'muted'`, `'soloed'`, `'name'`, `'src'`, `'renderMode'`, …); the editor sends the arrangement only the mixer properties it names.
+
+**The mix attributes are undo steps.** A `volume`, `pan`, `muted` or `soloed` change after the track has loaded is one undo step per update: properties set in one synchronous run are one Lit update and one step. While the track is still loading, a change sets the values it enters with and is not a step. The editor never writes the element back: after an Undo the element keeps the value it was given, while the controls and `editor.tracks` show the restored one. Setting the element to that same value again changes nothing (the element did not change, so it fires no event); set another value, use the controls, or call `editor.updateTrack()`, which writes the mix directly.
 
 ### `<daw-clip>`
 
@@ -265,13 +271,16 @@ Visual overlay for the selected time region.
 
 Per-track control panel showing track name, volume slider, pan knob, mute/solo buttons, and remove button. Fixed position — doesn't scroll with the waveforms.
 
+It draws the arrangement's mix, so its sliders and buttons follow Undo and Redo. Each change dispatches `daw-track-control` `{ trackId, prop, value, gesture? }`, which the editor sends to the arrangement. One pointer drag on a slider, or one key press (a held key included), is one undo step: the slider's `gesture` id stays the same until the input's `change`, the key's `keyup` or a blur. Each Mute or Solo click is one step. Keyboard Undo (`<daw-keyboard-shortcuts undo>`) does not fire while a slider has focus; click elsewhere or press `Tab` first (#730).
+
 **JS Properties (set by `<daw-editor>`, not attributes):**
 
-| Property      | Type      | Default | Description                                                                                    |
-| ------------- | --------- | ------- | ---------------------------------------------------------------------------------------------- |
-| `reorderable` | `boolean` | `false` | Mirrors the editor's `track-reordering` attribute — shows the drag grip + move up/down buttons |
-| `trackIndex`  | `number`  | `0`     | This track's 0-based position, for computing move-button disabled state                        |
-| `trackCount`  | `number`  | `1`     | Total track count, for computing move-button disabled state (down disabled at the last index)  |
+| Property      | Type      | Default | Description                                                                                                                                        |
+| ------------- | --------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `recording`   | `boolean` | `false` | A take is recording onto the track (the editor passes `engine.recordingTrackIds.has(trackId)`): the M button is disabled and a click sends nothing |
+| `reorderable` | `boolean` | `false` | Mirrors the editor's `track-reordering` attribute — shows the drag grip + move up/down buttons                                                     |
+| `trackIndex`  | `number`  | `0`     | This track's 0-based position, for computing move-button disabled state                                                                            |
+| `trackCount`  | `number`  | `1`     | Total track count, for computing move-button disabled state (down disabled at the last index)                                                      |
 
 Dispatches `daw-track-reorder` (move buttons) and `daw-track-reorder-grab` (drag grip pointerdown) — see the `<daw-editor>` events table above.
 
@@ -371,6 +380,14 @@ Render-less element that adds keyboard shortcuts to the editor. Must be a direct
 4. First track load creates `PlaylistEngine` + audio adapter (lazy)
 5. Waveforms render immediately from peaks (no play required)
 6. First play click resumes `AudioContext` (user gesture requirement)
+
+## Undo and the Mix
+
+Mixer moves are undo steps, like clip and track edits: a control gesture, a `<daw-track>` attribute update and an `editor.updateTrack()` call are one step each, and Undo brings back the volume, pan, mute and solo of the state it returns to. `editor.tracks` and `<daw-track-controls>` report the arrangement's mix.
+
+**A take mutes the track it records onto.** During a take the recorded track plays muted (`engine.setTrackRecording`): its controls and `editor.tracks` show it muted, and `exportAudio()` during the take leaves it out. The take's mute is not an undo step and does not change the track's own mute: a mute set during the take (through the element, `updateTrack` or the engine) stays after it, and the take's end only clears the take's mute.
+
+**Loading a track clears the history (#848).** Every track load ends in `engine.setTracks`, which starts a new undo history. Steps made while a track is still loading, mixer moves included, cannot be undone once it has finished; the same happens when a track is added later, a file is dropped or a `src` changes.
 
 ## File Drop
 

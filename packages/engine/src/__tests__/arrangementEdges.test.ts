@@ -418,11 +418,13 @@ describe('skipAdapter when the arrangement call throws', () => {
 });
 
 describe('mixer entries of tracks that are gone', () => {
-  it('an entry is dropped when a new step clears the redo state that was the last to hold its track', () => {
+  it('an entry is not in the current Map while only the redo state holds its track, and is not found again once a new step clears it', () => {
     const arrangement = createArrangement({ tracks: fixture() });
     arrangement.addTrack(track('C', [], { volume: 0.2 }));
     arrangement.undo(); // only the redo stack holds C
-    expect(arrangement.getMixer().has('C')).toBe(true);
+    // Rule (#843): the current Map holds the current tracks only (the redo
+    // state holds C's entry in its own Map); before, `true`.
+    expect(arrangement.getMixer().has('C')).toBe(false);
     arrangement.moveClip('A', 'a1', 1000); // the redo stack is cleared
     expect(arrangement.getMixer().has('C')).toBe(false);
     arrangement.addTrack(track('C', [], { volume: 0.9 }));
@@ -433,9 +435,11 @@ describe('mixer entries of tracks that are gone', () => {
     const arrangement = createArrangement({ tracks: fixture(), undoLimit: 2 });
     arrangement.setTrackVolume('B', 0.2);
     arrangement.removeTrack('B');
-    expect(arrangement.getMixer().has('B')).toBe(true);
+    // Rule (#843): the current Map holds the current tracks only; the undo
+    // step holds B's entry in its own Map. Before, `true` here and below.
+    expect(arrangement.getMixer().has('B')).toBe(false);
     arrangement.moveClip('A', 'a1', 100);
-    expect(arrangement.getMixer().has('B')).toBe(true); // the removal is still undoable
+    expect(arrangement.getMixer().has('B')).toBe(false); // the removal is still undoable
     arrangement.moveClip('A', 'a1', 100);
     arrangement.moveClip('A', 'a1', 100);
     expect(arrangement.getMixer().has('B')).toBe(false);
@@ -562,11 +566,12 @@ describe('a track that is given a new id', () => {
     expect(arrangement.getMixer().get('C')?.volume).toBe(0.9);
   });
 
-  it('the old id’s entry stays while an undo step holds the track under that id', () => {
+  it('the old id’s entry leaves the current Map; the undo step holds it in its own', () => {
     const arrangement = createArrangement({ tracks: fixture() });
     arrangement.setTrackVolume('A', 0.3);
     arrangement.updateTrack('A', (current) => ({ ...current, id: 'Z' }));
-    expect(arrangement.getMixer().has('A')).toBe(true);
+    // Rule (#843): the current Map holds the current tracks only; before, `true`.
+    expect(arrangement.getMixer().has('A')).toBe(false);
   });
 
   it('undoing the change gives the old id its mix back', () => {

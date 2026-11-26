@@ -29,7 +29,7 @@ import {
   useActiveAnnotation,
   useEngineRefs,
   useArrangement,
-  useRecordingArm,
+  useRecordingTrack,
   useTrimPreviewOptional,
   useTrimPreviewPeaksOptional,
 } from '../contexts/playlistContexts';
@@ -208,10 +208,13 @@ const ArrangementProbeChild: React.FC = () => {
   return null;
 };
 
-// Reads the armed track (#812, internal).
-let armProbe: { value: ReturnType<typeof useRecordingArm>; renders: number };
-const ArmProbeChild: React.FC = () => {
-  armProbe = { value: useRecordingArm(), renders: (armProbe?.renders ?? 0) + 1 };
+// Reads the take's track (#812, internal).
+let recordingTrackProbe: { value: ReturnType<typeof useRecordingTrack>; renders: number };
+const RecordingTrackProbeChild: React.FC = () => {
+  recordingTrackProbe = {
+    value: useRecordingTrack(),
+    renders: (recordingTrackProbe?.renders ?? 0) + 1,
+  };
   return null;
 };
 
@@ -252,7 +255,7 @@ const CHILDREN = (
     <ControlsProbeChild />
     <TrimProbeChild />
     <ArrangementProbeChild />
-    <ArmProbeChild />
+    <RecordingTrackProbeChild />
     <LayoutSeekChild />
   </>
 );
@@ -509,13 +512,13 @@ describe('the arrangement value is the one given and never changes (#812)', () =
   });
 });
 
-// #812: the armed track is provider state with its own small value, so the
+// #812: the take's track is provider state with its own small value, so the
 // track controls follow a take without a mixer or a timeline change moving it.
-describe('the recording arm value changes only with the armed track (#812)', () => {
+describe("the recording-track value changes only with the take's track (#812)", () => {
   it('through a mixer change, a clip edit, an undo, play and pause, a zoom and a re-render with inline props', async () => {
     const { arrangement, rerender } = await mount({ inlineProps: true });
-    const { value, renders } = armProbe;
-    expect(value).toEqual({ armedTrackId: null });
+    const { value, renders } = recordingTrackProbe;
+    expect(value).toEqual({ recordingTrackId: null });
 
     await act(async () => {
       probe.editor.setTrackVolume('track-1', 0.4);
@@ -531,31 +534,31 @@ describe('the recording arm value changes only with the armed track (#812)', () 
       probe.controls.pause();
       rerender();
     });
-    // A session without an armed track arms nothing.
+    // A session without a track to record onto marks nothing.
     act(() => probe.editor.setRecordingActive(true));
     act(() => probe.editor.setRecordingActive(false));
 
-    expect(armProbe.value).toBe(value);
-    expect(armProbe.renders).toBe(renders);
+    expect(recordingTrackProbe.value).toBe(value);
+    expect(recordingTrackProbe.renders).toBe(renders);
   });
 
-  it('a new value when a track is armed, the same when it is armed again, a new one at the end', async () => {
+  it('a new value when a take starts on a track, the same when it is named again, a new one at the end', async () => {
     await mount();
     act(() => probe.editor.setRecordingActive(true, 'track-1'));
-    const armed = armProbe.value;
-    expect(armed).toEqual({ armedTrackId: 'track-1' });
-    const renders = armProbe.renders;
+    const recording = recordingTrackProbe.value;
+    expect(recording).toEqual({ recordingTrackId: 'track-1' });
+    const renders = recordingTrackProbe.renders;
 
     act(() => probe.editor.setRecordingActive(true, 'track-1'));
-    // The arm mute is a mixer change: it does not move the arm value.
+    // A mixer change does not move the recording-track value.
     act(() => probe.editor.setTrackVolume('track-1', 0.2));
-    expect(armProbe.value).toBe(armed);
-    expect(armProbe.renders).toBe(renders);
+    expect(recordingTrackProbe.value).toBe(recording);
+    expect(recordingTrackProbe.renders).toBe(renders);
 
     act(() => probe.editor.setRecordingActive(true, 'track-2'));
-    expect(armProbe.value).toEqual({ armedTrackId: 'track-2' });
+    expect(recordingTrackProbe.value).toEqual({ recordingTrackId: 'track-2' });
     act(() => probe.editor.setRecordingActive(false));
-    expect(armProbe.value).toEqual({ armedTrackId: null });
+    expect(recordingTrackProbe.value).toEqual({ recordingTrackId: null });
   });
 });
 

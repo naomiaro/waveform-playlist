@@ -11,10 +11,10 @@
 //    playback runs past the end of existing material. Consumers call
 //    setRecordingActive eagerly (before play()) — a render round-trip loses
 //    the race against the first animation frame on an empty timeline.
-// 4. setRecordingActive(active, armedTrackId) also transiently mutes the
-//    armed track for the session (punch-in replaces its overlapped content —
-//    the doomed material must not play under the take) and restores the
-//    previous mute state on release.
+// 4. setRecordingActive(active, recordingTrackId) also marks the track in the
+//    arrangement as the take's track (#843), which plays it muted (punch-in
+//    replaces its overlapped content — the doomed material must not play
+//    under the take); on release the track plays with its own mute again.
 // 5. Explicit ends still stop: selection playback passes a playDuration and
 //    stops at its end regardless.
 //
@@ -115,7 +115,7 @@ interface Probe {
   isPlaying: boolean;
   isReady: boolean;
   play: (startTime?: number, playDuration?: number) => Promise<void>;
-  setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
+  setRecordingActive: (active: boolean, recordingTrackId?: string | null) => void;
 }
 
 let probe: Probe;
@@ -266,7 +266,7 @@ describe('end-of-audio auto-stop semantics', () => {
   });
 });
 
-describe('setRecordingActive armed-track mute', () => {
+describe("setRecordingActive mutes the take's track", () => {
   beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -279,7 +279,7 @@ describe('setRecordingActive armed-track mute', () => {
     vi.restoreAllMocks();
   });
 
-  it('mutes the armed track for the session and restores it on release', async () => {
+  it("mutes the take's track for the session and restores it on release", async () => {
     const adapter = createFakeAdapter();
     const trackA = makeTrack('track-a', [makeClip(0, 2, 'clip-a')]);
     const trackB = makeTrack('track-b', [makeClip(0, 2, 'clip-b')]);
@@ -290,7 +290,7 @@ describe('setRecordingActive armed-track mute', () => {
       probe.setRecordingActive(true, 'track-a');
     });
     expect(adapter.muteCalls).toContainEqual({ trackId: 'track-a', muted: true });
-    // only the armed track is touched
+    // only the take's track is touched
     expect(adapter.muteCalls.some((c) => c.trackId === 'track-b')).toBe(false);
 
     adapter.muteCalls.length = 0;
@@ -313,7 +313,7 @@ describe('setRecordingActive armed-track mute', () => {
     expect(adapter.muteCalls.filter((c) => c.trackId === 'track-a')).toHaveLength(1);
   });
 
-  it('restores a previously-muted armed track to muted, not unmuted', async () => {
+  it("restores a previously-muted take's track to muted, not unmuted", async () => {
     const adapter = createFakeAdapter();
     const trackA = makeTrack('track-a', [makeClip(0, 2, 'clip-a')], /* muted */ true);
     mountProvider(adapter, [trackA]);
@@ -326,8 +326,12 @@ describe('setRecordingActive armed-track mute', () => {
     await act(async () => {
       probe.setRecordingActive(false);
     });
-    // release restores the pre-session state: still muted
-    expect(adapter.muteCalls).toContainEqual({ trackId: 'track-a', muted: true });
+    // release: the track plays with its own mute again, still muted.
+    // Rule (#843): the end of the take sends the mute the track now plays with, its
+    // own (`true`); the mute in the mix was never written. Before, the
+    // provider wrote the mute from before the session back with the setter.
+    // What matters is that it is never unmuted.
+    expect(adapter.muteCalls).toEqual([{ trackId: 'track-a', muted: true }]);
   });
 
   it('activation without a trackId does not touch any track mute', async () => {

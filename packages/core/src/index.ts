@@ -16,4 +16,6 @@ export * from './panStage';
 export * from './valueSource';
 export * from './sourceLoader';
 export * from './audioTrack';
+export { createMixerGesture } from './mixerGesture';
+export type { MixerGesture } from './mixerGesture';
 export * from './effects/registry';

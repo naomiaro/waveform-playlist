@@ -36,6 +36,7 @@ function stubAudioPipeline(editor: any) {
   };
   // Mock the engine so _ensureEngine resolves without building one.
   editor._engine = {
+    recordingTrackIds: new Set<string>(),
     setTracks: vi.fn(),
     addTrack: vi.fn(),
     removeTrack: vi.fn(),
@@ -191,23 +192,22 @@ describe('editor.updateTrack()', () => {
 
   it('applies directly to engine for non-DOM tracks (file drops)', () => {
     const editor = setupEditor();
-    const desc = {
-      name: 'File',
-      src: '',
-      volume: 1,
-      pan: 0,
-      muted: false,
-      soloed: false,
-      clips: [],
-    };
+    const desc = { name: 'File', src: '', clips: [] };
     editor._tracks = new Map([['file-id', desc]]);
     editor._engineTracks = new Map([['file-id', { id: 'file-id', clips: [] }]]);
 
     editor.updateTrack('file-id', { volume: 0.5, muted: true });
-    expect(editor._engine.setTrackVolume).toHaveBeenCalledWith('file-id', 0.5);
-    expect(editor._engine.setTrackMute).toHaveBeenCalledWith('file-id', true);
-    expect(editor._tracks.get('file-id').volume).toBe(0.5);
-    expect(editor._tracks.get('file-id').muted).toBe(true);
+    // One call is one undo step (#843): both setters carry one gesture id.
+    const gesture = { gesture: expect.any(String) };
+    expect(editor._engine.setTrackVolume).toHaveBeenCalledWith('file-id', 0.5, gesture);
+    expect(editor._engine.setTrackMute).toHaveBeenCalledWith('file-id', true, gesture);
+    expect(editor._engine.setTrackVolume.mock.calls[0][2]).toEqual(
+      editor._engine.setTrackMute.mock.calls[0][2]
+    );
+    expect(editor._engine.setTrackPan).not.toHaveBeenCalled();
+    // The mix is the arrangement's (#843): the descriptor holds no copy.
+    expect(editor._tracks.get('file-id')).not.toHaveProperty('volume');
+    expect(editor._tracks.get('file-id')).not.toHaveProperty('muted');
     editor.remove();
   });
 });
@@ -1341,18 +1341,19 @@ describe('audit wave 6 — lifecycle & rendering state', () => {
 
   it('synthesizes descriptors for engine tracks restored by undo', () => {
     const editor = setupEditor();
-
-    editor._reconcileDescriptorsWithEngineTracks([
-      {
-        id: 'ghost',
-        name: 'Guitar',
-        volume: 0.7,
-        pan: -0.2,
-        muted: false,
-        soloed: false,
-        clips: [],
-      },
-    ]);
+    const ghost = {
+      id: 'ghost',
+      name: 'Guitar',
+      volume: 0.7,
+      pan: -0.2,
+      muted: false,
+      soloed: false,
+      clips: [],
+    };
+    // As the statechange handler does: the engine tracks first (the mix is
+    // read from them, #843), then the reconcile.
+    editor._engineTracks = new Map([['ghost', ghost]]);
+    editor._reconcileDescriptorsWithEngineTracks([ghost]);
 
     // Undo restores the track in ENGINE state, but _tracks was purged at
     // removal — without a synthesized descriptor the track plays and renders

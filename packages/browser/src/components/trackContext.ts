@@ -10,6 +10,7 @@
  */
 import { createContext, use, type RefObject } from 'react';
 import type { RenderMode, TrackKind } from '@waveform-playlist/core';
+import type { MixerChangeOptions } from '@waveform-playlist/engine';
 import type { TrackMenuItem } from '@waveform-playlist/ui-components';
 
 /** What `useTrack()` returns: one track's identity, mixer state and bound actions. */
@@ -23,6 +24,7 @@ export interface TrackContextValue {
 
   /** The track's name, or "Track N" (N is the position, from 1) when it has none and while it is loading. */
   name: string;
+  /** The track's own mute, or true while a take is recording onto it (`isRecording`). */
   muted: boolean;
   soloed: boolean;
   /** 0 to 1. */
@@ -43,19 +45,24 @@ export interface TrackContextValue {
   hasSpectrogram: boolean;
   /**
    * True while a take is being recorded onto this track (`setRecordingActive`,
-   * `useRecordingSession`). The track is muted for the take and its mute from
-   * before is written back when the take ends, so a change made meanwhile does
-   * not stay: the built-in `<TrackMuteButton />` is disabled while this is
-   * true, and an app's own mute control can do the same.
+   * `useRecordingSession`). The track plays muted for the take and `muted` is
+   * true, while the track's own mute (`arrangement.getMixer()`) is not
+   * changed by the take: a mute set meanwhile stays after it (#843). The
+   * built-in `<TrackMuteButton />` is disabled while this is true; an app's
+   * own mute control can do the same, since toggling from `muted` here would
+   * set the track's own mute from the take's mute.
    */
-  isRecordingArmed: boolean;
+  isRecording: boolean;
 
   // Actions. Each keeps its identity while the track's slot is mounted and a
-  // track menu neither becomes available nor stops being so.
-  setMuted: (muted: boolean) => void;
-  setSoloed: (soloed: boolean) => void;
-  setVolume: (volume: number) => void;
-  setPan: (pan: number) => void;
+  // track menu neither becomes available nor stops being so. The four mixer
+  // actions are undo steps (#843); `options` (the engine's
+  // `MixerChangeOptions`) makes calls with one `gesture` id one step, or a
+  // value with `undoable: false` no step.
+  setMuted: (muted: boolean, options?: MixerChangeOptions) => void;
+  setSoloed: (soloed: boolean, options?: MixerChangeOptions) => void;
+  setVolume: (volume: number, options?: MixerChangeOptions) => void;
+  setPan: (pan: number, options?: MixerChangeOptions) => void;
   /** Makes this the selected track. */
   select: () => void;
   /** Moves the track one position up. Nothing happens for the first track. */

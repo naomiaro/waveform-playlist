@@ -333,7 +333,7 @@ async function stopTake(page: Page) {
 }
 
 // #812: a take carves the clips it overlaps, which only a loaded clip allows,
-// and the armed track is muted through the arrangement while it records.
+// and the track it records onto is muted through the arrangement meanwhile.
 test.describe('Recording example — the arrangement and a take', () => {
   test('recording is refused over a clip that is still loading', async ({ page, baseURL }) => {
     await page.addInitScript(holdDecodes);
@@ -418,7 +418,7 @@ test.describe('Recording example — the arrangement and a take', () => {
     await expect(row.locator('[data-clip-placeholder="true"]')).toHaveCount(0);
   });
 
-  test('the armed track’s mute button is disabled and shows muted during a take', async ({
+  test('the take’s track’s mute button is disabled and shows muted during a take', async ({
     page,
     baseURL,
   }) => {
@@ -428,31 +428,31 @@ test.describe('Recording example — the arrangement and a take', () => {
     await expect(page.locator('[data-track-row]')).toHaveCount(2);
     const mutes = page.getByRole('button', { name: 'Mute', exact: true });
     await expect(mutes).toHaveCount(2);
-    const armed = mutes.nth(1); // the track added last is selected
+    const takeTrack = mutes.nth(1); // the track added last is selected
     const other = mutes.nth(0);
-    await expect(armed).toBeEnabled();
-    await expect(armed).toHaveAttribute('aria-pressed', 'false');
+    await expect(takeTrack).toBeEnabled();
+    await expect(takeTrack).toHaveAttribute('aria-pressed', 'false');
 
     await page.getByRole('button', { name: 'Start recording' }).click();
     await expect(recordingButton(page)).toBeVisible({ timeout: 15000 });
-    await expect(armed).toBeDisabled();
-    await expect(armed).toHaveAttribute('aria-pressed', 'true');
-    // The other track is not armed: its mute is as it was.
+    await expect(takeTrack).toBeDisabled();
+    await expect(takeTrack).toHaveAttribute('aria-pressed', 'true');
+    // The take does not record onto the other track: its mute is as it was.
     await expect(other).toBeEnabled();
     await expect(other).toHaveAttribute('aria-pressed', 'false');
-    // The control: the unarmed track's Mute still toggles during the take,
-    // and the armed one stays muted and disabled meanwhile.
+    // The control: the other track's Mute still toggles during the take,
+    // and the take's track stays muted and disabled meanwhile.
     await other.click();
     await expect(other).toHaveAttribute('aria-pressed', 'true');
     await other.click();
     await expect(other).toHaveAttribute('aria-pressed', 'false');
-    await expect(armed).toBeDisabled();
-    await expect(armed).toHaveAttribute('aria-pressed', 'true');
+    await expect(takeTrack).toBeDisabled();
+    await expect(takeTrack).toHaveAttribute('aria-pressed', 'true');
 
     await stopTake(page);
-    // The value from before the take is written back.
-    await expect(armed).toBeEnabled();
-    await expect(armed).toHaveAttribute('aria-pressed', 'false');
+    // The track's own mute, which the take never wrote, shows again.
+    await expect(takeTrack).toBeEnabled();
+    await expect(takeTrack).toHaveAttribute('aria-pressed', 'false');
     await expect(other).toHaveAttribute('aria-pressed', 'false');
   });
 });

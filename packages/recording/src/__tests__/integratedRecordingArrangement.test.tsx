@@ -160,7 +160,7 @@ describe('a take is an edit of the arrangement (#812)', () => {
     expect(clipsOf(arrangement, 'new-track')).toHaveLength(0);
   });
 
-  it('the armed track removed during a take: the take ends with the could-not-be-saved error and changes nothing', async () => {
+  it('the track a take is recording onto, removed during the take: the take ends with the could-not-be-saved error and changes nothing', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const arrangement = arrangementOf([track('track-1'), track('track-2')]);
     const rendered = await mount(arrangement);

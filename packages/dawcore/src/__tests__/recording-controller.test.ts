@@ -27,6 +27,8 @@ let mockWorkletNode: any;
 let mockSource: any;
 
 import { RecordingController } from '../controllers/recording-controller';
+import { PlaylistEngine } from '@waveform-playlist/engine';
+import { createTrack } from '@waveform-playlist/core';
 
 function createMockHost() {
   const el = document.createElement('div');
@@ -371,86 +373,7 @@ describe('RecordingController', () => {
     );
   });
 
-  // --- armed-track transient mute (punch-in replaces the overlapped content,
-  // so the recorded-over track's existing material must not play under the take)
-
-  it('mutes the armed track for the session and restores it after stop', async () => {
-    host._engine = {
-      setTrackMute: vi.fn(),
-      getState: vi.fn(() => ({ tracks: [{ id: 'track-1', muted: false }] })),
-    };
-    const controller = new RecordingController(host);
-    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
-    expect(host._engine.setTrackMute).toHaveBeenCalledWith('track-1', true);
-
-    simulateWorkletData('track-1');
-    host._engine.setTrackMute.mockClear();
-    await controller.stopRecording();
-    expect(host._engine.setTrackMute).toHaveBeenCalledWith('track-1', false);
-  });
-
-  it('restores a previously-muted armed track to muted, not unmuted', async () => {
-    host._engine = {
-      setTrackMute: vi.fn(),
-      getState: vi.fn(() => ({ tracks: [{ id: 'track-1', muted: true }] })),
-    };
-    const controller = new RecordingController(host);
-    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
-    simulateWorkletData('track-1');
-    host._engine.setTrackMute.mockClear();
-    await controller.stopRecording();
-    expect(host._engine.setTrackMute).toHaveBeenCalledWith('track-1', true);
-  });
-
-  it('engages the armed-track mute before overdub playback starts', async () => {
-    host._engine = {
-      setTrackMute: vi.fn(),
-      getState: vi.fn(() => ({ tracks: [{ id: 'track-1', muted: false }] })),
-    };
-    host.play = vi.fn(() => Promise.resolve());
-    const controller = new RecordingController(host);
-    await controller.startRecording(createMockStream(), { trackId: 'track-1', overdub: true });
-
-    const muteOrder = host._engine.setTrackMute.mock.invocationCallOrder[0];
-    const playOrder = (host.play as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
-    expect(muteOrder).toBeLessThan(playOrder);
-  });
-
-  it('restores the armed-track mute when sessions are cleaned up on disconnect', async () => {
-    host._engine = {
-      setTrackMute: vi.fn(),
-      getState: vi.fn(() => ({ tracks: [{ id: 'track-1', muted: false }] })),
-    };
-    const controller = new RecordingController(host);
-    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
-    host._engine.setTrackMute.mockClear();
-
-    controller.hostDisconnected();
-
-    expect(host._engine.setTrackMute).toHaveBeenCalledWith('track-1', false);
-  });
-
-  it('restores armed-track mute when no audio data was captured', async () => {
-    host._engine = {
-      setTrackMute: vi.fn(),
-      getState: vi.fn(() => ({ tracks: [{ id: 'track-1', muted: false }] })),
-    };
-    const controller = new RecordingController(host);
-    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
-    host._engine.setTrackMute.mockClear();
-
-    // Stop without ever delivering worklet samples → "No audio data captured" path
-    await controller.stopRecording();
-
-    expect(controller.isRecording).toBe(false);
-    expect(host._engine.setTrackMute).toHaveBeenCalledWith('track-1', false);
-  });
-
   it('cleans up the session and dispatches daw-recording-error when finalization throws', async () => {
-    host._engine = {
-      setTrackMute: vi.fn(),
-      getState: vi.fn(() => ({ tracks: [{ id: 'track-1', muted: false }] })),
-    };
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
     simulateWorkletData('track-1');
@@ -459,7 +382,6 @@ describe('RecordingController', () => {
     vi.mocked(concatenateAudioData).mockImplementationOnce(() => {
       throw new Error('allocation failed');
     });
-    host._engine.setTrackMute.mockClear();
     const events: string[] = [];
     host.dispatchEvent = vi.fn((e: CustomEvent) => {
       events.push(e.type);
@@ -472,7 +394,6 @@ describe('RecordingController', () => {
 
     expect(controller.isRecording).toBe(false);
     expect(mockSource.disconnect).toHaveBeenCalled();
-    expect(host._engine.setTrackMute).toHaveBeenCalledWith('track-1', false);
     expect(events).toContain('daw-recording-error');
   });
 
@@ -1382,5 +1303,239 @@ describe('RecordingController', () => {
       480, // latencyOffsetSamples (from the override, not outputLatency)
       undefined // clipName
     );
+  });
+
+  // --- the take's mute (#843). Punch-in replaces what the take overlaps, so
+  // the recorded-over track must not play under the take: the controller
+  // mutes it through the engine (`setTrackRecording`), outside the undo
+  // history and leaving the stored mute alone, and clears that once on every
+  // path a session ends.
+  describe("the take's mute (#843)", () => {
+    const SET_THEN_CLEARED = [
+      ['track-1', true],
+      ['track-1', false],
+    ];
+
+    function recordingSpyEngine() {
+      return { setTrackRecording: vi.fn(), setTrackMute: vi.fn() };
+    }
+
+    it('a take mutes its track before overdub playback starts', async () => {
+      host._engine = recordingSpyEngine();
+      host.play = vi.fn(() => Promise.resolve());
+      const controller = new RecordingController(host);
+      await controller.startRecording(createMockStream(), { trackId: 'track-1', overdub: true });
+
+      expect(host._engine.setTrackRecording.mock.calls).toEqual([['track-1', true]]);
+      const muteOrder = host._engine.setTrackRecording.mock.invocationCallOrder[0];
+      const playOrder = (host.play as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
+      expect(muteOrder).toBeLessThan(playOrder);
+      // The take's mute is not the track's mute: the stored mute is never written.
+      expect(host._engine.setTrackMute).not.toHaveBeenCalled();
+    });
+
+    type Teardown = {
+      name: string;
+      options?: Record<string, unknown>;
+      before?: () => Promise<void> | void;
+      end: (controller: RecordingController) => Promise<void> | void;
+    };
+    const teardowns: Teardown[] = [
+      {
+        name: 'a take that is saved',
+        end: async (controller) => {
+          simulateWorkletData('track-1');
+          await controller.stopRecording();
+          expect(host._addRecordedClip).toHaveBeenCalled();
+        },
+      },
+      {
+        name: 'a take the app keeps (preventDefault)',
+        before: () => {
+          host.addEventListener('daw-recording-complete', (e: Event) => e.preventDefault());
+        },
+        end: async (controller) => {
+          simulateWorkletData('track-1');
+          await controller.stopRecording();
+          expect(host._addRecordedClip).not.toHaveBeenCalled();
+        },
+      },
+      {
+        name: 'no audio captured',
+        end: (controller) => controller.stopRecording(),
+      },
+      {
+        name: 'a take too short for the latency offset',
+        options: { latencyOffset: 2 }, // 96000 samples, more than the 48000 captured
+        end: async (controller) => {
+          simulateWorkletData('track-1');
+          await controller.stopRecording();
+          expect(host._addRecordedClip).not.toHaveBeenCalled();
+        },
+      },
+      {
+        name: 'a finalize that throws',
+        end: async (controller) => {
+          simulateWorkletData('track-1');
+          const { concatenateAudioData } = await import('@waveform-playlist/core');
+          vi.mocked(concatenateAudioData).mockImplementationOnce(() => {
+            throw new Error('allocation failed');
+          });
+          await controller.stopRecording();
+        },
+      },
+      {
+        name: 'a clip insertion that throws',
+        before: () => {
+          host._addRecordedClip = vi.fn(() => {
+            throw new Error('insert failed');
+          });
+        },
+        end: async (controller) => {
+          simulateWorkletData('track-1');
+          await controller.stopRecording();
+          expect(host._addRecordedClip).toHaveBeenCalled();
+        },
+      },
+      {
+        name: 'the editor disconnects',
+        end: (controller) => controller.hostDisconnected(),
+      },
+      {
+        name: 'an overdub start that fails after the take mutes its track',
+        options: { overdub: true },
+        before: () => {
+          host.play = vi.fn(() => Promise.reject(new Error('play failed')));
+        },
+        end: () => {},
+      },
+    ];
+
+    it.each(teardowns)("$name clears the take's mute once", async ({ options, before, end }) => {
+      host._engine = recordingSpyEngine();
+      await before?.();
+      const controller = new RecordingController(host);
+      await controller.startRecording(createMockStream(), { trackId: 'track-1', ...options });
+      await end(controller);
+
+      expect(controller.isRecording).toBe(false);
+      expect(host._engine.setTrackRecording.mock.calls).toEqual(SET_THEN_CLEARED);
+      expect(host._engine.setTrackMute).not.toHaveBeenCalled();
+    });
+
+    it('a start cancelled before its session exists mutes nothing', async () => {
+      host._engine = recordingSpyEngine();
+      const controller = new RecordingController(host);
+      const startPromise = controller.startRecording(createMockStream(), { trackId: 'track-1' });
+      await controller.stopRecording('track-1');
+      await startPromise;
+      expect(host._engine.setTrackRecording).not.toHaveBeenCalled();
+    });
+
+    it('two sessions mute two tracks, and ending one clears only its own', async () => {
+      // A worklet node per session, each acknowledging its own stop.
+      vi.stubGlobal(
+        'AudioWorkletNode',
+        vi.fn(function () {
+          const node: any = {
+            port: {
+              onmessage: null,
+              postMessage: vi.fn((msg: { command?: string }) => {
+                if (msg?.command === 'stop' && node.port.onmessage) {
+                  node.port.onmessage({ data: { channels: [], channelCount: 1, done: true } });
+                }
+              }),
+            },
+            disconnect: vi.fn(),
+          };
+          return node;
+        })
+      );
+      host._engine = recordingSpyEngine();
+      const controller = new RecordingController(host);
+      await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+      await controller.startRecording(createMockStream(), { trackId: 'track-2' });
+      expect(host._engine.setTrackRecording.mock.calls).toEqual([
+        ['track-1', true],
+        ['track-2', true],
+      ]);
+
+      await controller.stopRecording('track-1');
+      expect(host._engine.setTrackRecording.mock.calls).toEqual([
+        ['track-1', true],
+        ['track-2', true],
+        ['track-1', false],
+      ]);
+      expect(controller.getSession('track-2')).toBeDefined();
+
+      await controller.stopRecording('track-2');
+      expect(host._engine.setTrackRecording.mock.calls.slice(3)).toEqual([['track-2', false]]);
+    });
+
+    describe('with a real engine', () => {
+      function makeEngine() {
+        const adapter = {
+          audioContext: host.audioContext,
+          ppqn: 960,
+          setTracks: vi.fn(),
+          updateTrack: vi.fn(),
+          setTempo: vi.fn(),
+          play: vi.fn(),
+          pause: vi.fn(),
+          stop: vi.fn(),
+          seek: vi.fn(),
+          setTrackVolume: vi.fn(),
+          setTrackMute: vi.fn(),
+          setTrackSolo: vi.fn(),
+          setTrackPan: vi.fn(),
+          init: vi.fn().mockResolvedValue(undefined),
+          dispose: vi.fn(),
+          isPlaying: vi.fn().mockReturnValue(false),
+        };
+        const engine = new PlaylistEngine({ adapter: adapter as any, sampleRate: 48000 });
+        engine.setTracks([{ ...createTrack({ name: 'A' }), id: 'track-1' }]);
+        return { engine, adapter };
+      }
+      const mutedOf = (engine: PlaylistEngine) =>
+        engine.getState().tracks.find((t) => t.id === 'track-1')?.muted;
+
+      it('a take plays its track muted and makes no undo step', async () => {
+        const { engine, adapter } = makeEngine();
+        expect(engine.canUndo).toBe(false);
+        host._engine = engine;
+        const controller = new RecordingController(host);
+
+        await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+        expect(mutedOf(engine)).toBe(true);
+        expect(adapter.setTrackMute).toHaveBeenLastCalledWith('track-1', true);
+        expect(engine.canUndo).toBe(false);
+
+        simulateWorkletData('track-1');
+        await controller.stopRecording();
+        expect(mutedOf(engine)).toBe(false);
+        expect(adapter.setTrackMute).toHaveBeenLastCalledWith('track-1', false);
+        // The take's clip goes through the mocked _addRecordedClip, so the
+        // only history the take's mute could have made is none.
+        expect(engine.canUndo).toBe(false);
+      });
+
+      it('a mute changed during a take stays after it', async () => {
+        const { engine } = makeEngine();
+        host._engine = engine;
+        const controller = new RecordingController(host);
+        await controller.startRecording(createMockStream(), { trackId: 'track-1' });
+
+        engine.setTrackMute('track-1', true); // the user mutes the track mid-take
+        simulateWorkletData('track-1');
+        await controller.stopRecording();
+
+        expect(mutedOf(engine)).toBe(true);
+        // The user's mute is the one step; undoing it unmutes the track.
+        expect(engine.canUndo).toBe(true);
+        engine.undo();
+        expect(mutedOf(engine)).toBe(false);
+        expect(engine.canUndo).toBe(false);
+      });
+    });
   });
 });

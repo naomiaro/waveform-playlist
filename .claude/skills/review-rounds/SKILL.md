@@ -19,6 +19,7 @@ The rule itself is in root `CLAUDE.md`: the independent review covers the FINAL 
 - **A reviewer's "this is new" is checked on `dev` before it goes to the maintainer as a regression.** On #904 "dev snaps at once" (read) was wrong: the same probe on `dev`'s server showed the same ~270 ms hold, so the finding became a behaviour choice, not a regression. Copy the probe so it reads the same element on both branches.
 
 - **A finding whose cause is "not traced" is not a low yet.** On #812 two items of the final review listed as low and unrun were run afterwards: one moved the wrong clip on a drop (high, fixed), the other (a trim release differing from its preview, 2 of 1,065 random releases) led to clips overlapping after edits next to a loading clip and a negative start sent to the adapter (#859). Have the reviewer recover the failing seeds and reproduce them deterministically, with numbers, before the item goes into a PR text or to the maintainer.
+- **A rename is proven neutral by replaying random sequences through the old and new source.** On #843 the engine reviewer extracted the pre-rename source (`git show <sha>:<file>` into the scratchpad), ran 2,000 seeded sequences through both, and compared each step's state, history, versions and adapter calls: 2 runs differed, both from the one intended fix in the range.
 
 ## Briefing agents
 

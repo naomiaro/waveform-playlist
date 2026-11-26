@@ -12,9 +12,10 @@
  *
  * The mixer values (volume, mute, solo, pan) are a part of their own, a Map
  * by track id (`getMixer()`, ./mixer.ts). A setter replaces the Map and one
- * entry and no track object; the history holds tracks only, so an undo
- * never changes the mix. The entry of a removed track is kept while any
- * state of the history still holds the track, and dropped when none does.
+ * entry and no track object. The current Map holds an entry for each current
+ * track; a saved state (an undo or redo step, a transaction's base) holds the
+ * tracks AND the Map from its moment, so undo, redo and abort bring back the
+ * mix as well (#843).
  *
  * It knows nothing of adapters or playback. The engine subscribes with
  * `onChange` and makes the adapter call for each change it is told about.
@@ -44,15 +45,28 @@ import type { ArrangementSourcesValue } from './sources';
 import {
   EMPTY_HISTORY,
   beginBase,
+  dropRepeats,
+  mapHistoryStates,
+  mapHistoryTracks,
   purgeTrack,
   pushStep,
   redoStep,
-  sameTracks,
+  sameState,
+  stateWithMixerValues,
   undoStep,
-  withoutTrack,
+  withStateTracks,
+  writeThrough,
 } from './history';
-import type { History, TransactionBase } from './history';
-import { EMPTY_MIXER, carryMixerEntry, retainMixer, seedMixer, setMixerValues } from './mixer';
+import type { History, SavedState, TransactionBase } from './history';
+import {
+  EMPTY_MIXER,
+  carryMixerEntry,
+  mixerChanges,
+  mixerOf,
+  seedMixer,
+  setMixerValues,
+  withoutEntry,
+} from './mixer';
 import type { Mixer, TrackMixerValues } from './mixer';
 import { forLoadedClips, tickPreparer, withClips } from './ticks';
 import {
@@ -61,10 +75,11 @@ import {
   assertUniqueTrackIds,
   duplicateTrackId,
 } from './validate';
-import type { Arrangement, ClipBounds, RemoveTrackOptions } from './types';
+import type { Arrangement, ClipBounds, MixerChangeOptions, RemoveTrackOptions } from './types';
 
 const DEFAULT_MIN_DURATION_SECONDS = 0.1;
 const DEFAULT_UNDO_LIMIT = 100;
+const EMPTY_RECORDING: ReadonlySet<string> = new Set();
 
 /** What changed, for a subscriber that has to act on it (the engine's adapter sync). */
 export type ArrangementChange =
@@ -74,10 +89,18 @@ export type ArrangementChange =
   /** `previous`: the track object that was replaced (for a listener that sends only what differs). */
   | { type: 'update'; trackId: string; previous: ArrangementTrack }
   | { type: 'reorder' }
-  | { type: 'restore'; previous: readonly ArrangementTrack[] }
+  /**
+   * An undo, a redo or an abort that changed the tracks (and maybe the mix):
+   * `previous` and `previousMixer` are the tracks and the mix from before.
+   */
+  | { type: 'restore'; previous: readonly ArrangementTrack[]; previousMixer: Mixer }
+  /** An undo, a redo or an abort that changed the mix only. */
+  | { type: 'restoreMix'; previousMixer: Mixer }
   /** Audio arrived: loading clips of the current tracks became loaded clips. */
   | { type: 'load'; previous: readonly ArrangementTrack[] }
   | { type: 'mixer'; trackId: string; values: Partial<TrackMixerValues> }
+  /** A take started or ended recording onto a track (`recordingTrackIds` is another Set). */
+  | { type: 'recording'; trackId: string }
   | { type: 'recompute' }
   | { type: 'history' };
 
@@ -114,8 +137,23 @@ export class ArrangementImpl implements Arrangement {
   private _tracksVersion = 0;
   private _mixerVersion = 0;
   private _mixer: Mixer = EMPTY_MIXER;
+  /**
+   * The ids of the tracks a take is recording onto: outside the history and
+   * every saved state (#843). Replaced on a change, never written to.
+   */
+  private _recordingTrackIds: ReadonlySet<string> = EMPTY_RECORDING;
   private _history: History = EMPTY_HISTORY;
   private _transaction: TransactionBase | null = null;
+  /**
+   * The gesture of the top undo step, while a change of that gesture may
+   * still join it: its id, and the history from before its step was pushed
+   * (put back when the gesture returns to where it began, with the redo
+   * states and any step the undo limit evicted). Set when a gesture change
+   * pushes the step, cleared by anything else that touches the history
+   * (#843). `before` is kept in step with the history: the time base, the
+   * switch to loaded clips and `undoable: false` reach it too.
+   */
+  private _gesture: { readonly id: string; readonly before: History } | null = null;
   private _timeBase: ArrangementTimeBase | null;
   /** The ppqn the stored ticks are counted in. Null until an engine has attached. */
   private _tickPpqn: number | null;
@@ -236,18 +274,20 @@ export class ArrangementImpl implements Arrangement {
     // nothing here has changed and the arrangement is not attached.
     const prepare = tickPreparer(timeBase, this._tickPpqn);
     const tracks = prepare(this._tracks);
-    const history = {
-      undo: this._history.undo.map(prepare),
-      redo: this._history.redo.map(prepare),
+    const history = mapHistoryTracks(this._history, prepare);
+    const gesture = this._gesture && {
+      ...this._gesture,
+      before: mapHistoryTracks(this._gesture.before, prepare),
     };
     const transaction = this._transaction && {
       ...this._transaction,
-      tracks: prepare(this._transaction.tracks),
+      state: withStateTracks(this._transaction.state, prepare(this._transaction.state.tracks)),
     };
 
     this._timeBase = timeBase;
     this._tickPpqn = timeBase.ppqn;
     this._history = history;
+    this._gesture = gesture;
     this._transaction = transaction;
     if (tracks !== this._tracks) {
       this._tracks = tracks;
@@ -273,24 +313,27 @@ export class ArrangementImpl implements Arrangement {
 
   undo(): void {
     this._abortOpenTransaction();
-    const step = undoStep(this._history, this._tracks);
+    this._gesture = null;
+    const step = undoStep(this._history, this._currentState());
     if (!step) return;
     this._history = step.history;
-    this._restoreTracks(step.tracks);
+    // A step that equals the current state still moved the history.
+    if (!this._restoreState(step.state)) this._emit({ type: 'history' });
   }
 
   redo(): void {
     this._abortOpenTransaction();
-    const step = redoStep(this._history, this._tracks);
+    this._gesture = null;
+    const step = redoStep(this._history, this._currentState());
     if (!step) return;
     this._history = step.history;
-    this._restoreTracks(step.tracks);
+    if (!this._restoreState(step.state)) this._emit({ type: 'history' });
   }
 
   clearHistory(): void {
     const hadHistory = this.canUndo || this.canRedo;
     this._history = EMPTY_HISTORY;
-    this._mixer = retainMixer(this._mixer, this._heldStates());
+    this._gesture = null;
     if (hadHistory) this._emit({ type: 'history' });
   }
 
@@ -302,7 +345,8 @@ export class ArrangementImpl implements Arrangement {
       );
     }
     const replaced = this._transaction !== null;
-    this._transaction = beginBase(this._tracks);
+    this._transaction = beginBase(this._currentState());
+    this._gesture = null;
     // The base that was dropped may have been the last state naming a source.
     if (replaced) this._resyncSourcesQuietly();
   }
@@ -314,11 +358,12 @@ export class ArrangementImpl implements Arrangement {
       return;
     }
     this._transaction = null;
+    this._gesture = null;
     // Only push undo entry if mutations actually occurred during the transaction.
     // Without this, no-op drags (e.g., against a boundary) create phantom undo entries.
-    // ... and only if the tracks are not back where the transaction began.
-    if (transaction.changed && !sameTracks(transaction.tracks, this._tracks)) {
-      this._pushStep(transaction.tracks);
+    // ... and only if the tracks and the mix are not back where the transaction began.
+    if (transaction.changed && !sameState(transaction.state, this._currentState())) {
+      this._pushStep(transaction.state);
       this._emit({ type: 'history' });
     }
   }
@@ -347,11 +392,12 @@ export class ArrangementImpl implements Arrangement {
     // Everything before is replaced, an open transaction included.
     this._transaction = null;
     this._history = EMPTY_HISTORY;
-    // An id that is in the tracks being replaced keeps its mix; every other
-    // entry is dropped (a track that only the history held is gone with it).
-    const kept = retainMixer(this._mixer, [this._tracks]);
+    this._gesture = null;
+    // An id that is in the tracks being replaced keeps its mix (the current
+    // Map holds the current tracks only); a new id is seeded, and the entry of
+    // an id that is not in the new tracks is dropped.
     this._tracks = tracks.map((track) => this._ingest(track));
-    this._mixer = retainMixer(seedMixer(kept, this._tracks), [this._tracks]);
+    this._mixer = mixerOf(this._mixer, this._tracks);
     this._tracksVersion++;
     this._emit({ type: 'set' });
   }
@@ -381,6 +427,9 @@ export class ArrangementImpl implements Arrangement {
     if (!this._tracks.some((t) => t.id === trackId)) return;
     this._pushUndoSnapshot();
     this._tracks = this._tracks.filter((t) => t.id !== trackId);
+    // The saved state from before keeps the entry; the current Map holds
+    // the current tracks only. Dropping is not a mixer change.
+    this._mixer = withoutEntry(this._mixer, trackId);
     this._tracksVersion++;
     this._emit({ type: 'remove', trackId });
   }
@@ -433,10 +482,9 @@ export class ArrangementImpl implements Arrangement {
     // A clip object this track already holds is kept, in either form.
     const enriched = this._ingest(track, new Set(current.clips));
     this._tracks = this._tracks.map((t) => (t.id === trackId ? enriched : t));
-    // A track that is given a new id takes its mix with it; the old id's
-    // entry goes unless a stored state still holds a track of that id.
+    // A track that is given a new id takes its mix with it, and the old id's
+    // entry goes (the saved state from before keeps it).
     this._mixer = seedMixer(carryMixerEntry(this._mixer, trackId, enriched.id), [enriched]);
-    if (enriched.id !== trackId) this._mixer = retainMixer(this._mixer, this._heldStates());
     this._tracksVersion++;
     this._emit({ type: 'update', trackId, previous: current });
   }
@@ -490,23 +538,56 @@ export class ArrangementImpl implements Arrangement {
   //
   // Each replaces the Map and one entry, bumps mixerVersion and announces
   // the change. NOT structural changes: no track object is replaced,
-  // tracksVersion stays (#501), and they are not undo steps. An id that is
-  // not in the current tracks does nothing.
+  // tracksVersion stays (#501). Each call is an undo step; inside an open
+  // transaction it is part of it, like any other change. Calls with one
+  // `gesture` id, one after another, are one step; `undoable: false` is no
+  // step and is written into every saved state (#843). A value that does
+  // not change, or an id that is not in the current tracks, does nothing.
 
-  setTrackVolume(trackId: string, volume: number): void {
-    this._setMixerValues(trackId, { volume });
+  setTrackVolume(trackId: string, volume: number, options?: MixerChangeOptions): void {
+    this._setMixerValues(trackId, { volume }, options);
   }
 
-  setTrackMute(trackId: string, muted: boolean): void {
-    this._setMixerValues(trackId, { muted });
+  setTrackMute(trackId: string, muted: boolean, options?: MixerChangeOptions): void {
+    this._setMixerValues(trackId, { muted }, options);
   }
 
-  setTrackSolo(trackId: string, soloed: boolean): void {
-    this._setMixerValues(trackId, { soloed });
+  setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void {
+    this._setMixerValues(trackId, { soloed }, options);
   }
 
-  setTrackPan(trackId: string, pan: number): void {
-    this._setMixerValues(trackId, { pan });
+  setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void {
+    this._setMixerValues(trackId, { pan }, options);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Recording mute (the track a take is recording onto)
+  // ---------------------------------------------------------------------------
+  //
+  // The track a take is recording onto plays muted: the engine's projection
+  // and the adapter get `muted: stored || recording`, and the stored mute in
+  // `getMixer()` is not touched. The set is outside the history: the take's
+  // mute is no undo step, and undo, redo, abort, `setTracks` and
+  // `clearHistory` leave it alone (#843).
+
+  /** The ids of the tracks a take is recording onto. The same Set until it changes; never written to. */
+  get recordingTrackIds(): ReadonlySet<string> {
+    return this._recordingTrackIds;
+  }
+
+  /**
+   * Mark a track as the one a take is recording onto, or clear it. An id
+   * that is not in the current tracks is recorded too, and mutes nothing
+   * until a track of that id enters. The same value does nothing.
+   */
+  setTrackRecording(trackId: string, recording: boolean): void {
+    if (this._recordingTrackIds.has(trackId) === recording) return;
+    this._recordingTrackIds = recording
+      ? new Set([...this._recordingTrackIds, trackId])
+      : new Set([...this._recordingTrackIds].filter((id) => id !== trackId));
+    // Only a current track's projection changes (the cache follows mixerVersion).
+    if (this._mixer.has(trackId)) this._mixerVersion++;
+    this._emit({ type: 'recording', trackId });
   }
 
   // ---------------------------------------------------------------------------
@@ -588,41 +669,120 @@ export class ArrangementImpl implements Arrangement {
     };
   }
 
-  private _setMixerValues(trackId: string, values: Partial<TrackMixerValues>): void {
-    // The entry of a removed track is kept for an undo; it is not a track to mix.
+  private _setMixerValues(
+    trackId: string,
+    values: Partial<TrackMixerValues>,
+    options: MixerChangeOptions = {}
+  ): void {
     if (!this._tracks.some((t) => t.id === trackId)) return;
     const next = setMixerValues(this._mixer, trackId, values);
     if (next === this._mixer) return;
-    this._mixer = next;
+    if (options.undoable === false) {
+      this._writeMixerThrough(trackId, values, next);
+    } else {
+      this._recordMixerChange(options.gesture);
+      this._mixer = next;
+      this._dropReturnedGestureStep();
+    }
     this._mixerVersion++;
     this._emit({ type: 'mixer', trackId, values });
   }
 
-  /** Every tracks array the arrangement can still return to, and the current one. */
+  /**
+   * The undo step of a mixer change about to be made: part of an open
+   * transaction, the top step when it was pushed by the same gesture and
+   * nothing has touched the history since, or else a new step (which becomes
+   * that gesture's).
+   */
+  private _recordMixerChange(gesture: string | undefined): void {
+    if (this._transaction) {
+      this._markTransactionChanged();
+      return;
+    }
+    if (gesture !== undefined && this._gesture?.id === gesture) return;
+    const before = this._history;
+    this._pushStep(this._currentState());
+    // An undo limit of 0 keeps no step for the gesture to join.
+    if (gesture !== undefined && this.canUndo) this._gesture = { id: gesture, before };
+  }
+
+  /**
+   * A gesture that came back to the state its step holds leaves no step, and
+   * the history is the one it found: the redo states its first change
+   * cleared come back (as with a transaction that changes nothing).
+   */
+  private _dropReturnedGestureStep(): void {
+    const gesture = this._gesture;
+    if (!gesture) return;
+    const { undo } = this._history;
+    if (!sameState(undo[undo.length - 1], this._currentState())) return;
+    this._history = dropRepeats(gesture.before, this._currentState());
+    this._gesture = null;
+  }
+
+  /**
+   * `undoable: false`: the value in the current mix and in every saved state
+   * that has an entry for the track, so that no undo, redo or abort brings
+   * the old one back. A step that no longer differs from the state next to
+   * it goes; when that was the step a gesture joins and no equal step is
+   * left on top, the gesture's next change pushes a new one.
+   */
+  private _writeMixerThrough(
+    trackId: string,
+    values: Partial<TrackMixerValues>,
+    next: Mixer
+  ): void {
+    this._mixer = next;
+    const write = stateWithMixerValues(trackId, values);
+    const { undo } = this._history;
+    const top = undo.length > 0 ? write(undo[undo.length - 1]) : undefined;
+    const written = writeThrough(this._history, this._transaction, this._currentState(), write);
+    this._history = written.history;
+    this._transaction = written.base;
+    if (this._gesture) {
+      // The top may be another object that equals the gesture's step: a step
+      // below it that the write made equal to it (`dropRepeats` keeps the
+      // older of two equal steps). It holds where the gesture began, so the
+      // gesture goes on joining it.
+      const newTop = this._history.undo[this._history.undo.length - 1];
+      this._gesture =
+        newTop !== undefined && top !== undefined && sameState(newTop, top)
+          ? { ...this._gesture, before: mapHistoryStates(this._gesture.before, write) }
+          : null;
+    }
+  }
+
+  /** The tracks and the mix as they are now: what an undo step or a transaction's base saves. */
+  private _currentState(): SavedState {
+    return { tracks: this._tracks, mixer: this._mixer };
+  }
+
+  /** Every tracks array the arrangement can still return to, and the current one (for the sources). */
   private _heldStates(): ReadonlyArray<readonly ArrangementTrack[]> {
     return [
       this._tracks,
-      ...this._history.undo,
-      ...this._history.redo,
-      ...(this._transaction ? [this._transaction.tracks] : []),
+      ...this._history.undo.map((state) => state.tracks),
+      ...this._history.redo.map((state) => state.tracks),
+      ...(this._gesture ? this._gesture.before.undo.map((state) => state.tracks) : []),
+      ...(this._gesture ? this._gesture.before.redo.map((state) => state.tracks) : []),
+      ...(this._transaction ? [this._transaction.state.tracks] : []),
     ];
   }
 
   /** `removeTrack` with `undoable: false`: out of the current tracks and out of every stored state. */
   private _removeTrackEverywhere(trackId: string): void {
     const wasThere = this._tracks.some((t) => t.id === trackId);
-    const purged = purgeTrack(this._history, this._tracks, trackId);
+    // An abort goes back to the base: the track must not be in it either.
+    const base = this._transaction?.state ?? null;
+    const purged = purgeTrack(this._history, this._currentState(), trackId, base);
     const historyChanged = purged.history !== this._history;
     this._history = purged.history;
-    if (this._transaction) {
-      // An abort goes back to the base: the track must not be in it either.
-      this._transaction = {
-        ...this._transaction,
-        tracks: withoutTrack(this._transaction.tracks, trackId),
-      };
+    this._gesture = null;
+    if (this._transaction && purged.base) {
+      this._transaction = { ...this._transaction, state: purged.base };
     }
-    this._tracks = purged.current;
-    this._mixer = retainMixer(this._mixer, this._heldStates());
+    this._tracks = purged.current.tracks;
+    this._mixer = purged.current.mixer;
     if (wasThere) {
       this._tracksVersion++;
       this._emit({ type: 'remove', trackId });
@@ -637,36 +797,60 @@ export class ArrangementImpl implements Arrangement {
   /** The state before a change: an undo step, or the mark that an open transaction changed. */
   private _pushUndoSnapshot(): void {
     if (this._transaction) {
-      if (!this._transaction.changed) {
-        this._transaction = { ...this._transaction, changed: true };
-      }
+      this._markTransactionChanged();
       return;
     }
-    this._pushStep(this._tracks);
+    this._pushStep(this._currentState());
   }
 
-  /** Add an undo step. The history may let go of states with it (the redo stack, a step past the limit). */
-  private _pushStep(tracks: readonly ArrangementTrack[]): void {
-    const letsGo = this._history.redo.length > 0 || this._history.undo.length >= this.undoLimit;
-    this._history = pushStep(this._history, tracks, this.undoLimit);
-    if (letsGo) this._mixer = retainMixer(this._mixer, this._heldStates());
+  /** An open transaction has changed something. */
+  private _markTransactionChanged(): void {
+    if (this._transaction && !this._transaction.changed) {
+      this._transaction = { ...this._transaction, changed: true };
+    }
   }
 
-  private _restoreTracks(snapshot: readonly ArrangementTrack[]): void {
+  /** Add an undo step. No gesture joins it (a gesture change that pushes sets its id after). */
+  private _pushStep(state: SavedState): void {
+    this._history = pushStep(this._history, state, this.undoLimit);
+    this._gesture = null;
+  }
+
+  /**
+   * Make a saved state the current one (an undo, a redo, an abort) and
+   * announce it: `'restore'` when the tracks array is another one (with the
+   * mix from before, which may differ too), `'restoreMix'` when only mixer
+   * values differ. `mixerVersion` counts it when a track that is in both
+   * states has other values; an entry that comes or goes with its track is
+   * not a mixer change. Returns false when nothing differed and nothing was
+   * announced.
+   */
+  private _restoreState(state: SavedState): boolean {
     const previous = this._tracks;
-    this._tracks = snapshot;
-    this._tracksVersion++;
-    this._emit({ type: 'restore', previous });
+    const previousMixer = this._mixer;
+    const tracksChanged = state.tracks !== previous;
+    const mixChanged = mixerChanges(previousMixer, state.mixer).length > 0;
+    this._tracks = state.tracks;
+    this._mixer = state.mixer;
+    if (mixChanged) this._mixerVersion++;
+    if (tracksChanged) {
+      this._tracksVersion++;
+      this._emit({ type: 'restore', previous, previousMixer });
+    } else if (mixChanged) {
+      this._emit({ type: 'restoreMix', previousMixer });
+    }
+    return tracksChanged || mixChanged;
   }
 
-  /** Ends an open transaction, restoring the tracks it began from if it changed them. */
+  /** Ends an open transaction, restoring the state it began from if it changed anything. */
   private _abortOpenTransaction(): void {
     const transaction = this._transaction;
     if (!transaction) return;
     this._transaction = null;
+    this._gesture = null;
     // Only restore if mutations occurred — avoids full adapter rebuild on click
     if (transaction.changed) {
-      this._restoreTracks(transaction.tracks);
+      this._restoreState(transaction.state);
     }
   }
 
@@ -693,12 +877,19 @@ export class ArrangementImpl implements Arrangement {
     const pass = this._sources.beginPass((startSample) => this._tickAt(startSample));
     const previous = this._tracks;
     this._tracks = pass.current(previous);
-    this._history = {
-      undo: this._history.undo.map(pass.stored),
-      redo: this._history.redo.map(pass.stored),
-    };
+    this._history = mapHistoryTracks(this._history, pass.stored);
+    if (this._gesture) {
+      this._gesture = {
+        ...this._gesture,
+        before: mapHistoryTracks(this._gesture.before, pass.stored),
+      };
+    }
     if (this._transaction) {
-      this._transaction = { ...this._transaction, tracks: pass.stored(this._transaction.tracks) };
+      const { state } = this._transaction;
+      this._transaction = {
+        ...this._transaction,
+        state: withStateTracks(state, pass.stored(state.tracks)),
+      };
     }
     return this._tracks === previous ? null : previous;
   }
@@ -728,15 +919,13 @@ export class ArrangementImpl implements Arrangement {
   private _emit(change: ArrangementChange): void {
     // The states may name other sources now, and a clip that came in may name
     // one that is loaded already: it is a loaded clip before anyone is told.
-    const switched = change.type === 'mixer' ? null : this._syncSources();
+    // A change of the mix alone (or of the take's mute) names no other source.
+    const mixOnly =
+      change.type === 'mixer' || change.type === 'restoreMix' || change.type === 'recording';
+    const switched = mixOnly ? null : this._syncSources();
     // Every change announces itself here, so this is where a new state is
     // frozen (outside production builds) before anyone can read it.
     freezeTracksInDevelopment(this._tracks);
-    // A track can have left the last state that held it: its mixer entry goes
-    // with it. (A step that leaves the history is handled where it leaves.)
-    if (change.type === 'remove' || change.type === 'restore') {
-      this._mixer = retainMixer(this._mixer, this._heldStates());
-    }
     const at: ArrangementVersions = {
       tracksVersion: this._tracksVersion,
       mixerVersion: this._mixerVersion,

@@ -4,6 +4,20 @@ import type { PropertyValues } from 'lit';
 import type { RenderMode, SpectrogramConfig, TrackKind } from '@waveform-playlist/core';
 import type { EffectState as TrackEffectState, SerializedEffectEntry } from '../effects/types';
 import { normalizeRenderMode } from '../types';
+import type { DawTrackUpdateDetail } from '../events';
+
+/** The properties whose change the editor hears about (`daw-track-update`). */
+const TRACK_PROPS: readonly string[] = [
+  'volume',
+  'pan',
+  'muted',
+  'soloed',
+  'src',
+  'name',
+  'kind',
+  'renderMode',
+  'spectrogramConfig',
+];
 
 /** Structural view of the editor's public per-track effects API (keyed by
  *  trackId) — avoids a value-import cycle between daw-track and daw-editor.
@@ -205,25 +219,18 @@ export class DawTrackElement extends LitElement {
       return;
     }
 
-    const trackProps = [
-      'volume',
-      'pan',
-      'muted',
-      'soloed',
-      'src',
-      'name',
-      'kind',
-      'renderMode',
-      'spectrogramConfig',
-    ];
-    const hasTrackChange = trackProps.some((p) => changed.has(p as keyof this));
+    // The names go in the event (#843): the editor sends a mixer property
+    // only when it is one of them, so an unrelated change (a rename after an
+    // Undo) never writes the element's older volume back.
+    const trackChanged = TRACK_PROPS.filter((p) => changed.has(p as keyof this));
 
-    if (hasTrackChange) {
+    if (trackChanged.length > 0) {
+      const detail: DawTrackUpdateDetail = { trackId: this.trackId, changed: trackChanged };
       this.dispatchEvent(
         new CustomEvent('daw-track-update', {
           bubbles: true,
           composed: true,
-          detail: { trackId: this.trackId },
+          detail,
         })
       );
     }

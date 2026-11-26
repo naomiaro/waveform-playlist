@@ -340,9 +340,19 @@ describe('WaveformPlaylistProvider on an arrangement (#812)', () => {
     act(() => moveClipByDrag(0, 'a1', ONE_SECOND_PX));
     act(() => moveClipByDrag(0, 'a1', ONE_SECOND_PX));
     act(() => probe.editor.setTrackVolume('A', 0.25));
+    // Rule (#843): the volume change is an undo step of its own, so the first
+    // undo takes it back and the second the last move. Before, one undo took
+    // back the last move and the volume stayed at 0.25 (also in the rebuilt
+    // adapter's setTracks).
+    act(() => probe.editor.undo());
+    expect(startOf(0, 'a1')).toBe(2 * RATE);
+    expect(probe.mixer.trackStates[0].volume).toBe(1);
+    act(() => probe.editor.redo());
+    expect(probe.mixer.trackStates[0].volume).toBe(0.25);
+    act(() => probe.editor.undo());
     act(() => probe.editor.undo());
     expect(startOf(0, 'a1')).toBe(RATE);
-    expect(probe.mixer.trackStates[0].volume).toBe(0.25);
+    expect(probe.mixer.trackStates[0].volume).toBe(1);
 
     await act(async () => {
       gate.open();
@@ -355,7 +365,7 @@ describe('WaveformPlaylistProvider on an arrangement (#812)', () => {
       | ArrangementTrack[]
       | undefined;
     expect((sent?.[0].clips[0] as AudioClip).startSample).toBe(RATE);
-    expect(sent?.[0].volume).toBe(0.25);
+    expect(sent?.[0].volume).toBe(1);
 
     await act(async () => {
       await probe.controls.play(0);

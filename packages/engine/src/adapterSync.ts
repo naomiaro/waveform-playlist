@@ -4,7 +4,8 @@
  * The engine subscribes to its arrangement and hands each change here; this
  * makes the adapter call for it. It also holds the projection the adapter
  * and `getState()` are given: the arrangement's tracks without the clips
- * that are still loading and with the current mixer values in their fields. Everything here is derived from the
+ * that are still loading and with the current mixer values in their fields
+ * (the track a take is recording onto muted, #843). Everything here is derived from the
  * arrangement or is bookkeeping about what the adapter was sent; nothing is
  * written back.
  */
@@ -17,12 +18,15 @@ import type {
   ArrangementVersions,
 } from './arrangement/Arrangement';
 import { freezeTrackInDevelopment, freezeTracksInDevelopment } from './arrangement/devFreeze';
-import { withMixerValues } from './arrangement/mixer';
-import type { TrackMixerValues } from './arrangement/mixer';
+import { mixerChanges, withMixerValues } from './arrangement/mixer';
+import type { Mixer, TrackMixerValues } from './arrangement/mixer';
 import type { PlayoutAdapter } from './types';
 
 /** A change to the tracks: the ones that can need an adapter track call. */
-export type TracksChange = Exclude<ArrangementChange, { type: 'mixer' | 'reorder' | 'history' }>;
+export type TracksChange = Exclude<
+  ArrangementChange,
+  { type: 'mixer' | 'restoreMix' | 'recording' | 'reorder' | 'history' }
+>;
 
 export class AdapterSync {
   /**
@@ -49,7 +53,7 @@ export class AdapterSync {
   } | null = null;
   private _withMixMemo = new WeakMap<
     ClipTrack,
-    { values: TrackMixerValues | undefined; merged: ClipTrack }
+    { values: TrackMixerValues | undefined; recording: boolean; merged: ClipTrack }
   >();
   /** Per track object of the arrangement that holds a loading clip: the track without them. */
   private _loadedMemo = new WeakMap<ArrangementTrack, ClipTrack>();
@@ -61,8 +65,8 @@ export class AdapterSync {
 
   /**
    * The arrangement's tracks, each without its loading clips and with the
-   * current mixer values in its fields: what every adapter track call and
-   * `getState().tracks` use. The same
+   * current mixer values in its fields (muted while a take records onto it): what every
+   * adapter track call and `getState().tracks` use. The same
    * array until the tracks or the mix change, and the same track object
    * while neither that track nor its mix changed.
    */
@@ -108,12 +112,30 @@ export class AdapterSync {
     return true;
   }
 
-  /** A mixer value changed: the adapter's setter for it. */
+  /**
+   * A mixer value changed: the adapter's setter for it. The mute sent is the
+   * one the track plays with: muted while a take records onto the track,
+   * whatever the value given.
+   */
   sendMixerValues(trackId: string, values: Partial<TrackMixerValues>): void {
     if (values.volume !== undefined) this._adapter?.setTrackVolume(trackId, values.volume);
-    if (values.muted !== undefined) this._adapter?.setTrackMute(trackId, values.muted);
+    if (values.muted !== undefined) {
+      this._adapter?.setTrackMute(trackId, values.muted || this._recordingNow(trackId));
+    }
     if (values.soloed !== undefined) this._adapter?.setTrackSolo(trackId, values.soloed);
     if (values.pan !== undefined) this._adapter?.setTrackPan(trackId, values.pan);
+  }
+
+  /**
+   * After an undo, a redo or an abort brought back another mix: the setter
+   * for each field that differs, of each current track that had an entry in
+   * `previousMixer` too. A track that entered with the restore was sent
+   * whole, with its mix in its fields.
+   */
+  sendMixerDiff(previousMixer: Mixer): void {
+    for (const { trackId, values } of mixerChanges(previousMixer, this._arrangement.getMixer())) {
+      this.sendMixerValues(trackId, values);
+    }
   }
 
   /**
@@ -263,13 +285,29 @@ export class AdapterSync {
     return loaded;
   }
 
-  /** One track with its current mixer values in its fields (memoized per track object). */
+  /**
+   * True when a take is recording onto the track and it is a current track
+   * (it has an entry in the current mix): it plays muted. A recording id that
+   * is not in the tracks mutes nothing until it enters.
+   */
+  private _recordingNow(trackId: string): boolean {
+    return (
+      this._arrangement.recordingTrackIds.has(trackId) && this._arrangement.getMixer().has(trackId)
+    );
+  }
+
+  /**
+   * One track with its current mixer values in its fields, muted while a
+   * take records onto it (memoized per track object).
+   */
   private _withMix(track: ClipTrack): ClipTrack {
     const values = this._arrangement.getMixer().get(track.id);
+    const recording = this._recordingNow(track.id);
     const memo = this._withMixMemo.get(track);
-    if (memo && memo.values === values) return memo.merged;
-    const merged = freezeTrackInDevelopment(withMixerValues(track, values));
-    this._withMixMemo.set(track, { values, merged });
+    if (memo && memo.values === values && memo.recording === recording) return memo.merged;
+    const playing = recording && values && !values.muted ? { ...values, muted: true } : values;
+    const merged = freezeTrackInDevelopment(withMixerValues(track, playing));
+    this._withMixMemo.set(track, { values, recording, merged });
     return merged;
   }
 }

@@ -65,6 +65,29 @@ describe('DawTrackElement', () => {
     document.body.removeChild(track);
   });
 
+  it('daw-track-update names the changed properties (#843)', async () => {
+    const track = document.createElement('daw-track') as any;
+    document.body.appendChild(track);
+    await track.updateComplete;
+
+    const details: any[] = [];
+    track.addEventListener('daw-track-update', (e: CustomEvent) => details.push(e.detail));
+
+    // One update, two track properties.
+    track.volume = 0.5;
+    track.pan = -0.25;
+    await track.updateComplete;
+    // Then only the name.
+    track.setAttribute('name', 'Vocals');
+    await track.updateComplete;
+
+    expect(details).toEqual([
+      { trackId: track.trackId, changed: ['volume', 'pan'] },
+      { trackId: track.trackId, changed: ['name'] },
+    ]);
+    document.body.removeChild(track);
+  });
+
   it('defaults renderMode to "waveform"', () => {
     const el = document.createElement('daw-track') as any;
     expect(el.renderMode).toBe('waveform');
@@ -108,7 +131,7 @@ describe('DawTrackElement', () => {
     el.renderMode = 'spectrogram';
     await el.updateComplete;
 
-    expect(detail).toEqual({ trackId: el.trackId });
+    expect(detail).toEqual({ trackId: el.trackId, changed: ['renderMode'] });
     document.body.removeChild(el);
   });
 

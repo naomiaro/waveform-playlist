@@ -161,6 +161,31 @@ describe('mixer setters take a track id', () => {
     ]);
   });
 
+  it('passes the undo options on to the arrangement (#843)', async () => {
+    const { arrangement } = mount([makeTrack('a')]);
+    await waitFor(() => expect(probe.isReady).toBe(true));
+    const spies = {
+      volume: vi.spyOn(arrangement, 'setTrackVolume'),
+      mute: vi.spyOn(arrangement, 'setTrackMute'),
+      solo: vi.spyOn(arrangement, 'setTrackSolo'),
+      pan: vi.spyOn(arrangement, 'setTrackPan'),
+    };
+    const gesture = { gesture: 'g1' };
+    const notAStep = { undoable: false } as const;
+
+    act(() => {
+      probe.controls.setTrackVolume('a', 0.5, gesture);
+      probe.controls.setTrackMute('a', true, notAStep);
+      probe.controls.setTrackSolo('a', true, gesture);
+      probe.controls.setTrackPan('a', 0.5, notAStep);
+    });
+
+    expect(spies.volume.mock.calls).toEqual([['a', 0.5, gesture]]);
+    expect(spies.mute.mock.calls).toEqual([['a', true, notAStep]]);
+    expect(spies.solo.mock.calls).toEqual([['a', true, gesture]]);
+    expect(spies.pan.mock.calls).toEqual([['a', 0.5, notAStep]]);
+  });
+
   it('changes only the object of the track that was set', async () => {
     mount([makeTrack('a'), makeTrack('b')]);
     await waitFor(() => expect(probe.isReady).toBe(true));
