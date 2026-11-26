@@ -548,19 +548,6 @@ describe('clips appended while a track loads or waits (#848)', () => {
 
 // Review of #917: each test reproduces a finding of the first round.
 describe('review fixes (#917)', () => {
-  it('M1: a track that connects during a drag enters when the drag ends, not inside it', async () => {
-    const editor = await mount(makeFakeAdapter(), MIDI_TRACK);
-    let dragging = true;
-    Object.defineProperty(editor, '_dragInProgress', { get: () => dragging, configurable: true });
-    editor.insertAdjacentHTML('beforeend', MIDI_TRACK.replace('Keys', 'Late'));
-    await tick(2);
-    expect(names(editor)).toEqual(['Keys']);
-    dragging = false;
-    window.dispatchEvent(new Event('pointerup'));
-    await tick(2);
-    expect(names(editor)).toEqual(['Keys', 'Late']);
-  });
-
   it('M2: a DOM reorder with an element-less track in between reorders the rows', async () => {
     const editor = await mount(
       makeFakeAdapter(),

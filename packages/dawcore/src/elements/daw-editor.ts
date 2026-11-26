@@ -1278,7 +1278,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this.removeEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
     this.removeEventListener('daw-track-reorder', this._onTrackReorder as EventListener);
     this.removeEventListener('daw-track-reorder-grab', this._onTrackReorderGrab as EventListener);
-    // Before the engine is disposed: a clip drag's cancel aborts its transaction.
+    // Before the engine is disposed: every pointer interaction ends here.
     this._cancelDrags(true);
     // No audio loads while detached (the decode context goes with the
     // engine). A dropped file whose track has entered is kept and counts as
@@ -2208,13 +2208,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // Without an engine the queue waits, silently (maintainer, #917; play()
     // without an adapter warns and fires daw-error with the no-adapter error).
     if (!this._engine) return;
-    // M1: during a drag the arrangement has the drag's transaction open; an
-    // add would join it (an abort would drop the track, a commit merge it
-    // into the drag's undo step). Enter when the drag has ended.
-    if (this._dragInProgress) {
-      this._flushAfterDrag();
-      return;
-    }
+    // No drag holds a transaction (#848 PR 3): a track enters during a drag
+    // as at any other time, an undo step of its own.
     const queued = this._entryQueue;
     this._entryQueue = [];
     const domOrder: string[] = [...this.querySelectorAll('daw-track')].map(
@@ -2230,27 +2225,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       return el !== undefined && !this._editorMadeTracks.has(el);
     };
     const arrangement = this._arrangement;
-    const historyWasEmpty = !arrangement.canUndo && !arrangement.canRedo && !this._dragInProgress;
+    const historyWasEmpty = !arrangement.canUndo && !arrangement.canRedo;
     let pageEntered = false;
     for (const id of ordered.filter(isPageTrack)) {
       if (this._enterTrack(id)) pageEntered = true;
     }
     if (historyWasEmpty && pageEntered) arrangement.clearHistory();
     for (const id of ordered.filter((id) => !isPageTrack(id))) this._enterTrack(id);
-  }
-  private _waitingForDragEnd = false;
-  /** Flush the queue once the drag in progress has ended (its pointer or key is released). */
-  private _flushAfterDrag(): void {
-    if (this._waitingForDragEnd) return;
-    this._waitingForDragEnd = true;
-    const events = ['pointerup', 'pointercancel', 'keyup'] as const;
-    const retry = () => {
-      for (const type of events) window.removeEventListener(type, retry);
-      this._waitingForDragEnd = false;
-      // After the drag's own handlers have ended it.
-      setTimeout(() => this._flushTrackEntries(), 0);
-    };
-    for (const type of events) window.addEventListener(type, retry);
   }
   /** Enter one registered track. False when it is gone, already in, or refused. */
   private _enterTrack(trackId: string): boolean {
