@@ -1,13 +1,16 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 import type { ClipTrack } from '@waveform-playlist/core';
 
+/** A track as it is played (loaded clips, current mix), read from the arrangement (#848). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const played = (editor: any, id: string) => editor._loadedTracks().find((t: any) => t.id === id);
+
 // Regression test for #501: PlaylistEngine's per-track mixer setters
 // (setTrackVolume/Mute/Solo/Pan) emit statechange + bump the dedicated
-// `mixerVersion` counter (NOT `tracksVersion`). <daw-editor> refreshes its
-// `_engineTracks` cache when EITHER counter changes, so live mixer state
-// survives a later rebuild — without that, an unrelated `addTrack` (which
-// rebuilds the engine via `engine.setTracks([...this._engineTracks.values()])`)
-// reverts live mixer state. The structural-only work (rewireTrackChains,
+// `mixerVersion` counter (NOT `tracksVersion`). <daw-editor> draws again
+// when EITHER counter changes, reading the mix from the arrangement (#848:
+// it keeps no cache of the tracks), so a later, unrelated `addTrack` cannot
+// revert live mixer state. The structural-only work (rewireTrackChains,
 // peak regeneration) stays gated on `tracksVersion` so it never runs on the
 // per-frame mixer edits a volume/pan slider drag produces.
 
@@ -94,7 +97,7 @@ describe('<daw-editor> mixer-change persistence (#501)', () => {
     );
 
     // The engine cache should reflect the mute synchronously (statechange fired).
-    expect(editor._engineTracks.get(trackAId).muted).toBe(true);
+    expect(played(editor, trackAId).muted).toBe(true);
 
     // Adding an unrelated track rebuilds the adapter's tracks (this adapter has
     // no addTrack, so the engine sends them all with setTracks).

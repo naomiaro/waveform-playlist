@@ -1,10 +1,9 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 
 // #843: a take mutes the track it is recording onto through the engine
-// (`setTrackRecording`), outside the undo history: the engine's tracks carry
-// `muted: true` for that track, and the editor reads them (`_engineTracks`)
-// for the controls and for an export, so neither needs code of its own for
-// the take's mute.
+// (`setTrackRecording`), outside the undo history: the arrangement's
+// `recordingTrackIds` holds that track, and the editor reads it (#848,
+// `mixOf` / `loadedTrack`) for the controls and for an export.
 
 vi.mock('@waveform-playlist/worklets', () => ({
   addRecordingWorkletModule: vi.fn(async (addModule: (url: string) => Promise<void>) => {

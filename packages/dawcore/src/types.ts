@@ -69,6 +69,22 @@ export type TrackMixFields = 'volume' | 'pan' | 'muted' | 'soloed';
  */
 export type StoredTrackDescriptor = Omit<TrackDescriptor, TrackMixFields>;
 
+/**
+ * What `<daw-editor>` keeps per track that the arrangement has no field for
+ * (internal, #848): how the track is drawn, the `<daw-track src>` shorthand
+ * as declared, and each clip's `peaks-src`. Names, times, gains and the mix
+ * are read from the arrangement; nothing here is written back to it.
+ */
+export interface TrackExtras {
+  kind: TrackKind;
+  renderMode: TrackRenderMode;
+  spectrogramConfig?: SpectrogramConfig | null;
+  /** The `<daw-track src>` shorthand as declared ('' when none). */
+  src: string;
+  /** A clip's `peaks-src`, by clip id. */
+  peaksSrc: ReadonlyMap<string, string>;
+}
+
 /** A `TrackDescriptor` plus its `trackId` — the shape returned by `editor.tracks`
  *  so consumers can map a track's name to the `trackId` the per-track APIs
  *  (`addTrackEffect`, `removeTrack`, `updateTrack`, …) are keyed by. */

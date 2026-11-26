@@ -22,7 +22,6 @@ function makeHost(overrides: Partial<RecordingClipHost> = {}): RecordingClipHost
     mono: false,
     isConnected: true,
     effectiveSampleRate: 48000,
-    _tracks: new Map(),
     _arrangement: createArrangement(),
     _peaksData: new Map(),
     _clipBuffers: new Map(),
@@ -160,22 +159,8 @@ describe('addRecordedClip zoom floor (audit wave 5 review)', () => {
 // unreachable — absent from editor.tracks and from daw-recording-complete
 // (which fires BEFORE the clip exists).
 describe('addRecordedClip clip addressability (#659)', () => {
-  function makeDescriptor() {
-    return {
-      name: 'Vocals',
-      src: '',
-      volume: 1,
-      pan: 0,
-      muted: false,
-      soloed: false,
-      renderMode: 'waveform',
-      clips: [],
-    } as unknown as RecordingClipHost['_tracks'] extends Map<string, infer D> ? D : never;
-  }
-
   function makeLoadedHost(overrides: Partial<RecordingClipHost> = {}) {
     return makeHost({
-      _tracks: new Map([['t1', makeDescriptor()]]),
       _arrangement: arrangementWith(),
       ...overrides,
     });
@@ -188,15 +173,13 @@ describe('addRecordedClip clip addressability (#659)', () => {
     await new Promise((r) => setTimeout(r, 0));
   }
 
-  it("puts the engine clip id on the take's descriptor so editor.tracks can address it", async () => {
+  it('the take is in the arrangement under its name, where editor.tracks reads it (#848)', async () => {
     const host = makeLoadedHost();
 
     addRecordedClip(host, 't1', makeBuffer(1024), 0, 1024, 0, 'Take 1');
     await settle(host);
 
-    const engineClip = trackOf(host).clips[0];
-    const desc = host._tracks.get('t1')!.clips[0];
-    expect(desc).toMatchObject({ kind: 'drop', name: 'Take 1', clipId: engineClip.id });
+    expect(trackOf(host).clips[0]).toMatchObject({ name: 'Take 1' });
   });
 
   it('dispatches daw-recording-clip-add with trackId + clipId AFTER the clip reaches the arrangement', async () => {
