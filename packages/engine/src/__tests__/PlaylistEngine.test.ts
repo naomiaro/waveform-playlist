@@ -645,8 +645,8 @@ describe('PlaylistEngine', () => {
   });
 
   // #843: the engine's setters take the arrangement's options, and the
-  // recording arm goes through the engine.
-  describe('mixer options and the arm', () => {
+  // take's recording mute goes through the engine.
+  describe('mixer options and the recording mute', () => {
     const setters = [
       ['setTrackVolume', [0.5, 0.4, 0.3], 'volume', 1],
       ['setTrackPan', [-0.5, -0.4, -0.3], 'pan', 0],
@@ -701,7 +701,7 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it('setTrackArmed reaches the arrangement: the track plays muted, the stored mute stays, no step', () => {
+    it('setTrackRecording reaches the arrangement: the track plays muted, the stored mute stays, no step', () => {
       const arrangement = createArrangement({ tracks: [makeTrack('t1', [])] });
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter, arrangement });
@@ -709,18 +709,18 @@ describe('PlaylistEngine', () => {
       engine.on('statechange', listener);
       const tracksVersion = engine.getState().tracksVersion;
 
-      engine.setTrackArmed('t1', true);
-      expect([...arrangement.armedTrackIds]).toEqual(['t1']);
+      engine.setTrackRecording('t1', true);
+      expect([...arrangement.recordingTrackIds]).toEqual(['t1']);
       expect(engine.getState().tracks[0].muted).toBe(true);
       expect(arrangement.getMixer().get('t1')?.muted).toBe(false);
-      // One adapter call, from the arrangement's 'arm' announcement.
+      // One adapter call, from the arrangement's 'recording' announcement.
       expect(vi.mocked(adapter.setTrackMute).mock.calls).toEqual([['t1', true]]);
       expect(listener).toHaveBeenCalledTimes(1);
       expect(engine.getState().canUndo).toBe(false);
       expect(engine.getState().tracksVersion).toBe(tracksVersion);
 
-      engine.setTrackArmed('t1', false);
-      expect(arrangement.armedTrackIds.size).toBe(0);
+      engine.setTrackRecording('t1', false);
+      expect(arrangement.recordingTrackIds.size).toBe(0);
       expect(engine.getState().tracks[0].muted).toBe(false);
       expect(vi.mocked(adapter.setTrackMute).mock.calls).toEqual([
         ['t1', true],
@@ -729,26 +729,26 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
-    it("armedTrackIds is the arrangement's set, read-only, and follows setTrackArmed", () => {
+    it("recordingTrackIds is the arrangement's set, read-only, and follows setTrackRecording", () => {
       const arrangement = createArrangement({ tracks: [makeTrack('t1', [])] });
       const engine = new PlaylistEngine({ adapter: createMockAdapter(), arrangement });
-      expect(engine.armedTrackIds.size).toBe(0);
-      engine.setTrackArmed('t1', true);
-      expect(engine.armedTrackIds.has('t1')).toBe(true);
-      expect(engine.armedTrackIds).toBe(arrangement.armedTrackIds);
-      engine.setTrackArmed('t1', false);
-      expect(engine.armedTrackIds.has('t1')).toBe(false);
+      expect(engine.recordingTrackIds.size).toBe(0);
+      engine.setTrackRecording('t1', true);
+      expect(engine.recordingTrackIds.has('t1')).toBe(true);
+      expect(engine.recordingTrackIds).toBe(arrangement.recordingTrackIds);
+      engine.setTrackRecording('t1', false);
+      expect(engine.recordingTrackIds.has('t1')).toBe(false);
       engine.dispose();
     });
 
-    it('a disposed engine: setTrackArmed still changes the arrangement and calls no adapter', () => {
+    it('a disposed engine: setTrackRecording still changes the arrangement and calls no adapter', () => {
       const arrangement = createArrangement({ tracks: [makeTrack('t1', [])] });
       const adapter = createMockAdapter();
       const engine = new PlaylistEngine({ adapter, arrangement });
       engine.dispose();
 
-      engine.setTrackArmed('t1', true);
-      expect([...arrangement.armedTrackIds]).toEqual(['t1']);
+      engine.setTrackRecording('t1', true);
+      expect([...arrangement.recordingTrackIds]).toEqual(['t1']);
       expect(adapter.setTrackMute).not.toHaveBeenCalled();
     });
   });

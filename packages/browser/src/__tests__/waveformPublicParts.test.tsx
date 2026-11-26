@@ -917,7 +917,7 @@ describe('the recording session', () => {
     bits: 16,
   });
 
-  it('the preview part alone does not mute the armed track', async () => {
+  it("the preview part alone does not mute the take's track", async () => {
     let isRecording = false;
     const { adapter, rerender } = await mountMultitrack(() => (
       <WaveformRoot>
@@ -932,7 +932,7 @@ describe('the recording session', () => {
     expect(adapter.setTrackMute).not.toHaveBeenCalled();
   });
 
-  it('useRecordingSession mutes the armed track for the take and restores it', async () => {
+  it("useRecordingSession mutes the take's track for the take and restores it", async () => {
     let isRecording = false;
     const Session: React.FC = () => {
       useRecordingSession({ isRecording, trackId: 't1' });
@@ -950,7 +950,7 @@ describe('the recording session', () => {
     expect(adapter.setTrackMute).toHaveBeenLastCalledWith('t1', false);
   });
 
-  it('the armed track changing during a take moves the mute', async () => {
+  it("the take's track changing during a take moves the mute", async () => {
     let trackId: string | null = null;
     const Session: React.FC = () => {
       useRecordingSession({ isRecording: trackId !== null, trackId });
@@ -976,7 +976,7 @@ describe('the recording session', () => {
     };
     const { adapter, rerender } = await mountMultitrack(() => (mounted ? <Session /> : <span />));
     // The session began before the engine was built: since #812 the mute is
-    // the arrangement's, so the engine was built with the armed track muted.
+    // the arrangement's, so the engine was built with the take's track muted.
     const built = adapter.setTracks.mock.calls[0][0] as ClipTrack[];
     expect(built.find((track) => track.id === 't2')?.muted).toBe(true);
     mounted = false;

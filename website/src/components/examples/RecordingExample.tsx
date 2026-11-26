@@ -253,7 +253,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   });
 
   // The take's session: while recording, the provider keeps playback running
-  // and mutes what the armed track already holds. The preview part in the
+  // and mutes what the take's track already holds. The preview part in the
   // view only draws the take.
   useRecordingSession({
     isRecording: isRecording && recordingTrackId !== null,
@@ -280,7 +280,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   // Re-entrancy guard for record start: isRecording state only commits after
   // startRecording's internal awaits (context resume, worklet load), so a
   // rapid second Record press would re-enter and clobber recordStartTimeRef
-  // and the armed-track mute mid-start.
+  // and the take's mute mid-start.
   const isStartingRecordingRef = useRef(false);
   // Set by handleStop when the user stops before the capture finished
   // starting — cancels the pending session instead of playing a phantom one.
@@ -294,7 +294,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     try {
       // Read from the ref: it follows playback, the `currentTime` state does not
       recordStartTimeRef.current = currentTimeRef.current;
-      // Arm the recorded track BEFORE starting playback: punch-in replaces
+      // Mute the recorded track BEFORE starting playback: punch-in replaces
       // whatever the take overlaps, so its existing content is transiently
       // muted for the session and must never blip. Release is automatic via
       // useRecordingSession when the recording ends.
@@ -302,7 +302,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
       const started = await startRecording();
       if (!started || cancelRecordingStartRef.current) {
         // Capture never started (no mic, no track, worklet failure) or the
-        // user stopped during startup — release the armed track and don't
+        // user stopped during startup — release the take's track and don't
         // start playback.
         if (started) stopRecording();
         setRecordingActive(false);

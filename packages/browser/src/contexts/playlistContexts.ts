@@ -291,20 +291,21 @@ export interface EditorControlsContextValue {
   // Recording
   /** Mark a recording session active/inactive. While active: (1) the
    *  end-of-audio auto-stop is suppressed so overdub playback runs past the
-   *  end of existing material, and (2) with an `armedTrackId`, that track is
-   *  armed in the arrangement for the session (`setTrackArmed`, #843):
-   *  punch-in recording replaces whatever the take overlaps (#579), so the
-   *  doomed material must not play under the overdub. The arm plays the
-   *  track muted and is no undo step. `trackStates` and the track's Mute
-   *  button show it muted, the built-in `<TrackMuteButton />` of that track
-   *  is disabled, and `useTrack().isRecordingArmed` is true for it, while
+   *  end of existing material, and (2) with a `recordingTrackId`, that track
+   *  is marked in the arrangement as the one the take is recording onto
+   *  (`setTrackRecording`, #843): punch-in recording replaces whatever the
+   *  take overlaps (#579), so the doomed material must not play under the
+   *  overdub. The take's mute plays the track muted and is no undo step.
+   *  `trackStates` and the track's Mute button show it muted, the built-in
+   *  `<TrackMuteButton />` of that track is disabled, and
+   *  `useTrack().isRecording` is true for it, while
    *  `arrangement.getMixer()` keeps the track's own mute: nothing is written
    *  to it, so a mute changed during the take stays after it. One track is
-   *  armed at a time: arming one disarms any other, and
-   *  `setRecordingActive(false)` disarms every track. `useRecordingSession`
+   *  recorded onto at a time: naming one clears any other, and
+   *  `setRecordingActive(false)` clears every track. `useRecordingSession`
    *  calls it for the length of a take; overdub flows should also call it
    *  eagerly (before `play()`). */
-  setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
+  setRecordingActive: (active: boolean, recordingTrackId?: string | null) => void;
 }
 
 /**
@@ -399,13 +400,13 @@ export interface TrackReorderPreviewContextValue {
 /**
  * INTERNAL (the context and its hook are not exported from the package,
  * #812): the track a take is being recorded onto, read from the
- * arrangement's `armedTrackIds` (#843; the first id, or null: React arms one
- * track at a time with `setRecordingActive`). Changes when a take starts and
- * ends and when the armed track changes. The track controls read it and give
- * each track's panel `isRecordingArmed`.
+ * arrangement's `recordingTrackIds` (#843; the first id, or null: React
+ * records onto one track at a time with `setRecordingActive`). Changes when
+ * a take starts and ends and when the take's track changes. The track
+ * controls read it and give each track's panel `isRecording`.
  */
-export interface RecordingArmContextValue {
-  armedTrackId: string | null;
+export interface RecordingTrackContextValue {
+  recordingTrackId: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -488,8 +489,8 @@ export const TrackReorderPreviewContext = slot<TrackReorderPreviewContextValue>(
  */
 export const TrimPreviewContext = slot<TrimPreviewHandle>();
 export const TrimPreviewPeaksContext = slot<TrimPreviewPeaksValue>();
-/** INTERNAL (#812): see {@link RecordingArmContextValue}. */
-export const RecordingArmContext = slot<RecordingArmContextValue>();
+/** INTERNAL (#812): see {@link RecordingTrackContextValue}. */
+export const RecordingTrackContext = slot<RecordingTrackContextValue>();
 
 // MediaElementPlaylistProvider only
 export const PlaybackRateContext = slot<PlaybackRateContextValue>();
@@ -647,10 +648,11 @@ export const useTrackReorderPreview = () =>
   useSlot(TrackReorderPreviewContext, 'useTrackReorderPreview', WEB_AUDIO);
 
 /**
- * INTERNAL (not exported from the package, #812): `{ armedTrackId }`, the
+ * INTERNAL (not exported from the package, #812): `{ recordingTrackId }`, the
  * track a take is being recorded onto. Re-renders when a take starts or ends.
  */
-export const useRecordingArm = () => useSlot(RecordingArmContext, 'useRecordingArm', WEB_AUDIO);
+export const useRecordingTrack = () =>
+  useSlot(RecordingTrackContext, 'useRecordingTrack', WEB_AUDIO);
 
 /** `{ playbackRate, setPlaybackRate }`. MediaElementPlaylistProvider only. */
 export const usePlaybackRate = () => useSlot(PlaybackRateContext, 'usePlaybackRate', MEDIA_ELEMENT);

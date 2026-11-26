@@ -127,7 +127,7 @@ These hooks read the nearest playlist provider. Each one returns a group of fiel
 | [`useEditorControls()`](#useeditorcontrols) | track mixer and order, zoom, loop, undo, recording | never |
 | [`useEngineRefs()`](#useenginerefs) | `playoutRef`, the engine's clock refs and functions | never |
 | [`usePlaylistTimeline()`](#useplaylisttimeline) | `tracks`, `peaksDataArray`, `duration`, `isReady` | every clip operation (a trim once, on release), a zoom, audio or peaks arriving, `isReady` changing |
-| [`usePlaylistMixer()`](#useplaylistmixer) | `trackStates`, `masterVolume` | every mute, solo, volume or pan change (also by an undo or a redo); a track armed for a take or disarmed; tracks added, removed, renamed or reordered |
+| [`usePlaylistMixer()`](#useplaylistmixer) | `trackStates`, `masterVolume` | every mute, solo, volume or pan change (also by an undo or a redo); a take starting or ending on a track; tracks added, removed, renamed or reordered |
 | [`useTrack()`](#usetrack) | one track's id, name, mixer state and bound actions. Only among the children of `<WaveformTrackControls>` | a change of that track's state, position or selection |
 | [`useTrackReorderPreview()`](#usetrackreorderpreview) | `trackDragPreview` | every drag-over of a track reorder |
 | [`useLoop()`](#useloop) | `isLoopEnabled`, `loopStart`, `loopEnd` | a loop change |
@@ -248,7 +248,7 @@ interface PlaylistTimelineContextValue {
 
 ### usePlaylistMixer
 
-`WaveformPlaylistProvider` only. Mixer state. The value changes on every mute, solo, volume or pan change (each step of a slider drag, and an undo or a redo that moves one), when a track is armed for a take or disarmed, and when tracks are added, removed, renamed or reordered, so call this hook in the component that shows the mixer values, not in the component that renders the page.
+`WaveformPlaylistProvider` only. Mixer state. The value changes on every mute, solo, volume or pan change (each step of a slider drag, and an undo or a redo that moves one), when a take starts or ends on a track, and when tracks are added, removed, renamed or reordered, so call this hook in the component that shows the mixer values, not in the component that renders the page.
 
 ```typescript
 function usePlaylistMixer(): PlaylistMixerContextValue;
@@ -260,7 +260,7 @@ interface PlaylistMixerContextValue {
 
 interface TrackState {
   name: string;
-  /** The track's own mute, or true while it is armed for a take. */
+  /** The track's own mute, or true while a take is recording onto it. */
   muted: boolean;
   soloed: boolean;
   volume: number;
@@ -274,7 +274,7 @@ interface TrackState {
 const anySolo = trackStates.some((s) => s.soloed);
 ```
 
-The values are the arrangement's mix (`arrangement.getMixer()`), kept by track id. A track keeps its mute, solo, volume and pan for as long as its id is in the arrangement: when other tracks are removed, when tracks are added in front of it, and when it is reordered. A mixer change is an undo step, so an undo or a redo brings back the values of the state it returns to. While a take is recorded onto a track (`setRecordingActive`, `useRecordingSession`), its `muted` is true: the arm plays the track muted, while `arrangement.getMixer()` holds the track's own mute. A track that enters with an id the arrangement has no mix for starts from its own `muted`, `soloed`, `volume` and `pan` fields; after that those fields are only the values it entered with, and the current ones are here. The `name` follows the track's `name`.
+The values are the arrangement's mix (`arrangement.getMixer()`), kept by track id. A track keeps its mute, solo, volume and pan for as long as its id is in the arrangement: when other tracks are removed, when tracks are added in front of it, and when it is reordered. A mixer change is an undo step, so an undo or a redo brings back the values of the state it returns to. While a take is recorded onto a track (`setRecordingActive`, `useRecordingSession`), its `muted` is true: the take plays the track muted, while `arrangement.getMixer()` holds the track's own mute. A track that enters with an id the arrangement has no mix for starts from its own `muted`, `soloed`, `volume` and `pan` fields; after that those fields are only the values it entered with, and the current ones are here. The `name` follows the track's `name`.
 
 The array keeps its identity while no entry changed (a trim or another clip edit gives new `tracks` and the same `trackStates`), and a change to one track replaces the object of that track only.
 
@@ -978,20 +978,21 @@ interface EditorControlsContextValue {
   // Recording
   /** Mark a recording session active/inactive. While active: (1) the
    *  end-of-audio auto-stop is suppressed so overdub playback runs past the
-   *  end of existing material, and (2) with an `armedTrackId`, that track is
-   *  armed in the arrangement for the session (`setTrackArmed`): punch-in
-   *  recording replaces whatever the take overlaps, so the doomed material
-   *  must not play under the overdub. The arm plays the track muted and is
-   *  no undo step. `trackStates` and the track's Mute button show it muted,
-   *  the built-in `<TrackMuteButton />` of that track is disabled, and
-   *  `useTrack().isRecordingArmed` is true for it, while
+   *  end of existing material, and (2) with a `recordingTrackId`, that track
+   *  is marked in the arrangement as the one the take is recording onto
+   *  (`setTrackRecording`): punch-in recording replaces whatever the take
+   *  overlaps, so the doomed material must not play under the overdub. The
+   *  take's mute plays the track muted and is no undo step. `trackStates`
+   *  and the track's Mute button show it muted, the built-in
+   *  `<TrackMuteButton />` of that track is disabled, and
+   *  `useTrack().isRecording` is true for it, while
    *  `arrangement.getMixer()` keeps the track's own mute: nothing is written
    *  to it, so a mute changed during the take stays after it. One track is
-   *  armed at a time: arming one disarms any other, and
-   *  `setRecordingActive(false)` disarms every track. `useRecordingSession`
+   *  recorded onto at a time: naming one clears any other, and
+   *  `setRecordingActive(false)` clears every track. `useRecordingSession`
    *  calls it for the length of a take; overdub flows should also call it
    *  eagerly (before `play()`). */
-  setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
+  setRecordingActive: (active: boolean, recordingTrackId?: string | null) => void;
 }
 ```
 
@@ -1001,7 +1002,7 @@ The mixer setters, `reorderTrack`, `undo` and `redo` call the provider's arrange
 
 Each mixer call is an undo step, and an undo, a redo or an aborted transaction brings back the mix of the state it returns to: Undo after a fader move moves the fader back. A slider that calls a setter on every move makes one step per move unless it passes one `gesture` id for the whole drag; the built-in `<TrackVolumeSlider />` and `<TrackPanSlider />` do, so a drag, or a held arrow key, is one step. For a slider of your own, make one `createMixerGesture()` (from `@waveform-playlist/core`) per slider, attach it to the input and pass `{ gesture: gesture.id }` (see the [upgrade guide](../upgrading.md#a-slider-of-your-own-makes-one-undo-step-per-move-until-it-passes-a-gesture)). A value that is not the user's edit, such as automation or a mix restored from a saved project, takes `{ undoable: false }`: no step, and no undo or redo brings back an older value. Keyboard Undo (`<KeyboardShortcuts undo />`) does not fire while a slider has focus, which it keeps after a mouse drag ([#730](https://github.com/naomiaro/waveform-playlist/issues/730)); an Undo button, or the key once focus has left the slider, works.
 
-If the provider unmounts (or is hidden by `<Activity>`) while a track is armed, it is disarmed then too.
+If the provider unmounts (or is hidden by `<Activity>`) while a take is recording onto a track, the take's mute is cleared then too.
 
 ```tsx
 const { tracks } = usePlaylistTimeline();
@@ -1036,7 +1037,7 @@ interface TrackContextValue {
 
   /** The track's name, or "Track N" (N is the position, from 1) when it has none. */
   name: string;
-  /** The track's own mute, or true while it is armed for a take (`isRecordingArmed`). */
+  /** The track's own mute, or true while a take is recording onto it (`isRecording`). */
   muted: boolean;
   soloed: boolean;
   /** 0 to 1. */
@@ -1062,9 +1063,9 @@ interface TrackContextValue {
    * changed by the take: a mute set meanwhile stays after it. The built-in
    * `<TrackMuteButton />` is disabled while this is true; an app's own mute
    * control can do the same, since toggling from `muted` here would set the
-   * track's own mute from the arm's value.
+   * track's own mute from the take's mute.
    */
-  isRecordingArmed: boolean;
+  isRecording: boolean;
 
   // Actions. Each keeps its identity while the track's slot is mounted and a
   // track menu neither becomes available nor stops being so. The four mixer
@@ -1102,7 +1103,7 @@ import { WaveformTrackControls, useTrack } from '@waveform-playlist/browser';
 import { createMixerGesture } from '@waveform-playlist/core';
 
 function TrackStrip() {
-  const { name, muted, volume, isRecordingArmed, setMuted, setVolume } = useTrack();
+  const { name, muted, volume, isRecording, setMuted, setVolume } = useTrack();
   // One gesture helper per slider: a drag, or a held arrow key, is one undo step.
   const [gesture] = useState(createMixerGesture);
   const sliderRef = useRef<HTMLInputElement>(null);
@@ -1113,8 +1114,8 @@ function TrackStrip() {
   return (
     <div style={{ height: '100%', padding: 8, boxSizing: 'border-box' }}>
       <strong>{name}</strong>
-      {/* Pressed during a take (the arm): a click would set the track's own mute from it */}
-      <button disabled={isRecordingArmed} aria-pressed={muted} onClick={() => setMuted(!muted)}>
+      {/* Pressed during a take: a click would set the track's own mute from it */}
+      <button disabled={isRecording} aria-pressed={muted} onClick={() => setMuted(!muted)}>
         Mute
       </button>
       <input
@@ -1500,7 +1501,7 @@ function ElapsedTime({ progress }: { progress: RecordingProgressSource }) {
 
 ### useRecordingSession
 
-`WaveformPlaylistProvider` only. Tells the playlist that a take is being recorded into a track, for as long as `isRecording` is true. The provider then keeps playback running past the end of the audio and arms the track in the arrangement (`arrangement.setTrackArmed`), which plays it muted, so what it already holds does not play under a punch-in that replaces it. `usePlaylistMixer().trackStates` and the track's Mute button show it muted, its built-in `<TrackMuteButton />` is disabled and `useTrack().isRecordingArmed` is true for it. The arm is no undo step and does not change the track's own mute (`arrangement.getMixer()`), so a mute changed during the take stays after it. The track is disarmed when the take ends, the track changes or the component unmounts; the provider also disarms it when it unmounts itself. An `<Activity>` hide of the component ends the session the same way, and the reveal arms the track again.
+`WaveformPlaylistProvider` only. Tells the playlist that a take is being recorded into a track, for as long as `isRecording` is true. The provider then keeps playback running past the end of the audio and marks the track in the arrangement as the one the take is recording onto (`arrangement.setTrackRecording`), which plays it muted for the take, so what it already holds does not play under a punch-in that replaces it. `usePlaylistMixer().trackStates` and the track's Mute button show it muted, its built-in `<TrackMuteButton />` is disabled and `useTrack().isRecording` is true for it. The take's mute is no undo step and does not change the track's own mute (`arrangement.getMixer()`), so a mute changed during the take stays after it. The take's mute is cleared when the take ends, the track changes or the component unmounts; the provider also clears it when it unmounts itself. An `<Activity>` hide of the component ends the session the same way, and the reveal mutes the track again.
 
 ```typescript
 function useRecordingSession(options: RecordingSessionOptions): void;
@@ -1513,7 +1514,7 @@ interface RecordingSessionOptions {
 }
 ```
 
-Call it in the component that calls `useIntegratedRecording`. `<WaveformRecordingPreview>` only draws the take: without this hook the track is not armed and plays as it is.
+Call it in the component that calls `useIntegratedRecording`. `<WaveformRecordingPreview>` only draws the take: without this hook the track is not muted for the take and plays as it is.
 
 ```tsx
 import { useRecordingSession } from '@waveform-playlist/browser';
@@ -1524,7 +1525,7 @@ useRecordingSession({ isRecording, trackId: recordingTrackId });
 
 The hook runs `setRecordingActive` (from `useEditorControls()`) in an effect, which is after the render that follows the start of the take. A handler that starts playback together with the recording should also call `setRecordingActive(true, trackId)` itself, before `play()`. `play()` does nothing before the playlist's first ready (`usePlaylistTimeline().isReady`), so a take started during the first load records without playback.
 
-Edges to know: if the armed track is removed during a take as an undo step, the end of the take still disarms it, so undoing that removal after the take brings the track back with its own mute; undone during the take, it comes back armed (muted) until the take ends. An app's own mute control (one that does not use `<TrackMuteButton />`) reads `useTrack().isRecordingArmed` or tracks the armed id itself: during a take `muted` is true because of the arm, so a toggle from it (`setMuted(!muted)`) sets the track's own mute to false, and the track comes out of the take unmuted.
+Edges to know: if the take's track is removed during a take as an undo step, the end of the take still clears its take mute, so undoing that removal after the take brings the track back with its own mute; undone during the take, it comes back muted until the take ends. An app's own mute control (one that does not use `<TrackMuteButton />`) reads `useTrack().isRecording` or tracks the take's track id itself: during a take `muted` is true because of the take, so a toggle from it (`setMuted(!muted)`) sets the track's own mute to false, and the track comes out of the take unmuted.
 
 ---
 

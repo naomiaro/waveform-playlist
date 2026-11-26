@@ -499,7 +499,7 @@ const { isRecording, progress, recordingTrackId, ... } =
   });
 
 // While the take runs: playback continues past the end of the audio, and the
-// armed track is muted in the mix (a punch-in replaces what it holds).
+// take's track plays muted (a punch-in replaces what it holds).
 useRecordingSession({ isRecording, trackId: recordingTrackId });
 
 <WaveformRoot>
@@ -532,21 +532,23 @@ useRecordingSession({ isRecording, trackId: recordingTrackId });
 
 `<WaveformRecordingPreview>` only draws the take. [`useRecordingSession`](/docs/react/api/hooks#userecordingsession) is what tells the provider that a take is running; call it in the component that calls `useIntegratedRecording`, under `WaveformPlaylistProvider`. A handler that starts playback together with the recording (an overdub) should also call `useEditorControls().setRecordingActive(true, trackId)` before `play()`, because the hook's effect runs a render later.
 
-### The Armed Track Is Muted for the Take
+### The Recorded Track Is Muted During the Take
 
-While a take records, the armed track is armed in the arrangement (`arrangement.setTrackArmed`), which plays it muted, so what it already holds does not play under the punch-in that replaces it:
+While a take records, the arrangement marks the track as the one the take is recording onto (`arrangement.setTrackRecording`), which plays it muted for the take, so what it already holds does not play under the punch-in that replaces it:
 
 - the mixer (`usePlaylistMixer().trackStates`) and the track's Mute button show it muted;
-- the built-in `<TrackMuteButton />` of that track is disabled, and `useTrack().isRecordingArmed` is true for it, for a mute control of your own;
-- the arm is not an undo step and does not change the track's own mute: `arrangement.getMixer()` keeps it, so a mute changed on that track during the take (a `setTrackMute`) stays after it;
-- the track is disarmed when the take ends or the armed track changes, and when the provider unmounts or is hidden by `<Activity>` with a track still armed.
+- the built-in `<TrackMuteButton />` of that track is disabled, and `useTrack().isRecording` is true for it, for a mute control of your own;
+- the take's mute is not an undo step and does not change the track's own mute: `arrangement.getMixer()` keeps it, so a mute changed on that track during the take (a `setTrackMute`) stays after it;
+- the take's mute is cleared when the take ends or the take's track changes, and when the provider unmounts or is hidden by `<Activity>` while a take is recording.
+
+This is not a record-arm: it lasts only while a take is recorded, and the app does not set it.
 
 Edges to know:
 
 - A take started during the playlist's first load records without playback: `play()` does nothing before the first [ready](/docs/react/guides/loading-audio#ready).
-- An `<Activity>` hide of the component that calls `useRecordingSession` ends the session (the track is disarmed); the reveal arms the track again.
-- Removing the armed track during a take as an undo step: the end of the take still disarms it, so undoing the removal after the take brings the track back with its own mute. Undone during the take, the track comes back armed, and plays muted until the take ends.
-- A mute control of your own that toggles from the reported value (`setMuted(!muted)`) during a take sets the track's own mute to false, because `muted` is true for the arm: the track stays muted for the take and comes out of it unmuted. Disable it while `isRecordingArmed`, as the built-in button is.
+- An `<Activity>` hide of the component that calls `useRecordingSession` ends the session (the take's mute is cleared); the reveal mutes the track again.
+- Removing the take's track during a take as an undo step: the end of the take still clears its take mute, so undoing the removal after the take brings the track back with its own mute. Undone during the take, the track comes back muted until the take ends.
+- A mute control of your own that toggles from the reported value (`setMuted(!muted)`) during a take sets the track's own mute to false, because `muted` is true for the take: the track stays muted for the take and comes out of it unmuted. Disable it while `isRecording`, as the built-in button is.
 - Only the built-in Mute button is disabled. Solo, volume and pan stay enabled.
 
 If `latencyOffset` is omitted from `recordingState`, the preview uses the same auto-computed value as `useIntegratedRecording`.

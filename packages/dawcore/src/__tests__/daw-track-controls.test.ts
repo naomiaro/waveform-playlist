@@ -46,11 +46,11 @@ describe('DawTrackControlsElement', () => {
     document.body.removeChild(el);
   });
 
-  it('the mute button is disabled while armed; a click sends nothing', async () => {
+  it('the mute button is disabled while a take records onto the track; a click sends nothing', async () => {
     const el = document.createElement('daw-track-controls') as any;
     el.trackId = 'track-1';
     el.muted = true;
-    el.armed = true;
+    el.recording = true;
     document.body.appendChild(el);
     await el.updateComplete;
 
@@ -62,7 +62,7 @@ describe('DawTrackControlsElement', () => {
     el['_onMuteClick']();
     expect(events).toHaveLength(0);
 
-    el.armed = false;
+    el.recording = false;
     await el.updateComplete;
     expect(muteBtn.disabled).toBe(false);
     document.body.removeChild(el);

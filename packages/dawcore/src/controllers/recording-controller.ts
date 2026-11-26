@@ -61,11 +61,6 @@ export interface RecordingSession {
   readonly latencySamples: number;
   /** Display name for the take (preview header + finalized clip name). */
   readonly clipName?: string;
-  /** True while this session holds the engine's recording arm on its track
-   * (#843): set when the session arms it, cleared by the one disarm on
-   * whichever teardown path ends the session. False when the host had no
-   * engine at the start. */
-  armed: boolean;
   readonly wasOverdub: boolean;
   /** Stored so it can be removed on stop/cleanup — not just when stream ends. */
   readonly _onTrackEnded: (() => void) | null;
@@ -115,13 +110,14 @@ export interface RecordingHost extends ReactiveControllerHost {
     offsetSamples?: number,
     clipName?: string
   ): void;
-  /** Structural view of the editor's engine for the recording arm (#843):
+  /** Structural view of the editor's engine for the take's mute (#843):
    *  punch-in replaces the overlapped content, so the recorded-over track's
-   *  existing material must not play under the take. An armed track plays
-   *  muted; the arm is outside the undo history and leaves the stored mute
-   *  alone. Optional — hosts without an engine skip the arm. */
+   *  existing material must not play under the take. The track a take is
+   *  recording onto plays muted; that mute is outside the undo history and
+   *  leaves the stored mute alone. Optional — hosts without an engine skip
+   *  it. */
   _engine?: {
-    setTrackArmed(trackId: string, armed: boolean): void;
+    setTrackRecording(trackId: string, recording: boolean): void;
   } | null;
   play?(startTime?: number): Promise<void>;
   stop?(): void;
@@ -352,7 +348,6 @@ export class RecordingController implements ReactiveController {
         isFirstMessage: true,
         latencySamples,
         clipName: options.clipName,
-        armed: false,
         wasOverdub: options.overdub ?? false,
         _onTrackEnded: onTrackEnded,
         _audioTrack: audioTrack,
@@ -374,19 +369,16 @@ export class RecordingController implements ReactiveController {
         audioTrack.addEventListener('ended', onTrackEnded);
       }
 
-      // Arm the track for the session — punch-in replaces whatever the take
-      // overlaps (#579), so the doomed material must not play under the
-      // overdub. The arm is the engine's override (#843): the track plays
-      // muted and the engine's tracks carry `muted: true`, which the track
-      // controls and an export read; the stored mute is untouched and the
-      // arm is no undo step, so a mute changed during the take stays after
-      // it. Disarmed by _disarmTrack on every session-teardown path. Must
-      // engage BEFORE the overdub host.play() below so the track never blips.
-      const engine = this._host._engine;
-      if (engine) {
-        engine.setTrackArmed(trackId, true);
-        session.armed = true;
-      }
+      // Mute the track the take is recording onto — punch-in replaces
+      // whatever the take overlaps (#579), so the doomed material must not
+      // play under the overdub. The take's mute is the engine's (#843): the
+      // track plays muted and the engine's tracks carry `muted: true`, which
+      // the track controls and an export read; the stored mute is untouched
+      // and the take's mute is no undo step, so a mute changed during the
+      // take stays after it. Cleared by _clearTakeMute on every
+      // session-teardown path. Must engage BEFORE the overdub host.play()
+      // below so the track never blips.
+      this._host._engine?.setTrackRecording(trackId, true);
 
       this._host.dispatchEvent(
         new CustomEvent<DawRecordingStartDetail>('daw-recording-start', {
@@ -492,7 +484,7 @@ export class RecordingController implements ReactiveController {
       // concatenation RangeError on a long take, AudioBuffer creation, clip
       // insertion) must not strand the session with stopping=true — that
       // wedges isRecording, keeps the mic graph connected, and leaves the
-      // track armed (playing muted). Resolve (not reject) and surface
+      // track playing muted. Resolve (not reject) and surface
       // the failure via daw-recording-error, matching the no-audio/too-short
       // error-path convention — fire-and-forget callers (stop button,
       // mic-unplug handler) only observe the event.
@@ -604,7 +596,7 @@ export class RecordingController implements ReactiveController {
     const notPrevented = this._host.dispatchEvent(event);
 
     // Clean up session
-    this._disarmTrack(session);
+    this._clearTakeMute(session);
     this._sessions.delete(id);
     this._host.requestUpdate();
 
@@ -780,7 +772,7 @@ export class RecordingController implements ReactiveController {
   }
 
   /** Shared teardown for finalize paths that end without a take (no data
-   * captured / too short after latency compensation): disarm the track, drop
+   * captured / too short after latency compensation): clear the take's mute, drop
    * the session, and notify via daw-recording-error so record buttons reset
    * their state. */
   private _abandonFinalize(
@@ -790,19 +782,19 @@ export class RecordingController implements ReactiveController {
     errorMessage: string = warnMessage
   ) {
     console.warn('[dawcore] RecordingController: ' + warnMessage);
-    this._disarmTrack(session);
+    this._clearTakeMute(session);
     this._sessions.delete(id);
     this._host.requestUpdate();
     this._dispatchRecordingError(id, new Error(errorMessage));
   }
 
-  /** Disarm the session's track, by the id it armed (idempotent — safe to
-   * call from both the finalize path and _cleanupSession; the session
-   * disarms once). Another session's arm on another track is left alone. */
-  private _disarmTrack(session: RecordingSession) {
-    if (!session.armed) return;
-    session.armed = false;
-    this._host._engine?.setTrackArmed(session.trackId, false);
+  /** Clear the take's mute on the session's track, by its id. Each teardown
+   * path calls this once, right before it drops the session from the map, so
+   * a later path never reaches the same session; clearing an id that is not
+   * set is a no-op in the engine. Another session's mute on another track is
+   * left alone. */
+  private _clearTakeMute(session: RecordingSession) {
+    this._host._engine?.setTrackRecording(session.trackId, false);
   }
 
   /** @param notifyError dispatch daw-recording-error after cleanup — used by
@@ -812,7 +804,7 @@ export class RecordingController implements ReactiveController {
     const session = this._sessions.get(trackId);
     if (!session) return;
     try {
-      this._disarmTrack(session);
+      this._clearTakeMute(session);
       this._removeTrackEndedListener(session);
       session.workletNode.port.postMessage({ command: 'stop' });
       session.source.disconnect();

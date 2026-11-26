@@ -387,7 +387,7 @@ describe('the template and useTrack()', () => {
         'isFirst',
         'isLast',
         'hasSpectrogram',
-        'isRecordingArmed',
+        'isRecording',
         'setMuted',
         'setSoloed',
         'setVolume',

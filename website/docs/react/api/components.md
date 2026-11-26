@@ -222,7 +222,7 @@ Under `MediaElementWaveformRoot` it draws nothing.
 |------|------|-------------|
 | `recordingState` | `WaveformRecordingState` | The take: `isRecording`, `trackId`, `startSample`, `progress` (from `useIntegratedRecording` / `useRecording`), `bits`, optional `latencyOffset` |
 
-It only draws the take. Call [`useRecordingSession`](/docs/react/api/hooks#userecordingsession) so the provider mutes the armed track for the take (the mixer shows it muted and its `<TrackMuteButton />` is disabled until the take ends). See the [Recording guide](/docs/react/guides/recording).
+It only draws the take. Call [`useRecordingSession`](/docs/react/api/hooks#userecordingsession) so the provider mutes the take's track for the take (the mixer shows it muted and its `<TrackMuteButton />` is disabled until the take ends). See the [Recording guide](/docs/react/guides/recording).
 
 #### WaveformAnnotationBoxes
 
@@ -724,7 +724,7 @@ import {
 } from '@waveform-playlist/browser';
 ```
 
-The pieces work while a track's audio is still loading: the values are the arrangement's mix, and a change made then is kept. While a take is recorded onto a track (`useTrack().isRecordingArmed`), its mute button is disabled and shown pressed: the track is armed, so it plays muted, while its own mute is left as it is. Every change the pieces make is an undo step: a click on mute or solo is one, and a drag of `<TrackVolumeSlider />` or `<TrackPanSlider />`, or a held arrow key on it, is one.
+The pieces work while a track's audio is still loading: the values are the arrangement's mix, and a change made then is kept. While a take is recorded onto a track (`useTrack().isRecording`), its mute button is disabled and shown pressed: the take plays the track muted, while its own mute is left as it is. Every change the pieces make is an undo step: a click on mute or solo is one, and a drag of `<TrackVolumeSlider />` or `<TrackPanSlider />`, or a held arrow key on it, is one.
 
 ### DefaultTrackControls
 

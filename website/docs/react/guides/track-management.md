@@ -140,7 +140,7 @@ function useMixerGesture() {
 }
 
 function CustomTrackControls() {
-  const { name, muted, soloed, volume, pan, isRecordingArmed, setMuted, setSoloed, setVolume, setPan } =
+  const { name, muted, soloed, volume, pan, isRecording, setMuted, setSoloed, setVolume, setPan } =
     useTrack();
   const volumeGesture = useMixerGesture();
   const panGesture = useMixerGesture();
@@ -149,8 +149,8 @@ function CustomTrackControls() {
     // The slot is as wide as the column and as tall as the track's row.
     <div style={{ height: '100%', boxSizing: 'border-box', padding: 8 }}>
       <div>{name}</div>
-      {/* Pressed during a take (the arm): a click would set the track's own mute from it */}
-      <button disabled={isRecordingArmed} onClick={() => setMuted(!muted)}>
+      {/* Pressed during a take: a click would set the track's own mute from it */}
+      <button disabled={isRecording} onClick={() => setMuted(!muted)}>
         {muted ? 'Unmute' : 'Mute'}
       </button>
       <button onClick={() => setSoloed(!soloed)}>
@@ -189,7 +189,7 @@ Four things to know:
 
 - **Size.** Each track has a slot in the column: as wide as the column (the `width` of the part) and as tall as the track's row, with `overflow: hidden`, so a panel taller than the row is cut off. A mono track's row is `waveHeight` tall (80 px by default), plus the clip header's height when the view has `<WaveformClipHeaders />`; the panel above has four lines of controls and does not fit in that, so set a larger `waveHeight` with `<WaveformViewOptions>` (128, say) or lay the controls out in fewer lines. Fill the slot with `height: 100%`. Do not compute the row height yourself: it depends on the number of channels (also of a take being recorded) and on the clip headers.
 - **Selection.** A click anywhere in a slot selects the track, in your own panel too. A control of yours that must not select calls `event.stopPropagation()` in its click handler. `useTrack().isSelected` says whether the track is the selected one.
-- **Loading and recording.** The values are the arrangement's mix, also while the track's audio loads, and the actions work then: there is nothing to disable for loading (`isLoading` is removed). While a take is recorded onto the track, `useTrack().isRecordingArmed` is true: the track is armed, so it plays muted and `muted` is true, while its own mute is left as it is. A mute button that toggles from `muted` would set the track's own mute from the arm's value, so disable it then.
+- **Loading and recording.** The values are the arrangement's mix, also while the track's audio loads, and the actions work then: there is nothing to disable for loading (`isLoading` is removed). While a take is recorded onto the track, `useTrack().isRecording` is true: the take plays the track muted and `muted` is true, while its own mute is left as it is. A mute button that toggles from `muted` would set the track's own mute from the take's mute, so disable it then.
 - **Undo.** Each mixer action is an undo step. A slider passes one `gesture` id per drag, as above, or every move is a step of its own; see [Undo of Mixer Moves](#undo-of-mixer-moves).
 - **Where it works.** `useTrack()` and the pieces work only among the children of `<WaveformTrackControls>`. Anywhere else they throw. For a mixer elsewhere on the page see [Mixer State Outside the Panel](#mixer-state-outside-the-panel).
 
@@ -292,7 +292,7 @@ Every mute, solo, volume and pan change is an undo step of the arrangement, in t
 - **`{ gesture: id }`:** calls with the same id, one after another, are one step. A slider calls its setter on every move, so it passes one id for the whole drag. `createMixerGesture()` makes the ids for one slider: `gesture.attach(input)` ends the gesture on the input's `change` (the end of a pointer drag), on the `keyup` of an arrow, Page or Home/End key that is held down, and on `blur`; `gesture.id` is the id to pass. Make one per slider, as in the examples above. The built-in `<TrackVolumeSlider />` and `<TrackPanSlider />` do this.
 - **`{ undoable: false }`:** no step. The value is also written into every saved state, so no undo or redo brings back an older one. Use it for a value that is not the user's edit: automation, a mix restored from a saved project, a value synced from elsewhere.
 
-A mixer change made inside an open transaction (`arrangement.beginTransaction()`) is part of it, and an abort takes it back (one with `undoable: false` stays). Arming a track for a take is not an undo step (see [Recording](/docs/react/guides/recording#the-armed-track-is-muted-for-the-take)).
+A mixer change made inside an open transaction (`arrangement.beginTransaction()`) is part of it, and an abort takes it back (one with `undoable: false` stays). The mute a take puts on the track it records onto is not an undo step (see [Recording](/docs/react/guides/recording#the-recorded-track-is-muted-during-the-take)).
 
 `createMixerGesture` is imported from `@waveform-playlist/core`, the package an app already imports `audioTrack` from.
 
@@ -543,7 +543,7 @@ function useMixerGesture() {
 
 // Rendered once per track by <WaveformTrackControls>; useTrack() is the track.
 function TrackControlRow() {
-  const { name, muted, soloed, volume, pan, isRecordingArmed, setMuted, setSoloed, setVolume, setPan } =
+  const { name, muted, soloed, volume, pan, isRecording, setMuted, setSoloed, setVolume, setPan } =
     useTrack();
   const volumeGesture = useMixerGesture();
   const panGesture = useMixerGesture();
@@ -562,7 +562,7 @@ function TrackControlRow() {
       <span>{name}</span>
       <div>
         <button
-          disabled={isRecordingArmed}
+          disabled={isRecording}
           aria-pressed={muted}
           onClick={() => setMuted(!muted)}
           style={{ background: muted ? '#ff6b6b' : '#e0e0e0' }}

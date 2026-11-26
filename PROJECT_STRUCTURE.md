@@ -152,7 +152,7 @@ const clip = createClipFromSeconds({
   - `operations/viewportOperations.ts` — Bounds, chunks, scroll threshold
   - `operations/timelineOperations.ts` — Duration, zoom, seek
   - `arrangement/index.ts` — `createArrangement()` and the public arrangement types
-  - `arrangement/types.ts` — `Arrangement` (tracks, mix, history, the recording arm, `sources`, `retry`), `ClipBounds`, `RemoveTrackOptions`, `MixerChangeOptions`, `CreateArrangementOptions` (`tracks`, `undoLimit`, `loadSource`)
+  - `arrangement/types.ts` — `Arrangement` (tracks, mix, history, the take's mute (`recordingTrackIds`), `sources`, `retry`), `ClipBounds`, `RemoveTrackOptions`, `MixerChangeOptions`, `CreateArrangementOptions` (`tracks`, `undoLimit`, `loadSource`)
   - `arrangement/Arrangement.ts` — `ArrangementImpl` (internal): tracks (loaded and loading clips), mix, history, transactions, ordered delivery of changes
   - `arrangement/sources.ts` — `ArrangementSources`: which sources the states name, the one source loader, the switch of a loading clip to a loaded one, `ArrangementSourcesValue`
   - `arrangement/loadSource.ts` — `LoadSource`, `defaultLoadSource` (fetch or read, then decode)
@@ -169,13 +169,13 @@ const clip = createClipFromSeconds({
 - **Build:** tsup (not vite) — `pnpm typecheck && tsup`. Outputs ESM + CJS + DTS.
 - **Testing:** vitest unit tests in `src/__tests__/`. Run with `npx vitest run` from `packages/engine/`.
 - **Key Types:** `PlayoutAdapter` (pluggable audio backend, optional `addTrack()` for incremental additions), `Arrangement` (from `createArrangement()`), `EngineState` (state incl. `tracksVersion`/`mixerVersion`; `tracks` is `readonly ClipTrack[]`, shared and not a copy), `EngineEvents` (statechange, play/pause/stop)
-- **State Ownership:** The arrangement owns the tracks, the per-track mix, the undo history (of the tracks and the mix), which tracks are armed for recording and the audio sources its clips name (one loader; a loading clip becomes a loaded clip when its source arrives). The engine owns transport, selection, loop, selectedTrackId, zoom and masterVolume. React subscribes to `statechange` events.
+- **State Ownership:** The arrangement owns the tracks, the per-track mix, the undo history (of the tracks and the mix), which tracks a take is recording onto and the audio sources its clips name (one loader; a loading clip becomes a loaded clip when its source arrives). The engine owns transport, selection, loop, selectedTrackId, zoom and masterVolume. React subscribes to `statechange` events.
 - **Clip Mutations:** `moveClip()`, `trimClip()`, `splitClip()` change the arrangement (new array, new track and clip objects for what changed); the engine, told by the arrangement, syncs the adapter via `adapter.updateTrack()` (or `adapter.setTracks()` when the adapter has no `updateTrack`) and emits `statechange`. The browser package's provider is given the arrangement (`arrangement` prop) and derives what it publishes from it; nothing is mirrored back.
   - `moveClip()` returns constrained delta (number). Accepts optional `skipAdapter` parameter to skip adapter sync during high-frequency drags.
   - `trimClip()` accepts optional `skipAdapter` parameter.
   - `getClipBounds()` — returns clip boundary info for constraint calculations.
   - `constrainTrimDelta()` — wraps pure `constrainBoundaryTrim` for per-frame collision detection during trim drag.
-- **Undo/Redo:** Built-in undo stack with configurable `undoLimit` (default 100). `undo()`, `redo()`, `canUndo`, `canRedo` getters. Transactions (`beginTransaction()` / `commitTransaction()` / `abortTransaction()`) group multiple mutations (e.g., a drag gesture) into a single undo step. A transaction that changed nothing pushes no undo step, so a no-op drag leaves no phantom entry. Each saved state holds the tracks and the mix, so an undo, a redo or an abort also brings back volume, mute, solo and pan; the four mixer setters are undo steps (`{ gesture }` groups a fader drag into one, `{ undoable: false }` is no step), and the recording arm is outside the history.
+- **Undo/Redo:** Built-in undo stack with configurable `undoLimit` (default 100). `undo()`, `redo()`, `canUndo`, `canRedo` getters. Transactions (`beginTransaction()` / `commitTransaction()` / `abortTransaction()`) group multiple mutations (e.g., a drag gesture) into a single undo step. A transaction that changed nothing pushes no undo step, so a no-op drag leaves no phantom entry. Each saved state holds the tracks and the mix, so an undo, a redo or an abort also brings back volume, mute, solo and pan; the four mixer setters are undo steps (`{ gesture }` groups a fader drag into one, `{ undoable: false }` is no step), and the take's mute (`setTrackRecording`) is outside the history.
 - **Dependencies:** Only peer dependency is `@waveform-playlist/core`
 - **No React, no Tone.js** — zero framework dependencies
 
@@ -329,7 +329,7 @@ const clip = createClipFromSeconds({
   │   ├── arrangementIdentity.ts        # WaveformPlaylistProvider: the key of its body per arrangement object (a new object remounts everything below), warned once in development
   │   ├── useEngineLifetime.ts          # WaveformPlaylistProvider: builds an engine on the arrangement (mount, effects, zoomLevels), disposes it, attaches the decode context once per mount; the provider's sample rate
   │   ├── useArrangementView.ts         # WaveformPlaylistProvider: what it publishes, derived from the arrangement: loaded tracks, peaks rows with placeholder records, duration, trackStates, canUndo/canRedo
-  │   ├── useArrangementEditing.ts      # WaveformPlaylistProvider: mixer setters, reorder, undo, redo and setRecordingActive on the arrangement; the armed track (RecordingArmContext)
+  │   ├── useArrangementEditing.ts      # WaveformPlaylistProvider: mixer setters, reorder, undo, redo and setRecordingActive on the arrangement; the take's track (RecordingTrackContext)
   │   ├── useReadyOnce.ts               # WaveformPlaylistProvider: isReady, onReady and the ready event once per mount; Play refused before the first ready
   │   ├── useAnnotationState.ts         # the annotationStore prop's list (read, never written), getAnnotations for the loop, preview, active id, the three options (state that follows the annotationList prop); AnnotationListProp
   │   ├── useScrollFollow.ts            # scroll container, automatic scroll, centrePlayhead()
@@ -845,7 +845,7 @@ Engine emits 'statechange' → each hook's onEngineState() mirrors it into React
 
 **Context Splitting Architecture:**
 
-`packages/browser/src/contexts/playlistContexts.ts` defines **26 contexts** (22 public and the four internal `SelectedRowContext`, `TrimPreviewContext`, `TrimPreviewPeaksContext` and `RecordingArmContext`), one per group of fields that change together, to optimize performance by isolating different update frequencies. Both providers render the same context objects for what they share; each provider puts a `BLOCKED` marker in the contexts it does not serve, so a hook reads the nearest provider or throws.
+`packages/browser/src/contexts/playlistContexts.ts` defines **26 contexts** (22 public and the four internal `SelectedRowContext`, `TrimPreviewContext`, `TrimPreviewPeaksContext` and `RecordingTrackContext`), one per group of fields that change together, to optimize performance by isolating different update frequencies. Both providers render the same context objects for what they share; each provider puts a `BLOCKED` marker in the contexts it does not serve, so a hook reads the nearest provider or throws.
 
 Rendered by both `WaveformPlaylistProvider` and `MediaElementPlaylistProvider` (11 public, plus the internal `SelectedRowContext`):
 
@@ -912,7 +912,7 @@ Rendered by `WaveformPlaylistProvider` only, blocked by `MediaElementPlaylistPro
 
 22. **TrimPreviewPeaksContext** (internal, not exported) - The stable function that draws the previewed clip from the provider's latest tracks; the value never changes
 
-23. **RecordingArmContext** (internal, not exported) - The track a take is recorded onto; the controls part gives that track's panel `isRecordingArmed`
+23. **RecordingTrackContext** (internal, not exported) - The track a take is recorded onto; the controls part gives that track's panel `isRecording`
 
 Rendered by `MediaElementPlaylistProvider` only, blocked by `WaveformPlaylistProvider` (2):
 
@@ -1055,8 +1055,8 @@ export interface EditorControlsContextValue {
   // Undo/Redo
   undo: () => void;
   redo: () => void;
-  // Recording (arms the track in the arrangement: plays muted, not an undo step)
-  setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
+  // Recording (mutes the take's track in the arrangement for the take, not an undo step)
+  setRecordingActive: (active: boolean, recordingTrackId?: string | null) => void;
 }
 
 // 4. View - what the provider was configured with; changes on a prop change
@@ -1536,9 +1536,9 @@ import {
 // Custom track controls: rendered once per track by WaveformTrackControls,
 // and useTrack() is the track this copy is drawn for
 const CustomTrackControls = () => {
-  const { muted, isRecordingArmed, setMuted } = useTrack();
+  const { muted, isRecording, setMuted } = useTrack();
   return (
-    <button disabled={isRecordingArmed} onClick={() => setMuted(!muted)}>
+    <button disabled={isRecording} onClick={() => setMuted(!muted)}>
       {muted ? 'Unmute' : 'Mute'}
     </button>
   );

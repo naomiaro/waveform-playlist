@@ -5,7 +5,7 @@ import { warnMisplacedPart } from './partWarnings';
 import {
   usePlaylistMixer,
   useEditorControls,
-  useRecordingArm,
+  useRecordingTrack,
   useSelectedTrackId,
 } from '../contexts/playlistContexts';
 import { SpectrogramIntegrationContext } from '../SpectrogramIntegrationContext';
@@ -61,7 +61,7 @@ interface TrackControlsSlotProps {
   isLast: boolean;
   renderMode: RenderMode;
   hasSpectrogram: boolean;
-  isRecordingArmed: boolean;
+  isRecording: boolean;
   height: number;
   top: number;
   animate: boolean;
@@ -93,7 +93,7 @@ function TrackControlsSlotImpl({
   isLast,
   renderMode,
   hasSpectrogram,
-  isRecordingArmed,
+  isRecording,
   height,
   top,
   animate,
@@ -157,7 +157,7 @@ function TrackControlsSlotImpl({
       isFirst,
       isLast,
       hasSpectrogram,
-      isRecordingArmed,
+      isRecording,
       ...actions,
     }),
     [
@@ -174,7 +174,7 @@ function TrackControlsSlotImpl({
       isFirst,
       isLast,
       hasSpectrogram,
-      isRecordingArmed,
+      isRecording,
       actions,
     ]
   );
@@ -245,7 +245,7 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
   }
   const { selectedTrackId } = useSelectedTrackId();
   // The track a take is recorded onto (#812): its slot alone renders when a take starts or ends.
-  const { armedTrackId } = useRecordingArm();
+  const { recordingTrackId } = useRecordingTrack();
   const spectrogram = use(SpectrogramIntegrationContext);
   const { trackStates } = usePlaylistMixer();
 
@@ -294,7 +294,7 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
               isLast={trackIndex === tracks.length - 1}
               renderMode={renderModeById.get(track.id) ?? 'waveform'}
               hasSpectrogram={spectrogram !== null && track.kind !== 'midi'}
-              isRecordingArmed={track.id === armedTrackId}
+              isRecording={track.id === recordingTrackId}
               height={trackHeightById.get(track.id) ?? 0}
               top={trackLayout.topById.get(track.id) ?? 0}
               // `top` is animated only while a drag preview is live, not in the

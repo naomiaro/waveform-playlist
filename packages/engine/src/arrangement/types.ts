@@ -49,15 +49,15 @@ export interface Arrangement {
    */
   getTracks(): readonly ArrangementTrack[];
   /**
-   * The current volume, mute, solo and pan by track id (the stored mute: an
-   * armed track's is not forced here). The same Map until a value changes, a
-   * track with a new id enters, entries of tracks that are gone are dropped,
-   * or an undo, a redo or an abort brings back another state's Map.
-   * `mixerVersion` counts the value changes of current tracks, and also an
-   * arm or a disarm of a current track, which leaves this Map as it is; an
-   * entry seeded, carried or dropped with its track is not counted. A
-   * track's own mixer fields in `getTracks()` are the values it entered
-   * with; the current ones are here.
+   * The current volume, mute, solo and pan by track id (the stored mute: the
+   * mute of the track a take is recording onto is not forced here). The same
+   * Map until a value changes, a track with a new id enters, entries of
+   * tracks that are gone are dropped, or an undo, a redo or an abort brings
+   * back another state's Map. `mixerVersion` counts the value changes of
+   * current tracks, and also the start or end of a take's mute on a current
+   * track, which leaves this Map as it is; an entry seeded, carried or
+   * dropped with its track is not counted. A track's own mixer fields in
+   * `getTracks()` are the values it entered with; the current ones are here.
    */
   getMixer(): ReadonlyMap<string, TrackMixerValues>;
   /**
@@ -120,22 +120,23 @@ export interface Arrangement {
   setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
   setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
 
-  // recording arm
+  // recording mute (the track a take is recording onto)
   /**
-   * The ids of the tracks armed for recording. The same Set until one is
-   * armed or disarmed; never write to it.
+   * The ids of the tracks a take is recording onto. The same Set until one
+   * is added or removed; never write to it.
    */
-  readonly armedTrackIds: ReadonlySet<string>;
+  readonly recordingTrackIds: ReadonlySet<string>;
   /**
-   * Arm or disarm a track for recording. An armed track plays muted: the
-   * engine's `getState().tracks` and its adapter have it muted, while its
-   * mute in `getMixer()` stays as it is and comes back when the track is
-   * disarmed. Arming is not an undo step, and undo, redo, an abort,
-   * `setTracks` and `clearHistory` do not change which tracks are armed. An
-   * id that is not in the current tracks is armed too, and mutes nothing
-   * until a track of that id enters. The same value changes nothing.
+   * Mark a track as the one a take is recording onto, or clear it when the
+   * take ends. Such a track plays muted: the engine's `getState().tracks`
+   * and its adapter have it muted, while its mute in `getMixer()` stays as
+   * it is and comes back when the take ends. This is not an undo step, and
+   * undo, redo, an abort, `setTracks` and `clearHistory` do not change which
+   * tracks are recording. An id that is not in the current tracks is
+   * recorded too, and mutes nothing until a track of that id enters. The
+   * same value changes nothing.
    */
-  setTrackArmed(trackId: string, armed: boolean): void;
+  setTrackRecording(trackId: string, recording: boolean): void;
 
   // history
   readonly canUndo: boolean;

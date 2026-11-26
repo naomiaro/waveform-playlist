@@ -113,7 +113,7 @@ A different tempo is not converted. A tick is the musical position, so an engine
 
 An arrangement plays through one engine at a time: building a second engine on it while the first has not been disposed logs a warning. Two engines alive on one arrangement is unsupported, in particular with different `ppqn`: the second engine's time base replaces the first's, so ticks the first engine gives later are computed with the second engine's. The engine's own `undoLimit` option is ignored, with a warning, when an arrangement is passed; set it on `createArrangement({ undoLimit })`. The `arrangement` option accepts only an arrangement made by `createArrangement()`. The engine recognises one by a versioned `Symbol.for` key and not by `instanceof`, so an arrangement made by another installed copy of this package (an app and a library that pin different versions) is accepted as long as both copies use the same key version. The key version changed with the mixer undo steps (`/v2`): an engine and an arrangement from copies on either side of that change refuse each other.
 
-The engine's track, clip, mixer, arm and history methods call the arrangement's, so a change made through either reaches the adapter and emits `statechange`. The arrangement's `removeTrack` also takes `{ undoable: false }` (no undo step, and the track is taken out of every undo and redo state, so no undo brings it back: for a dropped file that could not be decoded), and its `updateTrack` takes a function of the current track: `arrangement.updateTrack(id, (track) => ({ ...track, name: 'Bass' }))`.
+The engine's track, clip, mixer, recording and history methods call the arrangement's, so a change made through either reaches the adapter and emits `statechange`. The arrangement's `removeTrack` also takes `{ undoable: false }` (no undo step, and the track is taken out of every undo and redo state, so no undo brings it back: for a dropped file that could not be decoded), and its `updateTrack` takes a function of the current track: `arrangement.updateTrack(id, (track) => ({ ...track, name: 'Bass' }))`.
 
 ### Mixer moves are undo steps
 
@@ -140,7 +140,7 @@ slider.addEventListener('input', () => {
 
 `attach` ends the gesture on the input's `change` (the end of a pointer drag), except while an arrow, Page Up/Down, Home or End key is held: then on that key's `keyup`, so a held key is one step. A `blur` ends it too. Mute and solo buttons need no helper: each click is a step.
 
-**The recording arm.** `setTrackArmed(trackId, armed)` (arrangement and engine) arms a track for recording, and `arrangement.armedTrackIds` is the set of armed ids. An armed track plays muted: `engine.getState().tracks` and the adapter have it muted, while its mute in `getMixer()` stays as it is and comes back when the track is disarmed. Arming is not an undo step, and undo, redo, an abort, `setTracks` and `clearHistory` do not change which tracks are armed.
+**The take's mute.** `setTrackRecording(trackId, recording)` (arrangement and engine) marks the track a take is recording onto, and `arrangement.recordingTrackIds` is the set of those ids. Such a track plays muted for the length of the take: `engine.getState().tracks` and the adapter have it muted, while its mute in `getMixer()` stays as it is and comes back when the take ends. It is not an undo step, and undo, redo, an abort, `setTracks` and `clearHistory` do not change which tracks are recording. It is not a record-arm: it lasts only while a take is recorded.
 
 ### Loading audio
 
@@ -286,7 +286,7 @@ class PlaylistEngine {
   setTrackMute(trackId: string, muted: boolean, options?: MixerChangeOptions): void;
   setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
   setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
-  setTrackArmed(trackId: string, armed: boolean): void; // plays muted while armed; not an undo step
+  setTrackRecording(trackId: string, recording: boolean): void; // plays muted during the take; not an undo step
   zoomIn(): void;
   zoomOut(): void;
   setZoomLevel(samplesPerPixel: number): void;
@@ -353,9 +353,9 @@ interface Arrangement {
   setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
   setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
 
-  // recording arm (outside the history)
-  readonly armedTrackIds: ReadonlySet<string>;
-  setTrackArmed(trackId: string, armed: boolean): void;
+  // the take's mute: the tracks a take is recording onto (outside the history)
+  readonly recordingTrackIds: ReadonlySet<string>;
+  setTrackRecording(trackId: string, recording: boolean): void;
 
   // history
   readonly canUndo: boolean;

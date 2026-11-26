@@ -3889,7 +3889,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
                       .volume=${mix.volume}
                       .pan=${mix.pan}
                       .muted=${mix.muted}
-                      .armed=${this._engine?.armedTrackIds.has(t.trackId) ?? false}
+                      .recording=${this._engine?.recordingTrackIds.has(t.trackId) ?? false}
                       .soloed=${mix.soloed}
                       .reorderable=${this.trackReordering}
                       .trackIndex=${i}

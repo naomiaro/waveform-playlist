@@ -36,7 +36,7 @@ function stubAudioPipeline(editor: any) {
   };
   // Mock the engine so _ensureEngine resolves without building one.
   editor._engine = {
-    armedTrackIds: new Set<string>(),
+    recordingTrackIds: new Set<string>(),
     setTracks: vi.fn(),
     addTrack: vi.fn(),
     removeTrack: vi.fn(),

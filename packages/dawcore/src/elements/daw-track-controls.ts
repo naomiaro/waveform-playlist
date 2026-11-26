@@ -16,8 +16,8 @@ export class DawTrackControlsElement extends LitElement {
   @property({ type: Number, attribute: false }) volume = 1;
   @property({ type: Number, attribute: false }) pan = 0;
   @property({ type: Boolean, attribute: false }) muted = false;
-  /** The track is armed for a take: it plays muted, and the M button is disabled. */
-  @property({ type: Boolean, attribute: false }) armed = false;
+  /** A take is recording onto the track: it plays muted, and the M button is disabled. */
+  @property({ type: Boolean, attribute: false }) recording = false;
   @property({ type: Boolean, attribute: false }) soloed = false;
   /** Show the reorder grip + move up/down buttons (set by the editor from
    *  its track-reordering attribute). */
@@ -260,7 +260,7 @@ export class DawTrackControlsElement extends LitElement {
   };
 
   private _onMuteClick = () => {
-    if (this.armed) return;
+    if (this.recording) return;
     this._dispatchControl('muted', !this.muted);
   };
 
@@ -351,7 +351,7 @@ export class DawTrackControlsElement extends LitElement {
         <button
           class="btn ${this.muted ? 'muted-active' : ''}"
           @click=${this._onMuteClick}
-          ?disabled=${this.armed}
+          ?disabled=${this.recording}
           title="Mute"
         >
           M

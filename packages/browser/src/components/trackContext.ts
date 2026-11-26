@@ -24,7 +24,7 @@ export interface TrackContextValue {
 
   /** The track's name, or "Track N" (N is the position, from 1) when it has none and while it is loading. */
   name: string;
-  /** The track's own mute, or true while it is armed for a take (`isRecordingArmed`). */
+  /** The track's own mute, or true while a take is recording onto it (`isRecording`). */
   muted: boolean;
   soloed: boolean;
   /** 0 to 1. */
@@ -50,9 +50,9 @@ export interface TrackContextValue {
    * changed by the take: a mute set meanwhile stays after it (#843). The
    * built-in `<TrackMuteButton />` is disabled while this is true; an app's
    * own mute control can do the same, since toggling from `muted` here would
-   * set the track's own mute from the arm's value.
+   * set the track's own mute from the take's mute.
    */
-  isRecordingArmed: boolean;
+  isRecording: boolean;
 
   // Actions. Each keeps its identity while the track's slot is mounted and a
   // track menu neither becomes available nor stops being so. The four mixer

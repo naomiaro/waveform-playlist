@@ -79,7 +79,7 @@ import type { Arrangement, ClipBounds, MixerChangeOptions, RemoveTrackOptions } 
 
 const DEFAULT_MIN_DURATION_SECONDS = 0.1;
 const DEFAULT_UNDO_LIMIT = 100;
-const EMPTY_ARMED: ReadonlySet<string> = new Set();
+const EMPTY_RECORDING: ReadonlySet<string> = new Set();
 
 /** What changed, for a subscriber that has to act on it (the engine's adapter sync). */
 export type ArrangementChange =
@@ -99,8 +99,8 @@ export type ArrangementChange =
   /** Audio arrived: loading clips of the current tracks became loaded clips. */
   | { type: 'load'; previous: readonly ArrangementTrack[] }
   | { type: 'mixer'; trackId: string; values: Partial<TrackMixerValues> }
-  /** A track was armed or disarmed for recording (`armedTrackIds` is another Set). */
-  | { type: 'arm'; trackId: string }
+  /** A take started or ended recording onto a track (`recordingTrackIds` is another Set). */
+  | { type: 'recording'; trackId: string }
   | { type: 'recompute' }
   | { type: 'history' };
 
@@ -138,10 +138,10 @@ export class ArrangementImpl implements Arrangement {
   private _mixerVersion = 0;
   private _mixer: Mixer = EMPTY_MIXER;
   /**
-   * The ids of the tracks armed for recording: outside the history and
+   * The ids of the tracks a take is recording onto: outside the history and
    * every saved state (#843). Replaced on a change, never written to.
    */
-  private _armed: ReadonlySet<string> = EMPTY_ARMED;
+  private _recordingTrackIds: ReadonlySet<string> = EMPTY_RECORDING;
   private _history: History = EMPTY_HISTORY;
   private _transaction: TransactionBase | null = null;
   /**
@@ -561,32 +561,33 @@ export class ArrangementImpl implements Arrangement {
   }
 
   // ---------------------------------------------------------------------------
-  // Recording arm
+  // Recording mute (the track a take is recording onto)
   // ---------------------------------------------------------------------------
   //
-  // An armed track plays muted: the engine's projection and the adapter get
-  // `muted: stored || armed`, and the stored mute in `getMixer()` is not
-  // touched. The set is outside the history: arming is no undo step, and
-  // undo, redo, abort, `setTracks` and `clearHistory` leave it alone (#843).
+  // The track a take is recording onto plays muted: the engine's projection
+  // and the adapter get `muted: stored || recording`, and the stored mute in
+  // `getMixer()` is not touched. The set is outside the history: the take's
+  // mute is no undo step, and undo, redo, abort, `setTracks` and
+  // `clearHistory` leave it alone (#843).
 
-  /** The ids of the tracks armed for recording. The same Set until it changes; never written to. */
-  get armedTrackIds(): ReadonlySet<string> {
-    return this._armed;
+  /** The ids of the tracks a take is recording onto. The same Set until it changes; never written to. */
+  get recordingTrackIds(): ReadonlySet<string> {
+    return this._recordingTrackIds;
   }
 
   /**
-   * Arm or disarm a track for recording. An id that is not in the current
-   * tracks is recorded too, and mutes nothing until a track of that id
-   * enters. The same value does nothing.
+   * Mark a track as the one a take is recording onto, or clear it. An id
+   * that is not in the current tracks is recorded too, and mutes nothing
+   * until a track of that id enters. The same value does nothing.
    */
-  setTrackArmed(trackId: string, armed: boolean): void {
-    if (this._armed.has(trackId) === armed) return;
-    this._armed = armed
-      ? new Set([...this._armed, trackId])
-      : new Set([...this._armed].filter((id) => id !== trackId));
+  setTrackRecording(trackId: string, recording: boolean): void {
+    if (this._recordingTrackIds.has(trackId) === recording) return;
+    this._recordingTrackIds = recording
+      ? new Set([...this._recordingTrackIds, trackId])
+      : new Set([...this._recordingTrackIds].filter((id) => id !== trackId));
     // Only a current track's projection changes (the cache follows mixerVersion).
     if (this._mixer.has(trackId)) this._mixerVersion++;
-    this._emit({ type: 'arm', trackId });
+    this._emit({ type: 'recording', trackId });
   }
 
   // ---------------------------------------------------------------------------
@@ -913,9 +914,9 @@ export class ArrangementImpl implements Arrangement {
   private _emit(change: ArrangementChange): void {
     // The states may name other sources now, and a clip that came in may name
     // one that is loaded already: it is a loaded clip before anyone is told.
-    // A change of the mix alone (or of the arm) names no other source.
+    // A change of the mix alone (or of the take's mute) names no other source.
     const mixOnly =
-      change.type === 'mixer' || change.type === 'restoreMix' || change.type === 'arm';
+      change.type === 'mixer' || change.type === 'restoreMix' || change.type === 'recording';
     const switched = mixOnly ? null : this._syncSources();
     // Every change announces itself here, so this is where a new state is
     // frozen (outside production builds) before anyone can read it.

@@ -1,9 +1,10 @@
 /**
- * The recording arm (#843): a set of armed track ids that the arrangement
- * keeps outside the history. An armed track plays muted (the engine's
- * projection and the adapter have `muted: stored || armed`), while the
- * stored mute in `getMixer()` is never touched. Arming is no undo step, and
- * undo, redo, abort, `setTracks` and `clearHistory` leave the set alone.
+ * The take's mute (#843): a set of the ids of the tracks a take is recording
+ * onto, which the arrangement keeps outside the history. Such a track plays
+ * muted (the engine's projection and the adapter have
+ * `muted: stored || recording`), while the stored mute in `getMixer()` is
+ * never touched. The take's mute is no undo step, and undo, redo, abort,
+ * `setTracks` and `clearHistory` leave the set alone.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createClip, createTrack } from '@waveform-playlist/core';
@@ -66,92 +67,92 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('the recording arm', () => {
-  it('an armed track plays muted and its stored mute is untouched', () => {
+describe('the recording mute', () => {
+  it('the track a take is recording onto plays muted and its stored mute is untouched', () => {
     const { arrangement, adapter, engine } = setup();
-    arrangement.setTrackArmed('A', true);
+    arrangement.setTrackRecording('A', true);
     expect(mutedInState(engine)).toBe(true);
     expect(arrangement.getMixer().get('A')?.muted).toBe(false);
     expect(adapter.calls).toEqual([muteCall('A', true)]);
-    expect(arrangement.armedTrackIds.has('A')).toBe(true);
+    expect(arrangement.recordingTrackIds.has('A')).toBe(true);
 
     adapter.reset();
-    arrangement.setTrackArmed('A', false);
+    arrangement.setTrackRecording('A', false);
     expect(mutedInState(engine)).toBe(false);
     expect(adapter.calls).toEqual([muteCall('A', false)]);
-    expect(arrangement.armedTrackIds.has('A')).toBe(false);
+    expect(arrangement.recordingTrackIds.has('A')).toBe(false);
   });
 
-  it('disarming a track whose stored mute is on leaves it muted', () => {
+  it('the end of the take on a track whose stored mute is on leaves it muted', () => {
     const { arrangement, adapter, engine } = setup();
     arrangement.setTrackMute('A', true);
-    arrangement.setTrackArmed('A', true);
+    arrangement.setTrackRecording('A', true);
     adapter.reset();
-    arrangement.setTrackArmed('A', false);
+    arrangement.setTrackRecording('A', false);
     expect(mutedInState(engine)).toBe(true);
     expect(adapter.calls).toEqual([muteCall('A', true)]);
   });
 
-  it('arming is not an undo step and undo does not change it', () => {
+  it('the recording mute is not an undo step and undo does not change it', () => {
     const { arrangement, engine } = setup();
-    arrangement.setTrackArmed('A', true);
+    arrangement.setTrackRecording('A', true);
     expect(arrangement.canUndo).toBe(false);
     expect(arrangement.canRedo).toBe(false);
 
     arrangement.moveClip('A', 'a1', 1000);
     arrangement.undo();
-    expect(arrangement.armedTrackIds.has('A')).toBe(true);
+    expect(arrangement.recordingTrackIds.has('A')).toBe(true);
     expect(mutedInState(engine)).toBe(true);
     arrangement.redo();
-    expect(arrangement.armedTrackIds.has('A')).toBe(true);
+    expect(arrangement.recordingTrackIds.has('A')).toBe(true);
     expect(mutedInState(engine)).toBe(true);
   });
 
-  it('arming keeps the redo states', () => {
+  it('the recording mute keeps the redo states', () => {
     const { arrangement } = setup();
     arrangement.moveClip('A', 'a1', 1000);
     arrangement.undo();
-    arrangement.setTrackArmed('A', true);
+    arrangement.setTrackRecording('A', true);
     expect(arrangement.canRedo).toBe(true);
   });
 
-  it('arming inside a transaction is not taken back by abort, and a commit of only an arm pushes nothing', () => {
+  it('the recording mute inside a transaction is not taken back by abort, and a commit of only that pushes nothing', () => {
     const { arrangement } = setup();
     arrangement.beginTransaction();
-    arrangement.setTrackArmed('A', true);
+    arrangement.setTrackRecording('A', true);
     arrangement.abortTransaction();
-    expect(arrangement.armedTrackIds.has('A')).toBe(true);
+    expect(arrangement.recordingTrackIds.has('A')).toBe(true);
 
     arrangement.beginTransaction();
-    arrangement.setTrackArmed('A', false);
+    arrangement.setTrackRecording('A', false);
     arrangement.commitTransaction();
     expect(arrangement.canUndo).toBe(false);
-    expect(arrangement.armedTrackIds.has('A')).toBe(false);
+    expect(arrangement.recordingTrackIds.has('A')).toBe(false);
   });
 
-  it('setTracks and clearHistory leave the armed set alone', () => {
+  it('setTracks and clearHistory leave the recording set alone', () => {
     const { arrangement, engine } = setup();
-    arrangement.setTrackArmed('A', true);
-    const armed = arrangement.armedTrackIds;
+    arrangement.setTrackRecording('A', true);
+    const recording = arrangement.recordingTrackIds;
     arrangement.clearHistory();
     arrangement.setTracks(fixture());
-    expect(arrangement.armedTrackIds).toBe(armed);
+    expect(arrangement.recordingTrackIds).toBe(recording);
     expect(mutedInState(engine)).toBe(true);
   });
 
-  it('arming does not split a gesture', () => {
+  it('the recording mute does not split a gesture', () => {
     const { arrangement } = setup();
     arrangement.setTrackVolume('A', 0.5, { gesture: 'g' });
-    arrangement.setTrackArmed('B', true);
+    arrangement.setTrackRecording('B', true);
     arrangement.setTrackVolume('A', 0.4, { gesture: 'g' });
     arrangement.undo();
     expect(arrangement.getMixer().get('A')?.volume).toBe(1);
     expect(arrangement.canUndo).toBe(false);
   });
 
-  it('a mute set while armed still plays muted', () => {
+  it('a mute set while recording still plays muted', () => {
     const { arrangement, adapter, engine } = setup();
-    arrangement.setTrackArmed('A', true);
+    arrangement.setTrackRecording('A', true);
     adapter.reset();
     // Through the engine: its first call gives the value the track already has.
     engine.setTrackMute('A', false);
@@ -166,15 +167,15 @@ describe('the recording arm', () => {
     expect(arrangement.getMixer().get('A')?.muted).toBe(false);
 
     adapter.reset();
-    arrangement.setTrackArmed('A', false);
+    arrangement.setTrackRecording('A', false);
     expect(adapter.calls).toEqual([muteCall('A', false)]);
     expect(mutedInState(engine)).toBe(false);
   });
 
-  it('an undo that brings back an unmuted mix on an armed track does not unmute it', () => {
+  it('an undo that brings back an unmuted mix on the recording track does not unmute it', () => {
     const { arrangement, adapter, engine } = setup();
     arrangement.setTrackMute('A', true);
-    arrangement.setTrackArmed('A', true);
+    arrangement.setTrackRecording('A', true);
     adapter.reset();
     arrangement.undo(); // the stored mute goes back to false
     expect(arrangement.getMixer().get('A')?.muted).toBe(false);
@@ -186,80 +187,80 @@ describe('the recording arm', () => {
     expect(muteCalls(adapter.calls)).not.toContainEqual(muteCall('A', false));
 
     adapter.reset();
-    arrangement.setTrackArmed('A', false);
+    arrangement.setTrackRecording('A', false);
     expect(adapter.calls).toEqual([muteCall('A', false)]);
   });
 
-  it('an undo of a move with a mute change in one step keeps an armed track muted', () => {
+  it('an undo of a move with a mute change in one step keeps the recording track muted', () => {
     const { arrangement, adapter, engine } = setup();
     arrangement.beginTransaction();
     arrangement.moveClip('A', 'a1', 1000);
     arrangement.setTrackMute('A', true);
     arrangement.commitTransaction();
-    arrangement.setTrackArmed('A', true);
+    arrangement.setTrackRecording('A', true);
     adapter.reset();
     arrangement.undo();
     expect(muteCalls(adapter.calls)).not.toContainEqual(muteCall('A', false));
     expect(mutedInState(engine)).toBe(true);
   });
 
-  it('an arm change increments mixerVersion, not tracksVersion', () => {
+  it('a recording change increments mixerVersion, not tracksVersion', () => {
     const { arrangement } = setup();
     const { tracksVersion, mixerVersion } = arrangement;
-    arrangement.setTrackArmed('A', true);
+    arrangement.setTrackRecording('A', true);
     expect(arrangement.mixerVersion).toBe(mixerVersion + 1);
     expect(arrangement.tracksVersion).toBe(tracksVersion);
-    arrangement.setTrackArmed('A', false);
+    arrangement.setTrackRecording('A', false);
     expect(arrangement.mixerVersion).toBe(mixerVersion + 2);
     expect(arrangement.tracksVersion).toBe(tracksVersion);
   });
 
-  it('an arm change is announced as an arm, and the mixer Map stays the same object', () => {
+  it('a recording change is announced as recording, and the mixer Map stays the same object', () => {
     const { arrangement, changes } = setup();
     const mixer = arrangement.getMixer();
     const subscriber = vi.fn();
     arrangement.subscribe(subscriber);
-    arrangement.setTrackArmed('A', true);
-    expect(changes).toEqual([{ type: 'arm', trackId: 'A' }]);
+    arrangement.setTrackRecording('A', true);
+    expect(changes).toEqual([{ type: 'recording', trackId: 'A' }]);
     expect(subscriber).toHaveBeenCalledTimes(1);
     expect(arrangement.getMixer()).toBe(mixer);
   });
 
-  it('the armed set is replaced on a change and is the same Set until then', () => {
+  it('the recording set is replaced on a change and is the same Set until then', () => {
     const { arrangement } = setup();
-    const before = arrangement.armedTrackIds;
+    const before = arrangement.recordingTrackIds;
     expect(before.size).toBe(0);
-    arrangement.setTrackArmed('A', true);
-    const armed = arrangement.armedTrackIds;
-    expect(armed).not.toBe(before);
+    arrangement.setTrackRecording('A', true);
+    const recording = arrangement.recordingTrackIds;
+    expect(recording).not.toBe(before);
     expect(before.size).toBe(0);
-    expect(arrangement.armedTrackIds).toBe(armed);
-    arrangement.setTrackArmed('B', true);
-    expect([...arrangement.armedTrackIds]).toEqual(['A', 'B']);
-    expect([...armed]).toEqual(['A']);
+    expect(arrangement.recordingTrackIds).toBe(recording);
+    arrangement.setTrackRecording('B', true);
+    expect([...arrangement.recordingTrackIds]).toEqual(['A', 'B']);
+    expect([...recording]).toEqual(['A']);
   });
 
-  it('the projection is the same array until an arm changes it, and other tracks keep their objects', () => {
+  it('the projection is the same array until a recording change, and other tracks keep their objects', () => {
     const { arrangement, engine } = setup();
     const before = engine.getState().tracks;
     expect(engine.getState().tracks).toBe(before);
-    arrangement.setTrackArmed('A', true);
+    arrangement.setTrackRecording('A', true);
     const after = engine.getState().tracks;
     expect(after).not.toBe(before);
     expect(after[1]).toBe(before[1]);
-    arrangement.setTrackArmed('A', false);
+    arrangement.setTrackRecording('A', false);
     expect(engine.getState().tracks[0]).toBe(before[0]);
   });
 
-  it('an armed id not in the tracks mutes nothing until it enters', () => {
+  it('a recording id not in the tracks mutes nothing until it enters', () => {
     const { arrangement, adapter, engine, changes } = setup();
     const { mixerVersion, tracksVersion } = arrangement;
     const tracks = engine.getState().tracks;
-    arrangement.setTrackArmed('C', true);
-    expect(arrangement.armedTrackIds.has('C')).toBe(true);
+    arrangement.setTrackRecording('C', true);
+    expect(arrangement.recordingTrackIds.has('C')).toBe(true);
     // Rule (my call, #843): the set changed, so it is announced; the
     // projection cannot change, so mixerVersion stays.
-    expect(changes).toEqual([{ type: 'arm', trackId: 'C' }]);
+    expect(changes).toEqual([{ type: 'recording', trackId: 'C' }]);
     expect(arrangement.mixerVersion).toBe(mixerVersion);
     expect(arrangement.tracksVersion).toBe(tracksVersion);
     expect(engine.getState().tracks).toBe(tracks);
@@ -274,39 +275,39 @@ describe('the recording arm', () => {
     expect(sent.muted).toBe(true);
   });
 
-  it('an armed track that is removed and brought back by undo is armed again', () => {
+  it('a recording track that is removed and brought back by undo is muted again', () => {
     const { arrangement, engine } = setup();
-    arrangement.setTrackArmed('A', true);
+    arrangement.setTrackRecording('A', true);
     arrangement.removeTrack('A');
-    expect(arrangement.armedTrackIds.has('A')).toBe(true);
+    expect(arrangement.recordingTrackIds.has('A')).toBe(true);
     arrangement.undo();
     expect(mutedInState(engine)).toBe(true);
     expect(arrangement.getMixer().get('A')?.muted).toBe(false);
   });
 
-  it('arming the same value twice does nothing', () => {
+  it('setting the same recording value twice does nothing', () => {
     const { arrangement, adapter, changes } = setup();
-    arrangement.setTrackArmed('A', true);
-    const armed = arrangement.armedTrackIds;
+    arrangement.setTrackRecording('A', true);
+    const recording = arrangement.recordingTrackIds;
     const { mixerVersion } = arrangement;
     changes.length = 0;
     adapter.reset();
-    arrangement.setTrackArmed('A', true);
-    arrangement.setTrackArmed('B', false);
-    arrangement.setTrackArmed('C', false);
+    arrangement.setTrackRecording('A', true);
+    arrangement.setTrackRecording('B', false);
+    arrangement.setTrackRecording('C', false);
     expect(changes).toEqual([]);
     expect(adapter.calls).toEqual([]);
     expect(arrangement.mixerVersion).toBe(mixerVersion);
-    expect(arrangement.armedTrackIds).toBe(armed);
+    expect(arrangement.recordingTrackIds).toBe(recording);
   });
 
   it("the engine's setter for a track it does not hold still calls the adapter with the value given", () => {
     const { arrangement, adapter, engine } = setup();
-    arrangement.setTrackArmed('C', true);
+    arrangement.setTrackRecording('C', true);
     engine.setTrackMute('C', false);
     expect(adapter.calls).toEqual([muteCall('C', false)]);
 
-    // The arm applies once the track enters.
+    // The recording mute applies once the track enters.
     arrangement.addTrack(track('C', [clip('c1', 0)]));
     expect(mutedInState(engine, 'C')).toBe(true);
   });

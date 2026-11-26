@@ -1875,10 +1875,10 @@ Edits to the track/clip document model and to the mix are undoable:
 | Clip trim                      | Zoom                                      |
 | Clip split                     | Loop region                               |
 | Add/remove track               | Playback transport (play/pause/stop/seek) |
-| Add/remove clip                | The recording arm                         |
+| Add/remove clip                | A take's mute on its track                |
 | Volume, pan, mute, solo (#843) |                                           |
 
-A mixer move is one step per gesture: one slider drag or key press in `<daw-track-controls>`, one Mute or Solo click, one `<daw-track>` attribute update, one `editor.updateTrack()` call (engine calls with one `{ gesture }` id are one step; `{ undoable: false }` is none). Arming a track for a take mutes it without a step and without changing its stored mute. Selection and zoom are navigation, not edits.
+A mixer move is one step per gesture: one slider drag or key press in `<daw-track-controls>`, one Mute or Solo click, one `<daw-track>` attribute update, one `editor.updateTrack()` call (engine calls with one `{ gesture }` id are one step; `{ undoable: false }` is none). A take mutes the track it records onto without a step and without changing its stored mute (this is not the `record-armed` record-arm described above). Selection and zoom are navigation, not edits.
 
 ### Snapshot-Based Stack
 

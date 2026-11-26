@@ -11,7 +11,7 @@ Framework-agnostic Web Components for multi-track audio editing. Drop `<daw-edit
 - **Keyboard shortcuts** — Play/pause, split, undo/redo via `<daw-keyboard-shortcuts>`
 - **Undo/redo** — Full transaction-based undo with Cmd/Ctrl+Z and Cmd/Ctrl+Shift+Z; mixer moves are undo steps too (one per slider drag, click, attribute update or `updateTrack` call)
 - **File drop** — Drag audio files onto the editor to add tracks (enable with the `file-drop` attribute)
-- **Recording** — Live mic recording with waveform preview (full clip chrome incl. header while capturing), pause/resume, cancelable clip creation; takes land at the playhead and replace overlapped clip content (punch-in), the recorded-over track is armed (plays muted) during the take, and the end-of-timeline auto-stop is suppressed so takes run past existing audio
+- **Recording** — Live mic recording with waveform preview (full clip chrome incl. header while capturing), pause/resume, cancelable clip creation; takes land at the playhead and replace overlapped clip content (punch-in), the recorded-over track plays muted during the take, and the end-of-timeline auto-stop is suppressed so takes run past existing audio
 - **Pre-computed peaks** — Instant waveform rendering from `.dat` files before audio decodes
 - **MIDI tracks** — Declarative or programmatic MIDI clips render as piano-roll. Playback via the Tone.js adapter. See [MIDI Tracks](#midi-tracks).
 - **MIDI file loading** — `editor.loadMidi(urlOrFile)` parses a `.mid` file into piano-roll tracks via the optional `@dawcore/midi` peer
@@ -394,7 +394,7 @@ A recorded take has no `<daw-clip>` element; its engine clip id is the `clipId` 
 
 `daw-recording-clip-add` is not guaranteed after every `daw-recording-complete`: it is skipped when you cancel the complete event, when peak generation for the take fails (`daw-error` with `operation: 'recording-peaks'`), and when the track was removed in the meantime.
 
-During a take the editor shows the live preview with full clip chrome (header label from `RecordingOptions.clipName`, default "Recording…"), arms the recorded track (punch-in replaces whatever the take overlaps, so the doomed material never plays under the overdub: the track plays muted, its controls and `editor.tracks` show it muted, and an `exportAudio()` during the take leaves it out; arming is not an undo step and does not change the track's own mute, so a mute changed during the take stays after it), and suppresses the end-of-timeline auto-stop so the take can run past existing audio.
+During a take the editor shows the live preview with full clip chrome (header label from `RecordingOptions.clipName`, default "Recording…"), mutes the recorded track for the take (punch-in replaces whatever the take overlaps, so the doomed material never plays under the overdub: the track plays muted, its controls and `editor.tracks` show it muted, and an `exportAudio()` during the take leaves it out; the take's mute is not an undo step and does not change the track's own mute, so a mute changed during the take stays after it), and suppresses the end-of-timeline auto-stop so the take can run past existing audio.
 
 ## Single-Track Player
 

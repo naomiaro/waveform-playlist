@@ -1456,7 +1456,7 @@ then apply each row that matches. The annotation props of the last release's `<W
 
 The same holds for the two annotation elements here.
 
-**6. A recording.** The view used to tell the provider that a take was running: for as long as `recordingState.isRecording` was true, the provider kept playback running past the end of the audio and muted what the armed track already held. `<WaveformRecordingPreview>` only draws the take. Call the hook in the component that calls `useIntegratedRecording` (it must be under `WaveformPlaylistProvider`):
+**6. A recording.** The view used to tell the provider that a take was running: for as long as `recordingState.isRecording` was true, the provider kept playback running past the end of the audio and muted what the take's track already held. `<WaveformRecordingPreview>` only draws the take. Call the hook in the component that calls `useIntegratedRecording` (it must be under `WaveformPlaylistProvider`):
 
 ```tsx
 import { useRecordingSession } from '@waveform-playlist/browser';
@@ -1465,7 +1465,7 @@ const { isRecording, recordingTrackId } = useIntegratedRecording(/* … */);
 useRecordingSession({ isRecording, trackId: recordingTrackId });
 ```
 
-Without it a punch-in plays the armed track's old audio under the take, and a take on an empty timeline stops playback at once. The type of the `recordingState` prop is exported as `WaveformRecordingState`.
+Without it a punch-in plays the old audio of the take's track under the take, and a take on an empty timeline stops playback at once. The type of the `recordingState` prop is exported as `WaveformRecordingState`.
 
 **7. `usePlaylistView()`.** Search for `controls` and `timeScaleHeight` next to `usePlaylistView()` (also a destructuring: `const { sampleRate, controls } = usePlaylistView()`), and replace each read. The fields are `undefined` now, so `controls.show` throws at the moment the code runs, which may be inside an effect or a handler and not on first render.
 
@@ -1510,14 +1510,14 @@ In development a part that is not where it can work says so once in the console 
 | `useMediaElementTrack().fadeIn` / `.fadeOut` | the object of the latest `track` prop | the first object seen while `duration` and `type` are the same, so the hook's value no longer changes on every render of a parent that writes the fade inline |
 | A composition with `<WaveformLoopRegion />` and no `<WaveformTimescale />` | (not possible) | the 30 px strip is there for the loop region alone |
 | `<WaveformTimescale>` switched off and on beside a `<WaveformLoopRegion>` | (not possible) | the loop region stays mounted |
-| A take being recorded, without `useRecordingSession` | the armed track was muted for the take, and playback ran past the end of the audio | neither |
+| A take being recorded, without `useRecordingSession` | the take's track was muted for the take, and playback ran past the end of the audio | neither |
 | A fade written inline on a MediaElement `track` that is built on every render | the player was disposed and created again on every render of the provider's parent (playback stopped, the media loaded again) | compared by value: nothing happens while `duration` and `type` are the same |
 | A render of the component that renders `<Waveform />`, `<WaveformEditor />` or `<MediaElementWaveform />` | rendered the tracks part (not its rows) | does not: the composition hands the root the same elements each time |
 
 ### What to check after the replacement
 
 - Every page that had no ruler or no controls column and still renders `<Waveform />` or `<MediaElementWaveform />`: it has them now.
-- A recording: mute state of the armed track during a take, and that playback continues on an empty timeline.
+- A recording: mute state of the take's track during a take, and that playback continues on an empty timeline.
 - Code that wrapped `<Waveform>` to add its own props for the removed ones: it can render the composition directly.
 
 ## Track controls are composed from pieces bound to a track; the mixer setters take a track id
@@ -1550,7 +1550,7 @@ At the same time the four mixer setters (on `useEditorControls()`; they were on 
 
 | Export | Is |
 | --- | --- |
-| `useTrack()` | the track whose panel the calling component is part of: `id`, `kind`, `index`, `name`, `muted`, `soloed`, `volume`, `pan`, `renderMode`, `isSelected`, `isFirst`, `isLast`, `hasSpectrogram`, `isRecordingArmed`, and the actions `setMuted`, `setSoloed`, `setVolume`, `setPan`, `select`, `moveUp`, `moveDown`, `setRenderMode`, `openSpectrogramSettings`. Type: `TrackContextValue` |
+| `useTrack()` | the track whose panel the calling component is part of: `id`, `kind`, `index`, `name`, `muted`, `soloed`, `volume`, `pan`, `renderMode`, `isSelected`, `isFirst`, `isLast`, `hasSpectrogram`, `isRecording`, and the actions `setMuted`, `setSoloed`, `setVolume`, `setPan`, `select`, `moveUp`, `moveDown`, `setRenderMode`, `openSpectrogramSettings`. Type: `TrackContextValue` |
 | `<DefaultTrackControls>` | the default panel: name, track menu, mute, solo, volume, pan. Its `children` are drawn inside the panel, below the pan slider. Type: `DefaultTrackControlsProps` |
 | `<TrackName />` | the track's name on one line |
 | `<TrackMuteButton />`, `<TrackSoloButton />` | the two toggle buttons |
@@ -1652,12 +1652,12 @@ import { WaveformTrackControls, useTrack } from '@waveform-playlist/browser';
 import { Button, ButtonGroup, Controls, Header } from '@waveform-playlist/ui-components';
 
 function MyTrackPanel() {
-  const { name, muted, volume, isRecordingArmed, setMuted, setVolume } = useTrack();
+  const { name, muted, volume, isRecording, setMuted, setVolume } = useTrack();
   return (
     <Controls>
       <Header>{name}</Header>
       <ButtonGroup>
-        <Button disabled={isRecordingArmed} onClick={() => setMuted(!muted)}>
+        <Button disabled={isRecording} onClick={() => setMuted(!muted)}>
           {muted ? 'Unmute' : 'Mute'}
         </Button>
       </ButtonGroup>
@@ -1678,7 +1678,7 @@ function MyTrackPanel() {
 </WaveformTrackControls>
 ```
 
-`useTrack()` always returns a value: `name` is "Track N" (N is the position, from 1) for a track without a name. While a track's audio is still loading, its panel is drawn and works: the values are the arrangement's mix for the track and a value set then is kept, so a panel needs no loading case (the `if (!state) return null` of the "Before" goes). While a take is recorded onto the track, `isRecordingArmed` is true: the built-in mute button is disabled then, and a mute control of your own can do the same. The props a panel took from the closure of `renderTrackControls` (a callback, a manager object) are props of the element among the children now; keep them stable (see the behaviour table).
+`useTrack()` always returns a value: `name` is "Track N" (N is the position, from 1) for a track without a name. While a track's audio is still loading, its panel is drawn and works: the values are the arrangement's mix for the track and a value set then is kept, so a panel needs no loading case (the `if (!state) return null` of the "Before" goes). While a take is recorded onto the track, `isRecording` is true: the built-in mute button is disabled then, and a mute control of your own can do the same. The props a panel took from the closure of `renderTrackControls` (a callback, a manager object) are props of the element among the children now; keep them stable (see the behaviour table).
 
 Where the panel was the default one rebuilt by hand with one change, compose it from the pieces:
 
@@ -1811,7 +1811,7 @@ There is no `ref` for the item any more: the element that moves is the slot the 
 | The element a reorder drag moves | the element you gave `ref` from `SortableTrackControls` | the slot the part draws; your grip only starts the drag |
 | Children written inline | (the equivalent: an unstable `renderTrackControls` or `onRemoveTrack` rendered every panel on each render of your component) | the part compares the children with the previous ones (element types, keys and props, `children` recursively, `style` one level deep) and keeps the previous ones while they are equal, so inline children cost nothing while their props are stable. A function or an object written inline as a prop (other than `style`) makes every panel render on each render of the component that composes the view |
 | `useTrack()` outside the children of `<WaveformTrackControls>` | (new) | throws `useTrack must be used within <WaveformTrackControls>…`. For a mixer strip elsewhere on the page use `usePlaylistMixer()` and the id setters of `useEditorControls()`. Under `MediaElementPlaylistProvider` those two throw as well: it has one track and no mixer |
-| A track whose audio is still loading | the default panel's controls were disabled | the panel works: the values are the arrangement's mix for the track, a value set then is kept, and every piece is enabled. While a take is recorded onto a track its mute button is disabled (`useTrack().isRecordingArmed`) |
+| A track whose audio is still loading | the default panel's controls were disabled | the panel works: the values are the arrangement's mix for the track, a value set then is kept, and every piece is enabled. While a take is recorded onto a track its mute button is disabled (`useTrack().isRecording`) |
 | `<DefaultTrackControls>` | drew the close button and the grip itself, from props of the part | has neither. `<TrackRemoveButton>` places itself at the top left of the slot and `<TrackReorderGrip>` at its right edge; the default panel makes room for the grip on both sides (CSS `:has()`) |
 | The size of a custom panel | the slot, as now | the slot is as wide as the column (`width` of the part) and as tall as the track's row, with `overflow: hidden`. Fill it with `height: 100%`; do not compute the row height |
 | Selecting a track | changed the background of the two slots concerned without rendering their default panels, and called `renderTrackControls` for every track | renders the pieces of the two panels concerned (the one that stops being selected and the one that becomes selected): `isSelected` is in the value of `useTrack()` |
@@ -3532,7 +3532,7 @@ The setters take a last argument, `options?: MixerChangeOptions` (exported type)
 - `{ gesture: id }`: calls with the same id, one after another, are one step (a fader drag). `createMixerGesture()` (from `@waveform-playlist/core`) makes the ids for one control and `gesture.attach(input)` ends a gesture on the input's own events; see [Mixer moves](/docs/framework-agnostic/engine#mixer-moves) in the engine guide.
 - `{ undoable: false }`: no step. The value is also written into every undo and redo state, so no undo or redo brings back an older one. It wins over `gesture`, and an abort does not take it back.
 
-`setTrackArmed(trackId, armed)` (new, on the engine and the arrangement) arms a track for recording: it plays muted (`getState().tracks` and the adapter have it muted) while its mute in `arrangement.getMixer()` stays as it is. Arming is not an undo step.
+`setTrackRecording(trackId, recording)` (new, on the engine and the arrangement) marks the track a take is recording onto: it plays muted for the take (`getState().tracks` and the adapter have it muted) while its mute in `arrangement.getMixer()` stays as it is. It is not an undo step, and it is not a record-arm.
 
 **Find:**
 
@@ -3559,7 +3559,7 @@ slider.addEventListener('input', () =>
 engine.setTrackVolume(trackId, automationValue, { undoable: false });
 ```
 
-For a recording mute, use `engine.setTrackArmed(trackId, true)` and `false` instead of `setTrackMute`: nothing to remember and set back. Code that kept an earlier mix to set it back after an undo can go: the undo does it.
+For a recording mute, use `engine.setTrackRecording(trackId, true)` and `false` instead of `setTrackMute`: nothing to remember and set back. Code that kept an earlier mix to set it back after an undo can go: the undo does it.
 
 ### Duplicate track ids, and duplicate clip ids within a track, throw
 
@@ -4295,35 +4295,35 @@ const arrangement = useArrangement(); // under WaveformPlaylistProvider; or the 
 const recording = useIntegratedRecording(arrangement, selectedTrackId, { currentTime });
 ```
 
-## The armed track shows muted during a take, and its Mute button is disabled
+## The track a take records onto shows muted during the take, and its Mute button is disabled
 
 **Packages:** `@waveform-playlist/browser`, `@waveform-playlist/engine`.
 
-While a take records onto a track (`useRecordingSession`, or `setRecordingActive(true, trackId)`), the provider **arms** that track in the arrangement (`arrangement.setTrackArmed(trackId, true)`), so what it already holds does not play under the punch-in. An armed track plays muted; the arm is not an undo step, and undo and redo do not change it. Before, the provider muted the track in the engine for the take, the mixer and the Mute button still showed the track unmuted, and the mute from before the take was always written back when it ended. Now:
+While a take records onto a track (`useRecordingSession`, or `setRecordingActive(true, trackId)`), the provider marks that track in the arrangement as the one the take is recording onto (`arrangement.setTrackRecording(trackId, true)`), so what it already holds does not play under the punch-in. That track plays muted for the take; the take's mute is not an undo step, and undo and redo do not change it. Before, the provider muted the track in the engine for the take, the mixer and the Mute button still showed the track unmuted, and the mute from before the take was always written back when it ended. Now:
 
-- `usePlaylistMixer().trackStates` and the track's Mute button show it muted during the take: its `muted` is the track's own mute or the arm;
+- `usePlaylistMixer().trackStates` and the track's Mute button show it muted during the take: its `muted` is the track's own mute or the take's mute;
 - `arrangement.getMixer()` holds the track's own mute, which the take does not change: a mute set on that track during the take stays after it, and the mute from before the take is not written back (there is nothing to write back);
 - the built-in `<TrackMuteButton />` of that track is disabled during the take; solo, volume and pan stay enabled;
-- `useTrack().isRecordingArmed` is true for that track, for a mute control of your own;
-- the track is disarmed when the take ends or the armed track changes, and when the provider unmounts or is hidden by `<Activity>` with a track still armed. One track is armed at a time: arming one disarms any other.
+- `useTrack().isRecording` is true for that track, for a mute control of your own;
+- the take's mute is cleared when the take ends or the take's track changes, and when the provider unmounts or is hidden by `<Activity>` while a take is recording. One track is recorded onto at a time: naming one clears any other.
 
-Edges: a take started during the first load records without playback (Play does nothing before the first ready); an `<Activity>` hide of the component that calls `useRecordingSession` ends the session and the reveal arms the track again; removing the armed track during a take as an undo step, and undoing that removal after the take, brings the track back with its own mute (the end of the take disarms it). A mute control of your own that toggles from the reported value during a take (`setMuted(!muted)`, `setTrackMute(id, !trackStates[i].muted)`) sets the track's own mute to false, since `muted` is true for the arm: the track stays muted for the take and comes out of it unmuted.
+Edges: a take started during the first load records without playback (Play does nothing before the first ready); an `<Activity>` hide of the component that calls `useRecordingSession` ends the session and the reveal mutes the track again; removing the take's track during a take as an undo step, and undoing that removal after the take, brings the track back with its own mute (the end of the take clears its take mute). A mute control of your own that toggles from the reported value during a take (`setMuted(!muted)`, `setTrackMute(id, !trackStates[i].muted)`) sets the track's own mute to false, since `muted` is true for the take: the track stays muted for the take and comes out of it unmuted.
 
-**Find:** a mute control of your own in a track panel or a mixer strip; code that reads `trackStates[i].muted` during a take, or `arrangement.getMixer().get(id).muted` to learn whether a track is heard; code that mutes or unmutes the armed track during a take, or that saves a track's mute before a take to set it back after.
+**Find:** a mute control of your own in a track panel or a mixer strip; code that reads `trackStates[i].muted` during a take, or `arrangement.getMixer().get(id).muted` to learn whether a track is heard; code that mutes or unmutes the take's track during a take, or that saves a track's mute before a take to set it back after.
 
 **Replace with:**
 
 ```tsx
 // A mute control of your own, in a track panel
-const { muted, isRecordingArmed, setMuted } = useTrack();
-<button disabled={isRecordingArmed} aria-pressed={muted} onClick={() => setMuted(!muted)}>
+const { muted, isRecording, setMuted } = useTrack();
+<button disabled={isRecording} aria-pressed={muted} onClick={() => setMuted(!muted)}>
   Mute
 </button>
 ```
 
 ```tsx
-// Is the track heard? Its own mute or the arm
-const silent = arrangement.getMixer().get(id)?.muted || arrangement.armedTrackIds.has(id);
+// Is the track heard? Its own mute or the take's mute
+const silent = arrangement.getMixer().get(id)?.muted || arrangement.recordingTrackIds.has(id);
 // or, under the provider: usePlaylistMixer().trackStates[i].muted
 ```
 

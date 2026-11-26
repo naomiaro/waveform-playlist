@@ -6,7 +6,7 @@ Track controls are composed from pieces bound to a track, and the mixer setters 
 
 The children of `<WaveformTrackControls>` are the control panel of one track. The part renders them once per track, each copy inside that track's context:
 
-- `useTrack()` (type `TrackContextValue`): the track whose panel the calling component is part of: `id`, `kind`, `index`, `name`, `muted`, `soloed`, `volume`, `pan`, `renderMode`, `isSelected`, `isFirst`, `isLast`, `hasSpectrogram`, `isRecordingArmed`, and the bound actions `setMuted`, `setSoloed`, `setVolume`, `setPan`, `select`, `moveUp`, `moveDown`, `setRenderMode`, `openSpectrogramSettings`.
+- `useTrack()` (type `TrackContextValue`): the track whose panel the calling component is part of: `id`, `kind`, `index`, `name`, `muted`, `soloed`, `volume`, `pan`, `renderMode`, `isSelected`, `isFirst`, `isLast`, `hasSpectrogram`, `isRecording`, and the bound actions `setMuted`, `setSoloed`, `setVolume`, `setPan`, `select`, `moveUp`, `moveDown`, `setRenderMode`, `openSpectrogramSettings`.
 - `DefaultTrackControls` (the default panel, now exported; its `children` are drawn inside it, below the pan slider) and the pieces it is made of: `TrackName`, `TrackMuteButton`, `TrackSoloButton`, `TrackVolumeSlider`, `TrackPanSlider`, `TrackMenuButton`.
 - `TrackRemoveButton` (`onRemove(trackId)`) and `TrackReorderGrip` (drag grip with move up/down buttons), drawn by being rendered among the children.
 - `useTrackReorderHandle()` (type `TrackReorderHandle`): `{ handleRef, isDragSource }` for a drag grip of your own.

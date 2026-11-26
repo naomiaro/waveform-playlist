@@ -275,12 +275,12 @@ It draws the arrangement's mix, so its sliders and buttons follow Undo and Redo.
 
 **JS Properties (set by `<daw-editor>`, not attributes):**
 
-| Property      | Type      | Default | Description                                                                                                                               |
-| ------------- | --------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `armed`       | `boolean` | `false` | The track is armed for a take (the editor passes `engine.armedTrackIds.has(trackId)`): the M button is disabled and a click sends nothing |
-| `reorderable` | `boolean` | `false` | Mirrors the editor's `track-reordering` attribute — shows the drag grip + move up/down buttons                                            |
-| `trackIndex`  | `number`  | `0`     | This track's 0-based position, for computing move-button disabled state                                                                   |
-| `trackCount`  | `number`  | `1`     | Total track count, for computing move-button disabled state (down disabled at the last index)                                             |
+| Property      | Type      | Default | Description                                                                                                                                        |
+| ------------- | --------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `recording`   | `boolean` | `false` | A take is recording onto the track (the editor passes `engine.recordingTrackIds.has(trackId)`): the M button is disabled and a click sends nothing |
+| `reorderable` | `boolean` | `false` | Mirrors the editor's `track-reordering` attribute — shows the drag grip + move up/down buttons                                                     |
+| `trackIndex`  | `number`  | `0`     | This track's 0-based position, for computing move-button disabled state                                                                            |
+| `trackCount`  | `number`  | `1`     | Total track count, for computing move-button disabled state (down disabled at the last index)                                                      |
 
 Dispatches `daw-track-reorder` (move buttons) and `daw-track-reorder-grab` (drag grip pointerdown) — see the `<daw-editor>` events table above.
 
@@ -385,7 +385,7 @@ Render-less element that adds keyboard shortcuts to the editor. Must be a direct
 
 Mixer moves are undo steps, like clip and track edits: a control gesture, a `<daw-track>` attribute update and an `editor.updateTrack()` call are one step each, and Undo brings back the volume, pan, mute and solo of the state it returns to. `editor.tracks` and `<daw-track-controls>` report the arrangement's mix.
 
-**Recording arms the track.** During a take the recorded track is armed (`engine.setTrackArmed`): it plays muted, its controls and `editor.tracks` show it muted, and `exportAudio()` during the take leaves it out. Arming is not an undo step and does not change the track's own mute: a mute set during the take (through the element, `updateTrack` or the engine) stays after it, and the take's end only disarms.
+**A take mutes the track it records onto.** During a take the recorded track plays muted (`engine.setTrackRecording`): its controls and `editor.tracks` show it muted, and `exportAudio()` during the take leaves it out. The take's mute is not an undo step and does not change the track's own mute: a mute set during the take (through the element, `updateTrack` or the engine) stays after it, and the take's end only clears the take's mute.
 
 **Loading a track clears the history (#848).** Every track load ends in `engine.setTracks`, which starts a new undo history. Steps made while a track is still loading, mixer moves included, cannot be undone once it has finished; the same happens when a track is added later, a file is dropped or a `src` changes.
 

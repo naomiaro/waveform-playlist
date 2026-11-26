@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 
-// #843: a take arms its track through the engine. The arm is an override
-// outside the undo history: the engine's tracks carry `muted: true` for the
-// armed track, and the editor reads them (`_engineTracks`) for the controls
-// and for an export, so neither needs code of its own for the arm.
+// #843: a take mutes the track it is recording onto through the engine
+// (`setTrackRecording`), outside the undo history: the engine's tracks carry
+// `muted: true` for that track, and the editor reads them (`_engineTracks`)
+// for the controls and for an export, so neither needs code of its own for
+// the take's mute.
 
 vi.mock('@waveform-playlist/worklets', () => ({
   addRecordingWorkletModule: vi.fn(async (addModule: (url: string) => Promise<void>) => {
@@ -113,7 +114,7 @@ function controlsFor(editor: any, trackId: string): any {
 }
 
 describe('<daw-editor> during a take (#843)', () => {
-  it('the controls show the armed track muted, and no undo step is made', async () => {
+  it("the controls show the take's track muted, and no undo step is made", async () => {
     const { editor, aId, bId } = await makeEditor();
     const engine = editor.engine;
     expect(engine.canUndo).toBe(false);
@@ -131,36 +132,36 @@ describe('<daw-editor> during a take (#843)', () => {
     expect(engine.canUndo).toBe(false);
   });
 
-  it("the armed track's mute button is disabled during a take and enabled after", async () => {
+  it("the take's track's mute button is disabled during the take and enabled after", async () => {
     const { editor, aId, bId } = await makeEditor();
     const muteOf = (id: string) =>
       controlsFor(editor, id).shadowRoot.querySelector('button[title="Mute"]') as HTMLButtonElement;
     await editor.updateComplete;
-    expect(controlsFor(editor, aId).armed).toBe(false);
+    expect(controlsFor(editor, aId).recording).toBe(false);
 
     await editor.startRecording(makeStream(), { trackId: aId });
     await editor.updateComplete;
     await controlsFor(editor, aId).updateComplete;
-    expect(controlsFor(editor, aId).armed).toBe(true);
-    expect(controlsFor(editor, bId).armed).toBe(false);
+    expect(controlsFor(editor, aId).recording).toBe(true);
+    expect(controlsFor(editor, bId).recording).toBe(false);
     expect(muteOf(aId).disabled).toBe(true);
     expect(muteOf(bId).disabled).toBe(false);
 
     await editor.stopRecording();
     await editor.updateComplete;
     await controlsFor(editor, aId).updateComplete;
-    expect(controlsFor(editor, aId).armed).toBe(false);
+    expect(controlsFor(editor, aId).recording).toBe(false);
     expect(muteOf(aId).disabled).toBe(false);
   });
 
-  it('an export during a take leaves the armed track out', async () => {
+  it("an export during a take leaves the take's track out", async () => {
     const { editor, aId, bId } = await makeEditor();
     await editor.startRecording(makeStream(), { trackId: aId });
 
     await editor.exportAudio();
 
     // exportAudioImpl skips a muted track (export-audio.test.ts, "skips
-    // muted tracks and honors solo"); the armed one is handed over muted.
+    // muted tracks and honors solo"); the take's track is handed over muted.
     const host = vi.mocked(exportAudioImpl).mock.calls[0][0];
     expect(host.tracks.find((t) => t.id === aId)?.muted).toBe(true);
     expect(host.tracks.find((t) => t.id === bId)?.muted).toBe(false);

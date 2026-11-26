@@ -5,9 +5,10 @@
  * DERIVED from it during render and never written back: the loaded tracks,
  * one drawing row per track (the loaded clips' records and the placeholder
  * records of the clips still loading, in the arrangement's clip order), the
- * timeline length, `trackStates` from the arrangement's mixer and its
- * recording arm, and the undo state. The arrangement is the one owner of all
- * of it, so an undo moves `trackStates` back with no code here (#843).
+ * timeline length, `trackStates` from the arrangement's mixer and the
+ * take's mute (`recordingTrackIds`), and the undo state. The arrangement is
+ * the one owner of all of it, so an undo moves `trackStates` back with no
+ * code here (#843).
  *
  * Every result keeps its identity while nothing it depends on changed: a
  * fader move changes `trackStates` and nothing else; a clip edit changes
@@ -53,8 +54,8 @@ export interface ArrangementView {
   duration: number;
   /**
    * One entry per track, in order, from the arrangement's mixer. `muted` is
-   * the track's own mute or its recording arm (#843): an armed track plays
-   * muted, while `getMixer()` keeps its own mute.
+   * the track's own mute or the take's mute (#843): the track a take is
+   * recording onto plays muted, while `getMixer()` keeps its own mute.
    */
   trackStates: TrackState[];
   canUndo: boolean;
@@ -138,7 +139,7 @@ function sameState(a: TrackState, name: string, mix: TrackMixerValues, muted: bo
 function deriveTrackStates(
   tracks: readonly ArrangementTrack[],
   mixer: ReadonlyMap<string, TrackMixerValues>,
-  armed: ReadonlySet<string>,
+  recordingTrackIds: ReadonlySet<string>,
   previous: StatesCache
 ): StatesCache {
   const byTrackId = new Map<string, TrackState>();
@@ -146,8 +147,8 @@ function deriveTrackStates(
     // Every track the arrangement holds has a mixer entry; the default is
     // there so that the array never holds `undefined`.
     const mix = mixer.get(track.id) ?? DEFAULT_MIX;
-    // An armed track plays muted (the arm is an override, #843).
-    const muted = mix.muted || armed.has(track.id);
+    // The track a take is recording onto plays muted (#843).
+    const muted = mix.muted || recordingTrackIds.has(track.id);
     const before = previous.byTrackId.get(track.id);
     const state =
       before && sameState(before, track.name, mix, muted)
@@ -178,7 +179,7 @@ function useArrangementValue<T>(arrangement: Arrangement, read: (a: Arrangement)
 }
 
 const readMixer = (arrangement: Arrangement) => arrangement.getMixer();
-const readArmed = (arrangement: Arrangement) => arrangement.armedTrackIds;
+const readRecordingTrackIds = (arrangement: Arrangement) => arrangement.recordingTrackIds;
 const readCanUndo = (arrangement: Arrangement) => arrangement.canUndo;
 const readCanRedo = (arrangement: Arrangement) => arrangement.canRedo;
 
@@ -189,7 +190,7 @@ export function useArrangementView(
   const { samplesPerPixel, mono, baseScale, placeholderSampleRate } = options;
   const arrangementTracks = useArrangementTracks(arrangement);
   const mixer = useArrangementValue(arrangement, readMixer);
-  const armed = useArrangementValue(arrangement, readArmed);
+  const recordingTrackIds = useArrangementValue(arrangement, readRecordingTrackIds);
   const canUndo = useArrangementValue(arrangement, readCanUndo);
   const canRedo = useArrangementValue(arrangement, readCanRedo);
 
@@ -228,10 +229,15 @@ export function useArrangementView(
 
   const statesCacheRef = useRef<StatesCache>(EMPTY_STATES);
   const trackStates = useMemo(() => {
-    const next = deriveTrackStates(arrangementTracks, mixer, armed, statesCacheRef.current);
+    const next = deriveTrackStates(
+      arrangementTracks,
+      mixer,
+      recordingTrackIds,
+      statesCacheRef.current
+    );
     statesCacheRef.current = next;
     return next.result;
-  }, [arrangementTracks, mixer, armed]);
+  }, [arrangementTracks, mixer, recordingTrackIds]);
 
   return {
     tracks,

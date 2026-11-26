@@ -54,7 +54,7 @@ import {
   SelectionContext,
   TrackReorderPreviewContext,
   TrimPreviewContext,
-  RecordingArmContext,
+  RecordingTrackContext,
   TrimPreviewPeaksContext,
   UndoRedoContext,
   type ActiveAnnotationContextValue,
@@ -995,9 +995,9 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
                                                   <CurrentTimeContext value={currentTimeValue}>
                                                     <SelectionContext value={selection}>
                                                       <SelectedRowContext value={ONLY_ROW_SELECTED}>
-                                                        <RecordingArmContext value={BLOCKED}>
+                                                        <RecordingTrackContext value={BLOCKED}>
                                                           {children}
-                                                        </RecordingArmContext>
+                                                        </RecordingTrackContext>
                                                       </SelectedRowContext>
                                                     </SelectionContext>
                                                   </CurrentTimeContext>

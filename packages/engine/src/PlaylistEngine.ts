@@ -521,7 +521,7 @@ export class PlaylistEngine {
     const changed = this._mixerChanged(() =>
       this._arrangement.setTrackMute(trackId, muted, options)
     );
-    // Through the adapter sync, so an armed track the arrangement holds stays
+    // Through the adapter sync, so the track a take is recording onto stays
     // muted; a track it does not hold is sent the value given.
     if (!changed && !this._disposed) this._adapterSync.sendMixerValues(trackId, { muted });
   }
@@ -539,24 +539,25 @@ export class PlaylistEngine {
   }
 
   /**
-   * Arm or disarm a track for recording: the arrangement's `setTrackArmed`.
-   * An armed track plays muted (here and in the adapter) while its mute in
-   * the mix stays as it is; arming is not an undo step. The arrangement's
-   * `'arm'` announcement brings the adapter in step, so there is no adapter
-   * call of its own here; a disposed engine changes the arrangement only.
+   * Mark a track as the one a take is recording onto, or clear it when the
+   * take ends: the arrangement's `setTrackRecording`. That track plays muted
+   * (here and in the adapter) while its mute in the mix stays as it is; the
+   * take's mute is not an undo step. The arrangement's `'recording'`
+   * announcement brings the adapter in step, so there is no adapter call of
+   * its own here; a disposed engine changes the arrangement only.
    */
-  setTrackArmed(trackId: string, armed: boolean): void {
-    this._arrangement.setTrackArmed(trackId, armed);
+  setTrackRecording(trackId: string, recording: boolean): void {
+    this._arrangement.setTrackRecording(trackId, recording);
   }
 
   /**
-   * The tracks armed for recording, read from the arrangement (the owner; no
-   * copy). The same set object until it changes; never write to it, use
-   * `setTrackArmed`. An armed track plays muted, so a UI can disable its mute
-   * control while the id is in the set.
+   * The tracks a take is recording onto, read from the arrangement (the
+   * owner; no copy). The same set object until it changes; never write to
+   * it, use `setTrackRecording`. Such a track plays muted, so a UI can
+   * disable its mute control while the id is in the set.
    */
-  get armedTrackIds(): ReadonlySet<string> {
-    return this._arrangement.armedTrackIds;
+  get recordingTrackIds(): ReadonlySet<string> {
+    return this._arrangement.recordingTrackIds;
   }
 
   // ---------------------------------------------------------------------------
@@ -645,9 +646,9 @@ export class PlaylistEngine {
       case 'restoreMix': // an undo, a redo or an abort of the mix only: no track call
         this._adapterSync.sendMixerDiff(change.previousMixer);
         break;
-      case 'arm': {
+      case 'recording': {
         // The stored mute, which the adapter sync sends as the mute the track
-        // plays with. An armed id that is not a current track has nothing to send.
+        // plays with. A recording id that is not a current track has nothing to send.
         const values = this._arrangement.getMixer().get(change.trackId);
         if (values) this._adapterSync.sendMixerValues(change.trackId, { muted: values.muted });
         break;

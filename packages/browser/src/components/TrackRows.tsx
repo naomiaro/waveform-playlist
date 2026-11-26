@@ -573,9 +573,9 @@ export const WaveformTracks: React.FC<WaveformTracksProps> = ({ gainScaled = fal
           const track = rowList[trackIndex];
           if (!track) return null;
 
-          const isArmed =
+          const isRecordingTrack =
             recordingState?.isRecording === true && recordingState.trackId === track.id;
-          const recordingChannels = isArmed ? recordingChannelCount : 0;
+          const recordingChannels = isRecordingTrack ? recordingChannelCount : 0;
           const helpers = spectrogramHelpersById.get(track.id);
 
           return (
@@ -594,7 +594,7 @@ export const WaveformTracks: React.FC<WaveformTracksProps> = ({ gainScaled = fal
               numChannels={getTrackChannelCount(trackClipPeaks, recordingChannels)}
               waveHeight={waveHeight}
               mono={mono}
-              recordingState={isArmed ? recordingState : undefined}
+              recordingState={isRecordingTrack ? recordingState : undefined}
               spectrogramConfig={helpers?.config}
               frequencyScaleFn={helpers?.frequencyScaleFn}
               samplesPerPixel={samplesPerPixel}

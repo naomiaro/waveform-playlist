@@ -10,8 +10,9 @@
  *
  * The keys carry a version. An engine that finds the time-base key treats
  * the object as an arrangement of this version and uses it BY NAME: the
- * whole public `Arrangement` interface (every track, clip, mixer, arm and
- * history method it delegates to, `getTracks`, `getMixer`, `armedTrackIds`,
+ * whole public `Arrangement` interface (every track, clip, mixer, recording
+ * and history method it delegates to, `getTracks`, `getMixer`,
+ * `recordingTrackIds`,
  * the two version counters) and the internal `onChange(listener)` (with the
  * `ArrangementChange` and `ArrangementVersions` shapes of this version),
  * `recomputeStartSamples()` and `undoLimit`. A change to any of that needs a
@@ -19,8 +20,8 @@
  * misreading each other.
  *
  * v2 (#843): the mixer setters take options and are undo steps, the history
- * holds the mix (`'restoreMix'`), and the arrangement has the recording arm
- * (`setTrackArmed`, `armedTrackIds`, `'arm'`).
+ * holds the mix (`'restoreMix'`), and the arrangement has the take's mute
+ * (`setTrackRecording`, `recordingTrackIds`, `'recording'`).
  */
 
 import type { Arrangement } from './types';

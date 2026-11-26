@@ -1305,31 +1305,32 @@ describe('RecordingController', () => {
     );
   });
 
-  // --- the recording arm (#843). Punch-in replaces what the take overlaps, so
-  // the recorded-over track must not play under the take: the controller arms
-  // it through the engine, an override outside the undo history that leaves
-  // the stored mute alone, and disarms it once on every path a session ends.
-  describe('the recording arm (#843)', () => {
-    const ARMED_THEN_DISARMED = [
+  // --- the take's mute (#843). Punch-in replaces what the take overlaps, so
+  // the recorded-over track must not play under the take: the controller
+  // mutes it through the engine (`setTrackRecording`), outside the undo
+  // history and leaving the stored mute alone, and clears that once on every
+  // path a session ends.
+  describe("the take's mute (#843)", () => {
+    const SET_THEN_CLEARED = [
       ['track-1', true],
       ['track-1', false],
     ];
 
-    function armSpyEngine() {
-      return { setTrackArmed: vi.fn(), setTrackMute: vi.fn() };
+    function recordingSpyEngine() {
+      return { setTrackRecording: vi.fn(), setTrackMute: vi.fn() };
     }
 
-    it('a take arms its track before overdub playback starts', async () => {
-      host._engine = armSpyEngine();
+    it('a take mutes its track before overdub playback starts', async () => {
+      host._engine = recordingSpyEngine();
       host.play = vi.fn(() => Promise.resolve());
       const controller = new RecordingController(host);
       await controller.startRecording(createMockStream(), { trackId: 'track-1', overdub: true });
 
-      expect(host._engine.setTrackArmed.mock.calls).toEqual([['track-1', true]]);
-      const armOrder = host._engine.setTrackArmed.mock.invocationCallOrder[0];
+      expect(host._engine.setTrackRecording.mock.calls).toEqual([['track-1', true]]);
+      const muteOrder = host._engine.setTrackRecording.mock.invocationCallOrder[0];
       const playOrder = (host.play as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0];
-      expect(armOrder).toBeLessThan(playOrder);
-      // The arm is not a mute: the stored mute is never written.
+      expect(muteOrder).toBeLessThan(playOrder);
+      // The take's mute is not the track's mute: the stored mute is never written.
       expect(host._engine.setTrackMute).not.toHaveBeenCalled();
     });
 
@@ -1401,7 +1402,7 @@ describe('RecordingController', () => {
         end: (controller) => controller.hostDisconnected(),
       },
       {
-        name: 'an overdub start that fails after arming',
+        name: 'an overdub start that fails after the take mutes its track',
         options: { overdub: true },
         before: () => {
           host.play = vi.fn(() => Promise.reject(new Error('play failed')));
@@ -1410,28 +1411,28 @@ describe('RecordingController', () => {
       },
     ];
 
-    it.each(teardowns)('$name disarms the track once', async ({ options, before, end }) => {
-      host._engine = armSpyEngine();
+    it.each(teardowns)("$name clears the take's mute once", async ({ options, before, end }) => {
+      host._engine = recordingSpyEngine();
       await before?.();
       const controller = new RecordingController(host);
       await controller.startRecording(createMockStream(), { trackId: 'track-1', ...options });
       await end(controller);
 
       expect(controller.isRecording).toBe(false);
-      expect(host._engine.setTrackArmed.mock.calls).toEqual(ARMED_THEN_DISARMED);
+      expect(host._engine.setTrackRecording.mock.calls).toEqual(SET_THEN_CLEARED);
       expect(host._engine.setTrackMute).not.toHaveBeenCalled();
     });
 
-    it('a start cancelled before its session exists arms nothing', async () => {
-      host._engine = armSpyEngine();
+    it('a start cancelled before its session exists mutes nothing', async () => {
+      host._engine = recordingSpyEngine();
       const controller = new RecordingController(host);
       const startPromise = controller.startRecording(createMockStream(), { trackId: 'track-1' });
       await controller.stopRecording('track-1');
       await startPromise;
-      expect(host._engine.setTrackArmed).not.toHaveBeenCalled();
+      expect(host._engine.setTrackRecording).not.toHaveBeenCalled();
     });
 
-    it('two sessions arm two tracks, and ending one disarms only its own', async () => {
+    it('two sessions mute two tracks, and ending one clears only its own', async () => {
       // A worklet node per session, each acknowledging its own stop.
       vi.stubGlobal(
         'AudioWorkletNode',
@@ -1450,17 +1451,17 @@ describe('RecordingController', () => {
           return node;
         })
       );
-      host._engine = armSpyEngine();
+      host._engine = recordingSpyEngine();
       const controller = new RecordingController(host);
       await controller.startRecording(createMockStream(), { trackId: 'track-1' });
       await controller.startRecording(createMockStream(), { trackId: 'track-2' });
-      expect(host._engine.setTrackArmed.mock.calls).toEqual([
+      expect(host._engine.setTrackRecording.mock.calls).toEqual([
         ['track-1', true],
         ['track-2', true],
       ]);
 
       await controller.stopRecording('track-1');
-      expect(host._engine.setTrackArmed.mock.calls).toEqual([
+      expect(host._engine.setTrackRecording.mock.calls).toEqual([
         ['track-1', true],
         ['track-2', true],
         ['track-1', false],
@@ -1468,7 +1469,7 @@ describe('RecordingController', () => {
       expect(controller.getSession('track-2')).toBeDefined();
 
       await controller.stopRecording('track-2');
-      expect(host._engine.setTrackArmed.mock.calls.slice(3)).toEqual([['track-2', false]]);
+      expect(host._engine.setTrackRecording.mock.calls.slice(3)).toEqual([['track-2', false]]);
     });
 
     describe('with a real engine', () => {
@@ -1514,7 +1515,7 @@ describe('RecordingController', () => {
         expect(mutedOf(engine)).toBe(false);
         expect(adapter.setTrackMute).toHaveBeenLastCalledWith('track-1', false);
         // The take's clip goes through the mocked _addRecordedClip, so the
-        // only history the arm could have made is none.
+        // only history the take's mute could have made is none.
         expect(engine.canUndo).toBe(false);
       });
 

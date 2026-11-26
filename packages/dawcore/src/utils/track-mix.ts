@@ -13,7 +13,7 @@ export const DEFAULT_TRACK_MIX: Readonly<TrackMixerValues> = Object.freeze({
   soloed: false,
 });
 
-/** The mix fields of an engine track (the projection: `muted` includes an arm). */
+/** The mix fields of an engine track (the projection: `muted` includes a take's mute). */
 export function mixOfTrack(track: ClipTrack): TrackMixerValues {
   return { volume: track.volume, pan: track.pan, muted: track.muted, soloed: track.soloed };
 }

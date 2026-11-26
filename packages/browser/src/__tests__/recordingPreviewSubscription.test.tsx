@@ -298,7 +298,7 @@ describe('live recording preview (#695)', () => {
     }
   });
 
-  it('sizes the armed track for the number of recorded channels', async () => {
+  it("sizes the take's track for the number of recorded channels", async () => {
     const { publish } = await mountRecording(progressAt(0.5, 1));
     expect(counts.trackChannels.t2).toBe(1);
 

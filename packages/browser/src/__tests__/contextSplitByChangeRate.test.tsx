@@ -33,7 +33,7 @@ import {
   useSelection,
   useCurrentTime,
   useActiveAnnotation,
-  useRecordingArm,
+  useRecordingTrack,
   useTrimPreviewOptional,
   useTrimPreviewPeaksOptional,
 } from '../contexts/playlistContexts';
@@ -128,7 +128,7 @@ const HOOKS = {
   trimPreview: useTrimPreviewOptional,
   trimPreviewPeaks: useTrimPreviewPeaksOptional,
   // Internal (#812): the track a take is recorded onto.
-  recordingArm: useRecordingArm,
+  recordingTrack: useRecordingTrack,
 } as const;
 
 // The hooks both providers serve (#688); the rest need WaveformPlaylistProvider.
@@ -298,7 +298,7 @@ describe('each hook returns its own group of fields (#768)', () => {
     );
     expect(keys('trimPreview')).toEqual(['publish', 'source']);
     expect(keys('trimPreviewPeaks')).toEqual(['peaksFor']);
-    expect(keys('recordingArm')).toEqual(['armedTrackId']);
+    expect(keys('recordingTrack')).toEqual(['recordingTrackId']);
     // The arrangement itself, not a value made for it.
     expect(typeof values.arrangement.getTracks).toBe('function');
     expect(values.arrangement.getTracks().map((t) => t.id)).toEqual(['track-1', 'track-2']);
@@ -458,31 +458,31 @@ describe('an action re-renders only the readers of the group it changes (#768)',
     ).toEqual(['reorder']);
   });
 
-  // #843: the arm is the arrangement's override, outside the history:
-  // `trackStates` shows the armed track muted, so the mixer follows; the
-  // armed track is its own value, read by the track controls; the undo
-  // readers do not render, since arming is no undo step.
-  it('arming a track for a take, moving the arm and ending the take: the recording arm and the mixer', async () => {
+  // #843: the take's mute is the arrangement's, outside the history:
+  // `trackStates` shows the take's track muted, so the mixer follows; the
+  // take's track is its own value, read by the track controls; the undo
+  // readers do not render, since the take's mute is no undo step.
+  it('starting a take on a track, moving it to another and ending the take: the recording track and the mixer', async () => {
     await mount();
-    // Rule (#843): the arm is no undo step. Before, the arm was a mute
+    // Rule (#843): the take's mute is no undo step. Before, it was a mute
     // written to the mix (#812), and in part 1 of #843 that write was an
-    // undo step, so the first arm also rendered the undo readers.
+    // undo step, so the first take also rendered the undo readers.
     expect(await rendered(() => values.editorControls.setRecordingActive(true, 'track-1'))).toEqual(
-      ['mixer', 'recordingArm']
+      ['mixer', 'recordingTrack']
     );
     expect(values.undo).toEqual({ canUndo: false, canRedo: false });
-    expect(values.recordingArm.armedTrackId).toBe('track-1');
+    expect(values.recordingTrack.recordingTrackId).toBe('track-1');
     expect(values.mixer.trackStates[0].muted).toBe(true);
     expect(await rendered(() => values.editorControls.setRecordingActive(true, 'track-2'))).toEqual(
-      ['mixer', 'recordingArm']
+      ['mixer', 'recordingTrack']
     );
     expect(await rendered(() => values.editorControls.setRecordingActive(false))).toEqual([
       'mixer',
-      'recordingArm',
+      'recordingTrack',
     ]);
-    expect(values.recordingArm.armedTrackId).toBeNull();
+    expect(values.recordingTrack.recordingTrackId).toBeNull();
     expect(values.mixer.trackStates.map((s) => s.muted)).toEqual([false, false]);
-    // A session without an armed track: no reader renders.
+    // A session without a track to record onto: no reader renders.
     expect(await rendered(() => values.editorControls.setRecordingActive(true))).toEqual([]);
     expect(await rendered(() => values.editorControls.setRecordingActive(false))).toEqual([]);
   });
@@ -552,7 +552,7 @@ describe('an action re-renders only the readers of the group it changes (#768)',
       'trimPreview',
       'trimPreviewPeaks',
       'arrangement',
-      'recordingArm',
+      'recordingTrack',
     ] as HookName[]) {
       expect(names).not.toContain(quiet);
     }
@@ -641,7 +641,7 @@ describe('the hooks the groups replace are gone (#768)', () => {
     expect('usePlaylistZoomOptional' in publicApi).toBe(false);
     expect('useTrimPreviewOptional' in publicApi).toBe(false);
     expect('useTrimPreviewPeaksOptional' in publicApi).toBe(false);
-    expect('useRecordingArm' in publicApi).toBe(false);
+    expect('useRecordingTrack' in publicApi).toBe(false);
   });
 
   it('the trim preview readers are null outside a provider', () => {

@@ -420,7 +420,7 @@ describe('an arrangement made by another copy of the package', () => {
   });
 
   // #843: the history holds the mix, the setters take options and the
-  // arrangement has the arm, so the interface reached by name changed and
+  // arrangement has the take's mute, so the interface reached by name changed and
   // the keys moved to v2.
   it('the key strings end in /v2', () => {
     expect(ARRANGEMENT_ATTACH_DECODE.description).toBe(

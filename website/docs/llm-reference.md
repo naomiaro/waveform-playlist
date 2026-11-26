@@ -487,20 +487,21 @@ interface EditorControlsContextValue {
   // Recording
   /** Mark a recording session active/inactive. While active: (1) the
    *  end-of-audio auto-stop is suppressed so overdub playback runs past the
-   *  end of existing material, and (2) with an `armedTrackId`, that track is
-   *  armed in the arrangement for the session (`setTrackArmed`, #843):
-   *  punch-in recording replaces whatever the take overlaps (#579), so the
-   *  doomed material must not play under the overdub. The arm plays the
-   *  track muted and is no undo step. `trackStates` and the track's Mute
-   *  button show it muted, the built-in `<TrackMuteButton />` of that track
-   *  is disabled, and `useTrack().isRecordingArmed` is true for it, while
+   *  end of existing material, and (2) with a `recordingTrackId`, that track
+   *  is marked in the arrangement as the one the take is recording onto
+   *  (`setTrackRecording`, #843): punch-in recording replaces whatever the
+   *  take overlaps (#579), so the doomed material must not play under the
+   *  overdub. The take's mute plays the track muted and is no undo step.
+   *  `trackStates` and the track's Mute button show it muted, the built-in
+   *  `<TrackMuteButton />` of that track is disabled, and
+   *  `useTrack().isRecording` is true for it, while
    *  `arrangement.getMixer()` keeps the track's own mute: nothing is written
    *  to it, so a mute changed during the take stays after it. One track is
-   *  armed at a time: arming one disarms any other, and
-   *  `setRecordingActive(false)` disarms every track. `useRecordingSession`
+   *  recorded onto at a time: naming one clears any other, and
+   *  `setRecordingActive(false)` clears every track. `useRecordingSession`
    *  calls it for the length of a take; overdub flows should also call it
    *  eagerly (before `play()`). */
-  setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
+  setRecordingActive: (active: boolean, recordingTrackId?: string | null) => void;
 }
 ```
 
@@ -774,7 +775,7 @@ A track whose clips do not match its kind is rejected: the arrangement's `setTra
 ```typescript
 interface TrackState {
   name: string;
-  /** The track's own mute, or true while it is armed for a take (#843). */
+  /** The track's own mute, or true while a take is recording onto it (#843). */
   muted: boolean;
   soloed: boolean;
   volume: number;
@@ -1725,7 +1726,7 @@ interface MixerChangeOptions {
 // No options: each call is an undo step. With both, undoable: false wins. Inside an open transaction an undoable
 // mixer change is part of it (gesture ignored) and an abort takes it back; an undoable: false change is written into
 // the transaction's base too, so an abort keeps it. A gesture step ends at another step, an undo, a redo,
-// clearHistory, setTracks or a transaction (not at an arm, a call that changes nothing, or an undoable: false call
+// clearHistory, setTracks or a transaction (not at a take's mute, a call that changes nothing, or an undoable: false call
 // that leaves the step); a gesture that ends where its step began leaves no step, and the history it found comes
 // back (the redo states its first call cleared, and a step the undo limit evicted for it).
 
@@ -1748,10 +1749,10 @@ interface ClipBounds {
 interface Arrangement {
   // read
   getTracks(): readonly ArrangementTrack[];             // Loaded clips (AudioClip) and clips still loading (LoadingClip; isLoadingClip). The same array until the tracks change. A track's mixer fields are the values it entered with
-  getMixer(): ReadonlyMap<string, TrackMixerValues>;    // Current volume, mute, solo, pan by track id (the stored mute: an armed track's is not forced). The same Map until a value changes, an entry is added or dropped, or an undo, a redo or an abort brings back another state's
+  getMixer(): ReadonlyMap<string, TrackMixerValues>;    // Current volume, mute, solo, pan by track id (the stored mute: the take's track's is not forced). The same Map until a value changes, an entry is added or dropped, or an undo, a redo or an abort brings back another state's
   subscribe(listener: () => void): () => void;          // Once per change (tracks, mix or history), in order; returns the function that stops it
   readonly tracksVersion: number;                       // Counts changes to the tracks
-  readonly mixerVersion: number;                        // Counts the changes of the current mix: the four mixer setters, an undo/redo/abort that brings back other values, an arm or disarm of a current track (not entries added or dropped)
+  readonly mixerVersion: number;                        // Counts the changes of the current mix: the four mixer setters, an undo/redo/abort that brings back other values, the start or end of a take's mute on a current track (not entries added or dropped)
 
   // whole set
   setTracks(tracks: readonly ArrangementTrack[]): void; // Replace every track. Clears the undo history. An id that is in the tracks being replaced keeps its mix; any other id is seeded from the new track's fields
@@ -1789,24 +1790,25 @@ interface Arrangement {
   setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
   setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
 
-  // recording arm
+  // recording mute (the track a take is recording onto)
   /**
-   * The ids of the tracks armed for recording. The same Set until one is
-   * armed or disarmed; never write to it.
+   * The ids of the tracks a take is recording onto. The same Set until one
+   * is added or removed; never write to it.
    */
-  readonly armedTrackIds: ReadonlySet<string>;
+  readonly recordingTrackIds: ReadonlySet<string>;
   /**
-   * Arm or disarm a track for recording. An armed track plays muted: the
-   * engine's `getState().tracks` and its adapter have it muted, while its
-   * mute in `getMixer()` stays as it is and comes back when the track is
-   * disarmed. Arming is not an undo step, and undo, redo, an abort,
-   * `setTracks` and `clearHistory` do not change which tracks are armed. An
-   * id that is not in the current tracks is armed too, and mutes nothing
-   * until a track of that id enters. The same value changes nothing.
+   * Mark a track as the one a take is recording onto, or clear it when the
+   * take ends. Such a track plays muted: the engine's `getState().tracks`
+   * and its adapter have it muted, while its mute in `getMixer()` stays as
+   * it is and comes back when the take ends. This is not an undo step, and
+   * undo, redo, an abort, `setTracks` and `clearHistory` do not change which
+   * tracks are recording. An id that is not in the current tracks is
+   * recorded too, and mutes nothing until a track of that id enters. The
+   * same value changes nothing.
    */
-  setTrackArmed(trackId: string, armed: boolean): void;
-  /** The armed tracks, read from the arrangement (the same set object until it changes; never write to it). */
-  readonly armedTrackIds: ReadonlySet<string>;
+  setTrackRecording(trackId: string, recording: boolean): void;
+  /** The tracks a take is recording onto, read from the arrangement (the same set object until it changes; never write to it). */
+  readonly recordingTrackIds: ReadonlySet<string>;
 
   // history
   readonly canUndo: boolean;
@@ -1835,9 +1837,9 @@ interface Arrangement {
 // key version (v1 until the mixer became undoable: a v1 engine and a v2 arrangement refuse each other).
 
 interface EngineState {
-  tracks: readonly ClipTrack[]; // Each track with its current mixer values (muted while armed) and without clips that are still loading. Shared, not a copy: never write to it. Frozen outside production builds
+  tracks: readonly ClipTrack[]; // Each track with its current mixer values (muted while a take records onto it) and without clips that are still loading. Shared, not a copy: never write to it. Frozen outside production builds
   tracksVersion: number;        // Monotonic counter; increments on structural track changes only
-  mixerVersion: number;         // Monotonic counter; increments on every change of the current mix (the setters, an undo/redo/abort of the mix, an arm or disarm of a current track)
+  mixerVersion: number;         // Monotonic counter; increments on every change of the current mix (the setters, an undo/redo/abort of the mix, the start or end of a take's mute on a current track)
   duration: number;             // Of the loaded clips
   currentTime: number;
   isPlaying: boolean;
@@ -1863,7 +1865,7 @@ interface EngineState {
 // Track management: setTracks(tracks: readonly ClipTrack[]), addTrack(), removeTrack(), updateTrack(), reorderTrack(), selectTrack()
 // Clip editing: moveClip(), trimClip(), splitClip(), getClipBounds(), constrainTrimDelta()
 // Track mix (undo steps): setTrackVolume(trackId, volume, options?: MixerChangeOptions), setTrackMute(), setTrackSolo(), setTrackPan()
-// Recording arm (not an undo step; the track plays muted while armed): setTrackArmed(trackId: string, armed: boolean)
+// The take's mute (not an undo step; the track a take records onto plays muted): setTrackRecording(trackId: string, recording: boolean)
 // History: undo(), redo(), clearHistory(), beginTransaction(), commitTransaction(), abortTransaction(), canUndo, canRedo
 // Playback: play(), pause(), stop(), seek()
 // State: setSelection(), setLoopRegion(), setLoopEnabled(), setMasterVolume(), setTempo()
@@ -2366,7 +2368,7 @@ interface TrackContextValue {
 
   /** The track's name, or "Track N" (N is the position, from 1) when it has none. */
   name: string;
-  /** The track's own mute, or true while it is armed for a take (`isRecordingArmed`). */
+  /** The track's own mute, or true while a take is recording onto it (`isRecording`). */
   muted: boolean;
   soloed: boolean;
   /** 0 to 1. */
@@ -2390,9 +2392,9 @@ interface TrackContextValue {
    * changed by the take: a mute set meanwhile stays after it (#843). The
    * built-in `<TrackMuteButton />` is disabled while this is true; an app's
    * own mute control can do the same, since toggling from `muted` here would
-   * set the track's own mute from the arm's value.
+   * set the track's own mute from the take's mute.
    */
-  isRecordingArmed: boolean;
+  isRecording: boolean;
   // Removed (#812): isLoading. The values above are the arrangement's mix also while
   // the track's audio loads, the actions work then, and the pieces are enabled.
 
@@ -2584,13 +2586,13 @@ interface WaveformPlayheadProps {   // either provider
 
 // The view only draws a take. This tells the provider one is running
 // (WaveformPlaylistProvider only): playback runs past the end of the audio and
-// the track is armed in the arrangement for the take (setTrackArmed, #843),
-// which plays it muted and is no undo step: trackStates and its Mute button
-// show it muted, its <TrackMuteButton /> is disabled,
-// useTrack().isRecordingArmed is true, and arrangement.getMixer() keeps the
-// track's own mute (a mute changed during the take stays after it). It is
-// disarmed when the take ends, the track changes, this component unmounts or
-// the provider unmounts. play() does nothing before
+// the track is marked in the arrangement as the take's (setTrackRecording,
+// #843), which plays it muted and is no undo step: trackStates and its Mute
+// button show it muted, its <TrackMuteButton /> is disabled,
+// useTrack().isRecording is true, and arrangement.getMixer() keeps the
+// track's own mute (a mute changed during the take stays after it). The
+// take's mute is cleared when the take ends, the track changes, this
+// component unmounts or the provider unmounts. play() does nothing before
 // the first ready, so a take started during the first load records without
 // playback.
 function useRecordingSession(options: RecordingSessionOptions): void;

@@ -9,13 +9,13 @@
  * arrangement's `MixerChangeOptions` on (#843: each call is an undo step, a
  * gesture id makes many calls one). Every function keeps its identity for
  * the life of the provider (the arrangement does not change within a mount).
- * Also the value of `RecordingArmContext`: which track is armed for a take,
- * read from the arrangement's arm.
+ * Also the value of `RecordingTrackContext`: which track a take is recording
+ * onto, read from the arrangement's `recordingTrackIds`.
  */
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import type { Arrangement, MixerChangeOptions } from '@waveform-playlist/engine';
 import { warnOnce } from '../components/partWarnings';
-import type { RecordingArmContextValue } from '../contexts/playlistContexts';
+import type { RecordingTrackContextValue } from '../contexts/playlistContexts';
 
 type MixerSetter = 'setTrackMute' | 'setTrackSolo' | 'setTrackVolume' | 'setTrackPan';
 
@@ -37,24 +37,24 @@ export interface ArrangementEditing {
   reorderTrack: (trackId: string, toIndex: number) => void;
   undo: () => void;
   redo: () => void;
-  setRecordingActive: (active: boolean, armedTrackId?: string | null) => void;
+  setRecordingActive: (active: boolean, recordingTrackId?: string | null) => void;
   /** True while a recording session is active: the animation loop and `seekTo` read it. */
   recordingActiveRef: React.RefObject<boolean>;
-  /** The value of `RecordingArmContext`; a new object only when the armed track changes. */
-  recordingArm: RecordingArmContextValue;
+  /** The value of `RecordingTrackContext`; a new object only when the take's track changes. */
+  recordingTrack: RecordingTrackContextValue;
 }
 
-/** The first armed track of the arrangement, or null: React arms one at a time. */
-const readArmedTrackId = (arrangement: Arrangement): string | null => {
-  for (const id of arrangement.armedTrackIds) return id;
+/** The first recording track of the arrangement, or null: React records onto one at a time. */
+const readRecordingTrackId = (arrangement: Arrangement): string | null => {
+  for (const id of arrangement.recordingTrackIds) return id;
   return null;
 };
 
-/** Disarm every armed track of the arrangement but `keep`. */
-function disarmAll(arrangement: Arrangement, keep: string | null = null): void {
-  // A copy: each disarm gives the arrangement another Set.
-  for (const id of [...arrangement.armedTrackIds]) {
-    if (id !== keep) arrangement.setTrackArmed(id, false);
+/** Clear the take's mute on every recording track of the arrangement but `keep`. */
+function clearRecordingTracks(arrangement: Arrangement, keep: string | null = null): void {
+  // A copy: each change gives the arrangement another Set.
+  for (const id of [...arrangement.recordingTrackIds]) {
+    if (id !== keep) arrangement.setTrackRecording(id, false);
   }
 }
 
@@ -62,45 +62,46 @@ function disarmAll(arrangement: Arrangement, keep: string | null = null): void {
  * Recording session state. While active:
  * 1. the animation loop's end-of-audio auto-stop is suppressed, so overdub
  *    playback runs past the end of existing material (#589/#590);
- * 2. the armed track is armed in the arrangement (#843): punch-in replaces
- *    whatever the take overlaps (#579), so that material must not play under
- *    the overdub. The arm is an override outside the history: the track
- *    plays and shows as muted while `getMixer()` keeps its own mute, which
- *    nothing writes, so a mute changed during the take stays after it. React
- *    arms one track at a time: arming one disarms every other.
+ * 2. the track the take is recording onto is marked in the arrangement
+ *    (`setTrackRecording`, #843): punch-in replaces whatever the take
+ *    overlaps (#579), so that material must not play under the overdub. The
+ *    take's mute is outside the history: the track plays and shows as muted
+ *    while `getMixer()` keeps its own mute, which nothing writes, so a mute
+ *    changed during the take stays after it. React records onto one track
+ *    at a time: marking one clears every other.
  * Called by useRecordingSession for the length of a take; overdub flows also
  * call it eagerly before play(), because a render round-trip loses the race
  * against the first animation frame (play() does nothing before the first
  * ready, so a take started during the first load records without playback).
- * The provider also disarms in its own cleanup (below) when a track is
- * still armed.
+ * The provider also clears it in its own cleanup (below) when a track is
+ * still recording.
  *
- * The arm's owner is the arrangement (`armedTrackIds`); the provider holds
- * no copy and renders `armedTrackId` from it with `useSyncExternalStore`.
+ * The owner is the arrangement (`recordingTrackIds`); the provider holds
+ * no copy and renders `recordingTrackId` from it with `useSyncExternalStore`.
  */
 function useRecordingActive(arrangement: Arrangement) {
   const recordingActiveRef = useRef(false);
   const setRecordingActive = useCallback(
-    (active: boolean, armedTrackId?: string | null) => {
+    (active: boolean, recordingTrackId?: string | null) => {
       recordingActiveRef.current = active;
-      if (active && armedTrackId) {
-        disarmAll(arrangement, armedTrackId);
-        arrangement.setTrackArmed(armedTrackId, true); // the same value changes nothing
+      if (active && recordingTrackId) {
+        clearRecordingTracks(arrangement, recordingTrackId);
+        arrangement.setTrackRecording(recordingTrackId, true); // the same value changes nothing
       } else if (!active) {
-        disarmAll(arrangement);
+        clearRecordingTracks(arrangement);
       }
     },
     [arrangement]
   );
   // The arrangement outlives the provider (maintainer, F1): when the provider
   // goes (unmount, an <Activity> hide, a StrictMode or Fast Refresh remount)
-  // with a track still armed, it is disarmed and the session ends. Nothing
-  // happens when the session was already released (by useRecordingSession's
-  // own cleanup) or never armed a track; a session armed again after a
-  // remount or a reveal works as before.
+  // with a track still recording, its take's mute is cleared and the session
+  // ends. Nothing happens when the session was already released (by
+  // useRecordingSession's own cleanup) or never named a track; a session
+  // started again after a remount or a reveal works as before.
   useEffect(
     () => () => {
-      if (arrangement.armedTrackIds.size > 0) setRecordingActive(false);
+      if (arrangement.recordingTrackIds.size > 0) setRecordingActive(false);
     },
     [arrangement, setRecordingActive]
   );
@@ -108,10 +109,14 @@ function useRecordingActive(arrangement: Arrangement) {
     (listener: () => void) => arrangement.subscribe(listener),
     [arrangement]
   );
-  const getArmedTrackId = useCallback(() => readArmedTrackId(arrangement), [arrangement]);
-  const armedTrackId = useSyncExternalStore(subscribe, getArmedTrackId, getArmedTrackId);
-  const recordingArm = useMemo(() => ({ armedTrackId }), [armedTrackId]);
-  return { setRecordingActive, recordingActiveRef, recordingArm };
+  const getRecordingTrackId = useCallback(() => readRecordingTrackId(arrangement), [arrangement]);
+  const recordingTrackId = useSyncExternalStore(
+    subscribe,
+    getRecordingTrackId,
+    getRecordingTrackId
+  );
+  const recordingTrack = useMemo(() => ({ recordingTrackId }), [recordingTrackId]);
+  return { setRecordingActive, recordingActiveRef, recordingTrack };
 }
 
 export function useArrangementEditing(arrangement: Arrangement): ArrangementEditing {
@@ -146,7 +151,8 @@ export function useArrangementEditing(arrangement: Arrangement): ArrangementEdit
   );
   const undo = useCallback(() => arrangement.undo(), [arrangement]);
   const redo = useCallback(() => arrangement.redo(), [arrangement]);
-  const { setRecordingActive, recordingActiveRef, recordingArm } = useRecordingActive(arrangement);
+  const { setRecordingActive, recordingActiveRef, recordingTrack } =
+    useRecordingActive(arrangement);
   return {
     setTrackMute,
     setTrackSolo,
@@ -157,6 +163,6 @@ export function useArrangementEditing(arrangement: Arrangement): ArrangementEdit
     redo,
     setRecordingActive,
     recordingActiveRef,
-    recordingArm,
+    recordingTrack,
   };
 }
