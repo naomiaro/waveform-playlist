@@ -548,7 +548,7 @@ describe('clips appended while a track loads or waits (#848)', () => {
 
 // Review of #917: each test reproduces a finding of the first round.
 describe('review fixes (#917)', () => {
-  it('M2: a DOM reorder with an element-less track in between reorders the rows', async () => {
+  it('M2: reorderTrack with an element-less track in between moves to that arrangement index (#848)', async () => {
     const editor = await mount(
       makeFakeAdapter(),
       MIDI_TRACK.replace('Keys', 'A') +
@@ -562,7 +562,8 @@ describe('review fixes (#917)', () => {
     const c = editor._arrangement.getTracks()[2].id;
     editor.reorderTrack(c, 0);
     await tick();
-    expect(names(editor)).toEqual(['C', 'B', 'A']);
+    // An index in the arrangement's order, the element-less track included.
+    expect(names(editor)).toEqual(['C', 'A', 'B']);
   });
 
   it('M3: a reparent with the adapter set at once does not add an undone track again', async () => {

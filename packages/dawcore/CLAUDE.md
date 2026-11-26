@@ -174,7 +174,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 ## File Drop
 
 - **Always revoke blob URLs** — `URL.revokeObjectURL(blobUrl)` after decode succeeds or in the catch block.
-- `_getOrderedTracks()` sorts DOM-declared tracks by position, file-dropped tracks (not in DOM) sort after, preserving Map insertion order among themselves.
+- `_getOrderedTracks()` draws the rows in the arrangement's order (#848); a dropped file enters at the end, so drops keep their drop order.
 
 ## Lit/TypeScript Requirements
 

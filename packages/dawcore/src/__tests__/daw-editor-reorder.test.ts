@@ -165,26 +165,6 @@ describe('<daw-editor> track reordering (#612)', () => {
     expect(engineOrder).toEqual(declaredOrder);
     editor.remove();
   });
-
-  it('_syncDomToEngineOrder permutes only engine-known elements; unknown elements keep their relative order (#625)', async () => {
-    // Direct unit test of the branch where the permutation loop actually
-    // mutates the DOM while engine-UNKNOWN elements are interleaved (an
-    // engine-initiated reorder landing while other tracks are still
-    // loading). The staggered-load test above only exercises the no-op
-    // early-return path.
-    const editor = await makeEditor(4);
-    const [elX, elA, elY, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
-
-    // DOM [X, A, Y, B]; engine reports only [B, A] (X and Y "still loading").
-    editor._syncDomToEngineOrder([{ id: elB.trackId }, { id: elA.trackId }]);
-
-    // Committed invariants (assert synchronously, before the MutationObserver
-    // batch): engine-known elements land in engine order [B, A]; unknown
-    // elements X and Y are never moved, so X stays before Y.
-    const domOrder = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
-    expect(domOrder).toEqual([elX.trackId, elB.trackId, elA.trackId, elY.trackId]);
-    editor.remove();
-  });
 });
 
 describe('<daw-editor> track reordering — redundant reconnect guard (#612)', () => {
@@ -260,91 +240,16 @@ describe('<daw-editor> track reordering — redundant reconnect guard (#612)', (
   });
 });
 
-describe('<daw-editor> engine-to-DOM reorder sync (#612)', () => {
-  it('undo after a reorder moves the <daw-track> elements back', async () => {
-    const editor = await makeEditor(2);
-    const [elA, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
-    editor.reorderTrack(elB.trackId, 0);
-    await vi.waitFor(() => {
-      expect([...editor.querySelectorAll('daw-track')][0]).toBe(elB);
-    });
-    editor.engine!.undo();
-    await vi.waitFor(() => {
-      expect([...editor.querySelectorAll('daw-track')][0]).toBe(elA);
-      expect(editor.engine!.getState().tracks[0].id).toBe(elA.trackId);
-    });
-    editor.remove();
-  });
-
-  it('reorder sync converges under a 3-track permutation that forces 2 reorderTrack calls in one sync, without the engine->DOM handler bouncing mid-transaction', async () => {
-    const editor = await makeEditor(3);
-    const [elA, elB, elC] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
-    const reorderSpy = vi.spyOn(editor.engine!, 'reorderTrack');
-    // White-box spy on the engine->DOM direction: this is the method the
-    // `_inOrderSync` guard exists to suppress while a DOM->engine transaction
-    // (_syncEngineOrderToDom) is in flight. NOTE: because
-    // _syncEngineOrderToDom's forward-fill loop is self-correcting (its
-    // LAST reorderTrack call always lands the fully-converged permutation,
-    // by construction — every already-placed prefix position is never
-    // revisited), the FINAL DOM/engine state and the reorderTrack call
-    // count are identical whether or not the guard is present, for this
-    // single-batch scenario. The only observable difference is that,
-    // unguarded, `_syncDomToEngineOrder` fires once per mid-transaction
-    // reorderTrack call (bouncing the DOM to intermediate, not-yet-final
-    // orders) instead of zero times. That call-count is the load-bearing
-    // assertion below (sabotage-verified: with the `!this._inOrderSync`
-    // guard condition deleted, this spy is called 2 times instead of 0 —
-    // see #612 PR notes).
-    const domSyncSpy = vi.spyOn(
-      editor as unknown as { _syncDomToEngineOrder: () => void },
-      '_syncDomToEngineOrder'
-    );
-
-    // Two synchronous DOM mutations (no await between them) land in ONE
-    // MutationObserver batch, so _syncEngineOrderToDom sees the SETTLED
-    // order [c, b, a] (a full reversal) in a single call. Its forward-fill
-    // selection-sort algorithm needs 2 reorderTrack calls to realize this
-    // permutation (hand-traced against the algorithm in _syncEngineOrderToDom):
-    //   current=[a,b,c] target=[c,b,a]
-    //   i=0: c !== a -> reorderTrack(c, 0); current=[c,a,b]
-    //   i=1: b !== a -> reorderTrack(b, 1); current=[c,b,a]
-    //   i=2: a === a -> no call
-    // A single-rotation permutation (e.g. insertBefore(elC, elA) alone,
-    // giving [c,a,b]) only takes ONE reorderTrack call and would NOT
-    // exercise the mid-transaction statechange path that _inOrderSync
-    // guards — that was the weakness in the original 2-track version of
-    // this test (2 tracks can only ever produce a single transposition).
-    editor.insertBefore(elC, elA); // [c, a, b]
-    editor.insertBefore(elB, elA); // [c, b, a]
-
-    await vi.waitFor(() => {
-      const order = editor.engine!.getState().tracks.map((t: { id: string }) => t.id);
-      expect(order).toEqual([elC.trackId, elB.trackId, elA.trackId]);
-    });
-    const domOrder = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
-    expect(domOrder).toEqual([elC.trackId, elB.trackId, elA.trackId]);
-    expect(reorderSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
-    expect(domSyncSpy).not.toHaveBeenCalled(); // guard held for the whole transaction
-
-    const calls = reorderSpy.mock.calls.length;
-    await new Promise((r) => setTimeout(r, 50));
-    expect(reorderSpy.mock.calls.length).toBe(calls); // settled, no further churn
-    expect(domSyncSpy).not.toHaveBeenCalled();
-    editor.remove();
-  });
-});
-
 describe('<daw-editor track-reordering> UI-driven reorder (#612)', () => {
-  it('clicking the rendered move-down button reorders both the engine and the DOM', async () => {
+  it('clicking the rendered move-down button reorders the arrangement and moves no element (#848)', async () => {
     const editor = document.createElement('daw-editor') as any;
     editor.adapter = makeMockAdapter();
     editor.setAttribute('track-reordering', '');
     document.body.appendChild(editor);
-    await editor.addTrack({ name: 'A', midi: { notes: NOTES } });
-    await editor.addTrack({ name: 'B', midi: { notes: NOTES } });
+    const a = await editor.addTrack({ name: 'A', midi: { notes: NOTES } });
+    const b = await editor.addTrack({ name: 'B', midi: { notes: NOTES } });
     await editor.updateComplete;
-
-    const [elA, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
+    const domBefore = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
 
     const controlsEls = editor.shadowRoot!.querySelectorAll('daw-track-controls');
     expect(controlsEls.length).toBe(2);
@@ -356,10 +261,10 @@ describe('<daw-editor track-reordering> UI-driven reorder (#612)', () => {
 
     await vi.waitFor(() => {
       const engineOrder = editor.engine!.getState().tracks.map((t: { id: string }) => t.id);
-      expect(engineOrder).toEqual([elB.trackId, elA.trackId]);
-      const domOrder = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
-      expect(domOrder).toEqual([elB.trackId, elA.trackId]);
+      expect(engineOrder).toEqual([b, a]);
     });
+    const domOrder = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
+    expect(domOrder).toEqual(domBefore);
 
     editor.remove();
   });
@@ -396,5 +301,102 @@ describe('<daw-editor> reorderTrack input hardening (#612)', () => {
     );
 
     editor.remove();
+  });
+});
+
+// #848 PR 3 (P13): the editor never moves its children. A DOM move is a
+// reorder request; reorderTrack and an undo change the arrangement only.
+describe('<daw-editor> DOM order is a request (#848)', () => {
+  const PAGE =
+    '<daw-track name="A" kind="midi"></daw-track>' +
+    '<daw-track name="B" kind="midi"></daw-track>' +
+    '<daw-track name="C" kind="midi"></daw-track>';
+
+  async function pageEditor() {
+    const editor = document.createElement('daw-editor') as any;
+    editor.adapter = makeFakeAdapter().adapter;
+    editor.innerHTML = PAGE;
+    document.body.appendChild(editor);
+    await vi.waitFor(() => expect(editor._arrangement.getTracks()).toHaveLength(3));
+    await editor.updateComplete;
+    return editor;
+  }
+  type Editor = HTMLElement & {
+    _arrangement: { getTracks(): readonly { id: string; name?: string; clips: unknown[] }[] };
+  };
+  const names = (editor: Editor) => editor._arrangement.getTracks().map((t) => t.name);
+  const domNames = (editor: Editor) =>
+    [...editor.querySelectorAll('daw-track')].map((el) => el.getAttribute('name'));
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  afterEach(() => {
+    document.querySelectorAll('daw-editor').forEach((e) => e.remove());
+  });
+
+  it('reorderTrack changes the arrangement order and moves no element', async () => {
+    const editor = await pageEditor();
+    const c = editor._arrangement.getTracks()[2].id;
+    editor.reorderTrack(c, 0);
+    await flush();
+    expect(names(editor)).toEqual(['C', 'A', 'B']);
+    expect(domNames(editor)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('moving a <daw-track> before another reorders the arrangement, one undo step', async () => {
+    const editor = await pageEditor();
+    const [a, , c] = [...editor.querySelectorAll('daw-track')];
+    editor.insertBefore(c, a);
+    await flush();
+    expect(names(editor)).toEqual(['C', 'A', 'B']);
+    editor._arrangement.undo();
+    expect(names(editor)).toEqual(['A', 'B', 'C']);
+    expect(editor._arrangement.canUndo).toBe(false);
+  });
+
+  it('two elements moved in one task are one undo step', async () => {
+    const editor = await pageEditor();
+    const [a, b, c] = [...editor.querySelectorAll('daw-track')];
+    editor.append(b, a); // C, B, A
+    void c;
+    await flush();
+    expect(names(editor)).toEqual(['C', 'B', 'A']);
+    editor._arrangement.undo();
+    expect(names(editor)).toEqual(['A', 'B', 'C']);
+    expect(editor._arrangement.canUndo).toBe(false);
+  });
+
+  it('undo of a reorder moves no element', async () => {
+    const editor = await pageEditor();
+    const [a, , c] = [...editor.querySelectorAll('daw-track')];
+    editor.insertBefore(c, a);
+    await flush();
+    editor._arrangement.undo();
+    await flush();
+    expect(domNames(editor)).toEqual(['C', 'A', 'B']);
+    expect(names(editor)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('a re-render that writes the same attributes and order is no undo step', async () => {
+    const editor = await pageEditor();
+    const els = [...editor.querySelectorAll('daw-track')] as HTMLElement[];
+    for (const el of els) el.setAttribute('name', el.getAttribute('name')!);
+    editor.append(...els); // the same order, every element moved
+    await flush();
+    expect(names(editor)).toEqual(['A', 'B', 'C']);
+    expect(editor._arrangement.canUndo).toBe(false);
+  });
+
+  it('a <daw-clip> removed while the editor was detached is removed from its track at reconnect', async () => {
+    const editor = document.createElement('daw-editor') as any;
+    editor.adapter = makeFakeAdapter().adapter;
+    editor._peakPipeline = makeMockPeakPipeline();
+    editor.innerHTML =
+      '<daw-track name="M" kind="midi"><daw-clip duration="1"></daw-clip></daw-track>';
+    document.body.appendChild(editor);
+    await vi.waitFor(() => expect(editor._arrangement.getTracks()[0]?.clips).toHaveLength(1));
+    editor.remove();
+    editor.querySelector('daw-clip').remove();
+    document.body.appendChild(editor);
+    expect(editor._arrangement.getTracks()[0].clips).toHaveLength(0);
   });
 });

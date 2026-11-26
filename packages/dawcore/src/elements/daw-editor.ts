@@ -1445,10 +1445,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           });
         }
       }
-      let orderMayHaveChanged = addedTrackIds.size > 0;
+      const movedTrackIds = new Set<string>();
       for (const [trackId] of removedTracks) {
         if (addedTrackIds.has(trackId)) {
-          orderMayHaveChanged = true; // move, not removal
+          movedTrackIds.add(trackId); // move, not removal
           continue;
         }
         this._onTrackRemoved(trackId);
@@ -1458,7 +1458,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         if (clip.isConnected) continue;
         this._onClipRemovedFromDom(clip);
       }
-      if (orderMayHaveChanged) this._syncEngineOrderToDom();
+      if (movedTrackIds.size > 0) this._placeMovedTracks(movedTrackIds);
     });
     this._childObserver.observe(this, { childList: true, subtree: true });
     // A <daw-track> the page removed while the editor was detached (the
@@ -1466,6 +1466,18 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // (#917; `_trackElements` is kept across a disconnect).
     for (const [trackId, el] of [...this._trackElements]) {
       if (!this.contains(el)) this._onTrackRemoved(trackId);
+    }
+    // ... and a <daw-clip> the page removed meanwhile: its clip goes (#848).
+    for (const [trackId, el] of this._trackElements) {
+      const present = new Set(
+        [...el.querySelectorAll('daw-clip')].map((c) => (c as DawClipElement).clipId as string)
+      );
+      for (const clipId of this._extras.get(trackId)?.peaksSrc.keys() ?? []) {
+        if (present.has(clipId)) continue;
+        if (this._clipLinkState(trackId, clipId) === 'live')
+          this._removeClipFromTrack(trackId, clipId);
+        else this._forgetClip(trackId, clipId);
+      }
     }
     if (this._externalAdapter && !this._engine) this._buildEngineReporting();
   }
@@ -2777,13 +2789,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // splitClip, setTracks, addTrack, removeTrack).
     if (structuralChange) {
       this._recomputeDuration();
-      // Engine-initiated order changes (undo/redo of a reorder) move the
-      // DOM to match; guarded so the observer's own DOM→engine sync (which
-      // emits intermediate statechanges mid-transaction) can't bounce
-      // half-applied orders back into the DOM (#612).
-      if (!this._inOrderSync) {
-        this._syncDomToEngineOrder(engineState.tracks);
-      }
       // Transport setTracks rebuilds TrackNodes, severing effects hookups.
       this._effectsManager?.rewireTrackChains();
       // Regenerate peaks for new or trimmed clips.
@@ -2967,22 +2972,14 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       console.warn('[dawcore] reorderTrack: invalid toIndex ' + String(toIndex));
       return;
     }
-    const el = this._trackElements.get(trackId);
-    if (el) {
-      const els = [...this.querySelectorAll('daw-track')] as DawTrackElement[];
-      const from = els.indexOf(el);
-      if (from === -1) return;
-      const clamped = Math.max(0, Math.min(toIndex, els.length - 1));
-      if (from === clamped) return;
-      const anchor = els[clamped];
-      if (clamped > from) anchor.after(el);
-      else anchor.before(el);
-    } else if (this._isEntered(trackId)) {
-      this._arrangement.reorderTrack(trackId, toIndex);
-      this.requestUpdate();
-    } else {
+    if (!this._isEntered(trackId)) {
       console.warn('[dawcore] reorderTrack: no track found for id "' + trackId + '"');
+      return;
     }
+    // The arrangement's order; no element moves (#848: the markup is the
+    // starting declaration, order included).
+    const last = this._arrangement.getTracks().length - 1;
+    this._arrangement.reorderTrack(trackId, Math.max(0, Math.min(Math.trunc(toIndex), last)));
   }
 
   private _onTrackReorder = (e: CustomEvent<DawTrackReorderDetail>) => {
@@ -3761,91 +3758,30 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     );
   }
 
-  /** Guards the statechange handler's engine→DOM sync (Task: reorder #612)
-   *  while the observer is pushing DOM order INTO the engine — the intermediate
-   *  statechange emissions during the transaction would otherwise bounce
-   *  half-applied orders back into the DOM. */
-  _inOrderSync = false;
-
   /**
-   * DOM → engine: make the engine's track order match the light-DOM
-   * `<daw-track>` order. Single write path for reorders — editor-initiated
-   * (buttons/drag move the element) and consumer-initiated (insertBefore)
-   * mutations both land here via the MutationObserver. Element-less tracks
-   * (undo-resurrected) keep their engine positions (stable sort).
-   * Write-only-on-change: a no-op when orders already match, so the
-   * engine→DOM direction (statechange handler) converges in one pass.
+   * `<daw-track>` elements the page moved (one MutationObserver batch): each
+   * is placed after the arrangement track of the nearest `<daw-track>` before
+   * it, in DOM order, as one undo step (#848 P13). Elements whose track is
+   * not in the arrangement are left alone (a queued one enters at its DOM
+   * position). The arrangement's own order changes (an Undo) move no element.
    */
-  _syncEngineOrderToDom(): void {
-    const engine = this._engine;
-    if (!engine) return;
-    const domOrder: string[] = [...this.querySelectorAll('daw-track')].map(
-      (el) => (el as DawTrackElement).trackId
-    );
-    const engineIds: string[] = engine.getState().tracks.map((t) => t.id);
-    // The slots element-backed tracks hold, in the engine's order, refilled
-    // in DOM order; an element-less track keeps its slot. (A sort whose
-    // comparator returns 0 for element-less tracks is not transitive and can
-    // leave the order as it was, #917.)
-    const inDom = new Set(domOrder);
-    const slots = engineIds.flatMap((id, i) => (inDom.has(id) ? [i] : []));
-    const domSorted = domOrder.filter((id) => engineIds.includes(id));
-    const target = [...engineIds];
-    slots.forEach((slot, k) => {
-      target[slot] = domSorted[k];
-    });
-    if (target.every((id, i) => id === engineIds[i])) return;
-    this._inOrderSync = true;
-    try {
-      engine.beginTransaction(); // one undo step for the whole permutation
-      const current = [...engineIds];
-      for (let i = 0; i < target.length; i++) {
-        if (current[i] === target[i]) continue;
-        engine.reorderTrack(target[i], i);
-        const from = current.indexOf(target[i]);
-        current.splice(from, 1);
-        current.splice(i, 0, target[i]);
-      }
-      engine.commitTransaction();
-    } finally {
-      this._inOrderSync = false;
-    }
-    this.requestUpdate();
-  }
-
-  /**
-   * Engine → DOM: after an engine-initiated order change (undo/redo), move
-   * `<daw-track>` elements to match engine order. The resulting mutations fire
-   * the observer's _syncEngineOrderToDom, which finds the orders equal and
-   * no-ops — converges in one pass (write-only-on-change).
-   */
-  _syncDomToEngineOrder(tracks: readonly ClipTrack[]): void {
+  private _placeMovedTracks(movedIds: ReadonlySet<string>): void {
     const els = [...this.querySelectorAll('daw-track')] as DawTrackElement[];
-    if (els.length < 2) return;
-    const byId = new Map<string, DawTrackElement>(els.map((el) => [el.trackId, el]));
-    const desired = tracks
-      .map((t) => byId.get(t.id))
-      .filter((el): el is DawTrackElement => el != null);
-    if (desired.length < 2) return;
-    // Permute engine-known elements into engine order. Elements the engine
-    // hasn't seen yet (tracks still queued, waiting for an adapter or the
-    // next flush; a loading track is in the engine since #848) are never
-    // moved, so they keep their
-    // relative order among themselves (their absolute index can still shift
-    // when engine-known neighbors move around them); anchoring desired[0] at
-    // els[0] instead would promote the loaded subset to the top and reorder
-    // tracks by decode-completion order (#625).
-    const desiredSet = new Set(desired);
-    const slots = els.filter((el) => desiredSet.has(el));
-    if (desired.every((el, i) => el === slots[i])) return;
-    for (let i = 0; i < desired.length; i++) {
-      if (slots[i] === desired[i]) continue;
-      // desired[i] currently sits at a later slot (earlier ones are settled);
-      // insert it directly before the element occupying slot i.
-      slots[i].before(desired[i]);
-      const from = slots.indexOf(desired[i]);
-      slots.splice(from, 1);
-      slots.splice(i, 0, desired[i]);
+    const moved = els.filter((el) => movedIds.has(el.trackId) && this._isEntered(el.trackId));
+    if (moved.length === 0) return;
+    const arrangement = this._arrangement;
+    arrangement.beginTransaction();
+    try {
+      for (const el of moved) {
+        const others = arrangement
+          .getTracks()
+          .map((t) => t.id)
+          .filter((id) => id !== el.trackId);
+        // The index it already has changes nothing.
+        arrangement.reorderTrack(el.trackId, entryIndex(els, el.trackId, others));
+      }
+    } finally {
+      arrangement.commitTransaction();
     }
   }
 
