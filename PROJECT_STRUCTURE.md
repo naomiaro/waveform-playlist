@@ -637,7 +637,10 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
 - **Structure:**
   ```
   src/
-  ├── SpectrogramProvider.tsx  # Provider (fills SpectrogramIntegrationContext)
+  ├── SpectrogramProvider.tsx  # Provider (fills SpectrogramIntegrationContext, owns the worker pool)
+  ├── spectrogram-helpers.ts   # Pure helpers: chunk tiers, sample ranges, config keys, registered ranges
+  ├── audioRegistration.ts     # Which audio the pool holds: one key per AudioBuffer, spectrogram tracks only
+  ├── useStableByContent.ts    # config/colorMap compared by content
   ├── components/              # UI components (menu items, settings modal)
   ├── styled.d.ts
   └── index.ts

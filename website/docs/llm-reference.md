@@ -3078,6 +3078,7 @@ interface SpectrogramWorkerApi {
   unregisterCanvas(canvasId: string): void;
   registerAudioData(clipId: string, channelDataArrays: Float32Array[], sampleRate: number): void;
   unregisterAudioData(clipId: string): void;
+  registeredAudioClipIds(): string[];  // registered now; empty once terminated; a new array per call
   terminate(): void;
 }
 
