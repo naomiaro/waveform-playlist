@@ -16,8 +16,8 @@ reconcilers. Each load ends in `engine.setTracks`, which wipes the undo
 history, mixer steps included.
 
 After this work an app, or an AI agent, drives `<daw-editor>` through one
-object: it creates an arrangement, hands it to the editor, and reads and
-changes the tracks, the mix, undo and loading on it, without knowing about
+object: it creates an arrangement and hands it to the editor (or reads the
+editor's own, `editor.arrangement`), and reads and changes the tracks, the mix, undo and loading on it, without knowing about
 elements **(decided: "apps can hand in an arrangement - this seems a useful
 path for AI agents")**. The editor plays and draws the arrangement and changes
 it only through its methods.
@@ -54,9 +54,11 @@ live state is read from properties, like `input.value`.
 
 - A guard, flag or merge between two stored copies. If a design step needs
   one, a second owner is left.
-- The editor writing attributes or moving its children. That fights a
-  framework that renders the `<daw-track>` children (decided: the markup is
-  the starting declaration, track order included).
+- The editor writing attributes or moving its children on its own. That
+  fights a framework that renders the `<daw-track>` children (decided: the
+  markup is the starting declaration, track order included). The one
+  exception is an explicit request to remove: `editor.removeTrack` /
+  `removeClip` remove the element, as `select.remove(i)` does.
 
 ## Owner table
 
@@ -112,6 +114,32 @@ B, the editor writing attributes and moving elements (the `contenteditable`
 model; copied HTML is current, but the editor edits its children and fights a
 framework that renders them). C keeps one owner and reads like a form control.
 Order is part of the same rule (decided after discussion: no DOM order sync).
+
+**Other choices made in the conversation (each decided, 2026-11-25), with
+what was rejected:**
+
+- Markup and a handed-in arrangement: the `srcObject` model. Rejected: the
+  children added to whichever arrangement the editor plays (page tracks in
+  the app's undo history, duplicate ids on a swap, a split's leftover clip
+  coming back).
+- An element whose id left the arrangement: detached, linked by id.
+  Rejected: an element that declares its track again on reconnect or on an
+  attribute change (a split's `<daw-clip>` would come back over its halves).
+  Made visible: split keeps the left id, `:state(detached)`, a warning.
+- The editor's methods: arrangement calls. Rejected: element factory (the
+  editor writes its children after all, and the elements it made would be
+  detached under a handed-in arrangement); removing them (editor-only parts
+  would still need methods, two APIs for one task).
+- Inserting a track at a position: `addTrack(track, { index })`. Rejected:
+  a transaction around `addTrack` + `reorderTrack` (overwrites an open drag
+  transaction); always appending (not native).
+- A swap after the engine exists: keep the adapter. Rejected: the app sets a
+  fresh adapter after the swap (two steps, no playback between them); swap
+  allowed only before an engine (another project needs a new element).
+- A track whose sources all failed: stays, like a broken `<img>`. Rejected:
+  removed by the editor (drops the arrangement's retry).
+- Escape during a drag: only cancels the drag. Rejected: it also stops
+  playback and deselects.
 
 **Undo during a drag (decided: a).** Options were a) undo and redo do nothing
 during a drag, b) undo cancels the drag, c) undo cancels the drag and then
@@ -386,16 +414,26 @@ Named here so it is not discovered during review.
   `notes/tracks-and-loading.md`, `packages/dawcore/README.md`,
   `website/docs/web-components/getting-started.md`, `llms.txt` and
   `llm-reference.md` where they describe dawcore loading.
+- PR 2 also: the engine guide (`website/docs/framework-agnostic/engine.md`)
+  and `packages/engine/CLAUDE.md` for `addTrack(track, { index })` and the
+  `/v3` keys; `COMPONENTS.md` for `addTrack()` resolving with an id, the
+  failed placeholder and the retry method; upgrade notes in the dawcore
+  changesets (dawcore has no upgrade page; `packages/dawcore/README.md`
+  carries them if the plan finds no better place).
 - PR 3: `COMPONENTS.md` (`editor.arrangement`, element properties,
-  `trackEl.index`, attributes as declaration), the elements' entries in
+  `trackEl.index`, attributes as declaration, `:state(detached)`, the
+  warning, `removeTrack` / `removeClip` removing the element), the elements' entries in
   `packages/dawcore/CLAUDE.md` and `notes/elements.md`, the attribute tables
   in `docs/specs/web-components-migration.md`, `README.md`,
   `examples/dawcore-*/programmatic.html` (reads `clipEl.start` after a drag),
-  `llms.txt` (handing an arrangement to `<daw-editor>`, the agent path).
-- A new section in `packages/dawcore/CLAUDE.md` (decided: there, not a skill
-  for now): "As close to the native DOM as possible": the rule, the native
+  `llms.txt` (handing an arrangement to `<daw-editor>`, the agent path), the
+  engine guide and `packages/engine/CLAUDE.md` for the keep-the-adapter
+  option and a split keeping the left id, and for React the split's ids in
+  `website/docs/react/` wherever a split's result is described.
+- A new section in `packages/dawcore/CLAUDE.md` (call, told to the
+  maintainer with no objection: there, not a skill for now): "As close to the native DOM as possible": the rule, the native
   precedents (`<input>` value / `defaultValue`, `<option>` `selected` /
-  `index`, `<details open>`, `<video>`), and a checklist for a new attribute or
+  `index`, `<details open>`, `<video>` and `<source>`, custom states for runtime flags), and a checklist for a new attribute or
   property (what the attribute holds, what the property returns, whether the
   editor writes it back, which event fires, what happens before the element
   connects). Written in PR 3, where the rule is applied.
@@ -405,7 +443,10 @@ Named here so it is not discovered during review.
 - Where React's "a drag is in progress" lives (PR 1).
 - How Escape is caught in `<daw-editor>` so it reaches no other shortcut.
 - The `.dat` preview on the `LoadingClip` or beside it (PR 2).
-- Telling page-load tracks apart from later ones for the undo history (PR 2).
+- How the page's tracks are batched for the page-load history rule (PR 2).
+- The name of the engine's keep-the-adapter option and of the editor's retry
+  method (PR 3, PR 2).
+- The failed placeholder's look and its CSS custom property (PR 2).
 - The clip drag model in PR 3 (transaction or preview).
 - Which unit tests of dawcore change meaning (the reconciler, order sync and
   seed tests go with their code) and which e2e specs cover the new behaviour.
