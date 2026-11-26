@@ -310,6 +310,20 @@ DOM order is not synced.
   Removing an element is something only the page or an editor method does;
   a change to the arrangement alone (an Undo, an agent's
   `arrangement.removeTrack`) detaches it.
+- **Swapping the arrangement keeps the adapter (decided, 2026-11-25).**
+  Setting `editor.arrangement` once an engine exists lets the old engine go
+  WITHOUT disposing the adapter, and builds a new engine on the new
+  arrangement with the same adapter: playback stops, the new tracks are sent,
+  the effects chains of tracks that are not in the new arrangement are
+  disposed. To the app it is one assignment, like `video.srcObject = other`.
+  This needs a small public engine addition: a way for an engine to let go
+  of its arrangement and its adapter subscriptions without calling
+  `adapter.dispose()` (for example `engine.dispose({ keepAdapter: true })`;
+  the name is for the plan). The plan checks that an adapter serves a second
+  engine correctly (`onPlaybackEnded` is resubscribed, tempo and ppqn applied
+  again in `_buildEngine`, the decode context attached again) and that the
+  editor's `_adapterConsumedByDispose` guard does not fire for a swap. An
+  engine changeset and the engine guide's entry.
 - `<daw-track>` properties `volume`, `pan`, `muted`, `soloed`, `name` and
   `<daw-clip>` properties `start`, `duration`, `offset`, `gain`, `name`,
   fades, become getters over the arrangement, falling back to the parsed
