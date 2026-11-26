@@ -177,7 +177,9 @@ Independent of PRs 2 and 3.
   first `play()` (the user-gesture rule). The sample rate comes from
   `adapter.audioContext`; `_resolvedSampleRate` from decoded audio goes, or is
   read from the loaded clips if the plan finds a case where they differ.
-- A `<daw-track>` that connects enters the arrangement at once, with a
+- A `<daw-track>` that connects enters the arrangement as soon as the editor
+  has an adapter (at once in practice: pages set the adapter before tracks
+  load, as decode needs its `audioContext` today), with a
   `LoadingClip` per `<daw-clip>` (`src`, times in seconds, `name`, `gain`,
   fades), the same as `audioTrack()` in React. MIDI clips have no source and
   enter loaded, as today.
@@ -203,8 +205,9 @@ Independent of PRs 2 and 3.
   set.
 - Reparenting: the arrangement survives a disconnect (a moved `<input>` keeps
   its value). The engine is disposed with its adapter as today and rebuilt
-  when a fresh adapter is set. Element tracks are not added a second time on
-  reconnect (their ids are already in the arrangement).
+  when a fresh adapter is set. Element tracks are not added again on
+  reconnect, whether or not the arrangement still holds them (dormant
+  elements, PR 3).
 - Recording: a finished take goes in with `arrangement.updateTrack` (today
   `engine.updateTrack` plus `_engineTracks` and the descriptor); the take
   mute stays `setTrackRecording`.
@@ -212,8 +215,14 @@ Independent of PRs 2 and 3.
   whose `src` is the `File` (a `ClipSource`); the blob-URL handling goes. A
   file that fails is removed with `{ undoable: false }`, as the React example
   pages do.
-- Before the arrangement has a decode context (no adapter yet), tracks sit as
-  loading clips; they load once the engine attaches the adapter's context.
+- Tracks wait for the adapter before entering (call, 2026-11-25): without
+  it the sample rate is unknown, and a MIDI clip built at the 48000 fallback
+  (`_buildMidiClip`, `daw-editor.ts:2084`; `sampleRate`, `:461`) keeps those
+  samples when an engine at another rate attaches (`tickPreparer` derives
+  `startTick` from `startSample` at the engine's rate and leaves samples
+  alone, `packages/engine/src/arrangement/ticks.ts:67`). MIDI clips in
+  musical time (start, length and notes in ticks) would remove the wait;
+  that is its own issue, not part of #848.
 
 ## PR 3: a handed-in arrangement; live element properties
 
@@ -224,11 +233,25 @@ DOM order is not synced.
 **Calls:**
 
 - `editor.arrangement` is a property (no attribute). Reading it returns the
-  arrangement the editor plays. Setting it replaces the arrangement: the
-  engine is rebuilt on the new one (one engine per arrangement), and each
-  connected `<daw-track>` whose id the new arrangement does not hold is added
-  to it. The old arrangement is left as it is; the editor never disposes an
-  arrangement it was handed.
+  arrangement the editor plays: a handed-in one, or else the editor's own.
+- **The `srcObject` model (decided, 2026-11-25).** Like `<video src>` and
+  `video.srcObject`: the `<daw-track>` children declare the content of the
+  editor's OWN arrangement. A handed-in arrangement is played alone; the
+  children are not added to it, and are dormant (below) while it is set. An
+  app that wants markup and an object to drive reads `editor.arrangement`
+  (the editor's own) and does not hand one in. Setting `editor.arrangement`
+  back to `null` returns to the editor's own arrangement, with what it held.
+  The editor never disposes an arrangement it was handed.
+- **Dormant elements (decided, 2026-11-25).** An element whose track or clip
+  is not in the arrangement the editor plays (an Undo of the track's
+  arrival, an app's or agent's `removeTrack`, a split, which gives both
+  halves new ids, or a handed-in arrangement) is dormant: not drawn, not in
+  `editor.tracks`, its properties return its attribute values, and an
+  attribute change on it does nothing. It is never added again by the
+  editor: not on the editor's reconnect, not on an arrangement swap, not on
+  an attribute change. Removing it from the DOM and inserting it again
+  declares a new track (or clip). The native picture: an `<input>` after its
+  form was reset, whose markup stays while the live state moved on.
 - `<daw-track>` properties `volume`, `pan`, `muted`, `soloed`, `name` and
   `<daw-clip>` properties `start`, `duration`, `offset`, `gain`, `name`,
   fades, become getters over the arrangement, falling back to the parsed
