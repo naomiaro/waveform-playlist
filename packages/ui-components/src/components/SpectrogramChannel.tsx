@@ -1,4 +1,4 @@
-import React, { FunctionComponent, useRef, useEffect } from 'react';
+import React, { FunctionComponent, useRef, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { useVisibleChunkIndices } from '../contexts/ScrollViewport';
 import { useClipViewportOrigin } from '../contexts/ClipViewportOrigin';
@@ -79,6 +79,32 @@ export interface SpectrogramChannelProps {
   durationSamples?: number;
 }
 
+/**
+ * Unregisters each id whose canvas is no longer on the page, and returns the
+ * ids that stay registered.
+ */
+function releaseUnmounted(
+  ids: ReadonlySet<string>,
+  canvases: ReadonlyMap<number, HTMLCanvasElement>,
+  unregister: (canvasId: string) => void
+): Set<string> {
+  const remaining = new Set<string>();
+  for (const id of ids) {
+    const parsed = parseSpectrogramCanvasId(id);
+    const canvas = parsed ? canvases.get(parsed.chunkIndex) : undefined;
+    if (canvas?.isConnected) {
+      remaining.add(id);
+      continue;
+    }
+    try {
+      unregister(id);
+    } catch (err) {
+      console.warn(`[spectrogram] unregister failed for ${id}:`, err);
+    }
+  }
+  return remaining;
+}
+
 export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
   index,
   channelIndex: channelIndexProp,
@@ -94,10 +120,19 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
 }) => {
   const channelIndex = channelIndexProp ?? index;
   const { canvasRef, canvasMapRef } = useChunkedCanvasRefs();
-  const registeredIdsRef = useRef<string[]>([]);
+  // A set: a canvas whose key changes remounts and registers again under the
+  // same id, and the id must be unregistered once (#856).
+  const registeredIdsRef = useRef<ReadonlySet<string>>(new Set());
   const transferredCanvasesRef = useRef<WeakSet<HTMLCanvasElement>>(new WeakSet());
   const onCanvasRegisterRef = useRef(onCanvasRegister);
   const onCanvasUnregisterRef = useRef(onCanvasUnregister);
+  // Set by a cleanup that released the canvases. When the effects run again on
+  // the same component (StrictMode's simulated remount, an <Activity> reveal,
+  // Fast Refresh), the generation goes up: it is in the canvas key, so fresh
+  // canvases mount and register (a transferred canvas cannot be handed over a
+  // second time).
+  const releasedRef = useRef(false);
+  const [generation, setGeneration] = useState(0);
 
   const clipOriginX = useClipViewportOrigin();
   const visibleChunkIndices = useVisibleChunkIndices(length, MAX_CANVAS_WIDTH, clipOriginX);
@@ -113,31 +148,15 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
   // Clean up stale canvases, then transfer new ones to the spectrogram provider.
   useEffect(() => {
     if (!clipId) return;
+    // A cleanup released the canvases and the effect below is about to replace
+    // them: registering one now would be undone at once (#856).
+    if (releasedRef.current) return;
 
     const unregister = onCanvasUnregisterRef.current;
     const register = onCanvasRegisterRef.current;
 
     // Step 1: Drop registrations for canvases that have unmounted.
-    const remaining: string[] = [];
-    for (const id of registeredIdsRef.current) {
-      const parsed = parseSpectrogramCanvasId(id);
-      if (!parsed) {
-        remaining.push(id);
-        continue;
-      }
-      const chunkIdx = parsed.chunkIndex;
-      const canvas = canvasMapRef.current.get(chunkIdx);
-      if (canvas && canvas.isConnected) {
-        remaining.push(id);
-      } else {
-        try {
-          unregister(id);
-        } catch (err) {
-          console.warn(`[spectrogram] unregister failed for ${id}:`, err);
-        }
-      }
-    }
-    registeredIdsRef.current = remaining;
+    const remaining = releaseUnmounted(registeredIdsRef.current, canvasMapRef.current, unregister);
 
     // Step 2: Transfer newly mounted canvases.
     for (const [canvasIdx, canvas] of canvasMapRef.current.entries()) {
@@ -169,11 +188,12 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
           ...(offsetSamples !== undefined ? { offsetSamples } : {}),
           ...(durationSamples !== undefined ? { durationSamples } : {}),
         });
-        registeredIdsRef.current.push(canvasId);
+        remaining.add(canvasId);
       } catch (err) {
         console.warn(`[spectrogram] register failed for ${canvasId}:`, err);
       }
     }
+    registeredIdsRef.current = remaining;
   }, [
     canvasMapRef,
     clipId,
@@ -183,10 +203,18 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
     offsetSamples,
     durationSamples,
     visibleChunkIndices,
+    generation,
   ]);
 
-  // Unregister all canvases on component unmount.
+  // Every cleanup releases every canvas: React runs it for an unmount, StrictMode's
+  // simulated unmount, an <Activity> hide and Fast Refresh, and after a hide it
+  // may be the last one (a channel deleted while hidden runs no cleanup). When the
+  // effects run again, new canvases are mounted for the ones released (#856).
   useEffect(() => {
+    if (releasedRef.current) {
+      releasedRef.current = false;
+      setGeneration((g) => g + 1);
+    }
     return () => {
       const unregister = onCanvasUnregisterRef.current;
       for (const id of registeredIdsRef.current) {
@@ -196,7 +224,8 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
           console.warn(`[spectrogram] unregister failed for ${id}:`, err);
         }
       }
-      registeredIdsRef.current = [];
+      registeredIdsRef.current = new Set();
+      releasedRef.current = true;
     };
   }, []);
 
@@ -209,8 +238,9 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
       <SpectrogramCanvas
         // The height and the audio range are in the key: a transferred canvas
         // cannot be resized or registered again from here, and the provider
-        // renders at the height and the range a canvas registered with.
-        key={`${length}-${waveHeight}-${offsetSamples ?? ''}-${durationSamples ?? ''}-${i}`}
+        // renders at the height and the range a canvas registered with. The
+        // generation replaces canvases a cleanup released.
+        key={`${generation}-${length}-${waveHeight}-${offsetSamples ?? ''}-${durationSamples ?? ''}-${i}`}
         $cssWidth={currentWidth}
         $left={chunkLeft}
         width={currentWidth * devicePixelRatio}
