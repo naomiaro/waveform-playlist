@@ -401,3 +401,19 @@ describe('addTrack() targets the arrangement played when it is called (capture-i
     expect(ed.arrangement.getTracks().map((t: { name: string }) => t.name)).not.toContain('Late');
   });
 });
+
+describe('review round 4', () => {
+  it.each([[''], [0], [null], [false]])(
+    'an abort with the falsy reason %j rejects addTrack() with it; the track never enters',
+    async (reason) => {
+      const { ed } = await setup('');
+      const c = new AbortController();
+      const o = outcomeOf(ed.addTrack({ name: 'X' }, { signal: c.signal }));
+      c.abort(reason);
+      await tick(3);
+      expect(o.value).toBe('rejected');
+      expect(o.error).toBe(reason);
+      expect(ed.arrangement.getTracks()).toHaveLength(0);
+    }
+  );
+});

@@ -208,6 +208,9 @@ const noAdapterError = (): string =>
   "  import { createToneAdapter } from '@waveform-playlist/playout';\n" +
   '  editor.adapter = createToneAdapter();';
 
+/** The outcome of `_settleEntry` for a track that entered. */
+const ENTERED: unique symbol = Symbol('entered');
+
 @customElement('daw-editor')
 export class DawEditorElement extends LitElement implements MidiLoaderHost {
   @property({ type: Number, attribute: 'samples-per-pixel', noAccessor: true })
@@ -2919,7 +2922,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       );
       return false;
     }
-    this._settleEntry(trackId, null);
+    this._settleEntry(trackId, ENTERED);
     for (const clipDesc of built.descriptor.clips) {
       if (clipDesc.clipId && moved.movedIds.has(clipDesc.clipId)) continue; // loaded as it is
       if (clipDesc.peaksSrc && clipDesc.clipId && clipSourceOf(clipDesc)) {
@@ -3006,13 +3009,15 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       this._entryWaiters.set(trackId, { resolve, reject });
     });
   }
-  /** Settle the wait for a track's entry: entered (`null`), or refused or gone. */
-  private _settleEntry(trackId: string, error: unknown): void {
+  /** Settle the wait for a track's entry: entered (`ENTERED`), or refused or gone (the reason).*/
+  private _settleEntry(trackId: string, outcome: unknown): void {
     const waiter = this._entryWaiters.get(trackId);
     if (!waiter) return;
     this._entryWaiters.delete(trackId);
-    if (error) waiter.reject(error);
-    else waiter.resolve(trackId);
+    // Anything but ENTERED rejects, also a falsy abort reason ('', 0, null,
+    // false: a signal's reason is passed on as it is; review of #919).
+    if (outcome === ENTERED) waiter.resolve(trackId);
+    else waiter.reject(outcome);
   }
   /**
    * A dropped file as a track with no element (a File cannot be an attribute):
@@ -3060,11 +3065,19 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    */
   _discardTrack(trackId: string, from: Arrangement = this._arrangement): void {
     // From the arrangement it entered: after a swap that is no longer the one
-    // played (review of #919).
-    const track = from.getTracks().find((t) => t.id === trackId);
-    if (from === this._arrangement) {
-      this._announcer.forget(trackId, track?.clips.map((c) => c.id) ?? []);
+    // played (review of #919). The editor shows nothing of that one, so only
+    // its own record of the track goes (no event, no playhead change).
+    if (from !== this._arrangement) {
+      from.removeTrack(trackId, { undoable: false });
+      if (this._extras.has(trackId)) {
+        const nextExtras = new Map(this._extras);
+        nextExtras.delete(trackId);
+        this._extras = nextExtras;
+      }
+      return;
     }
+    const track = from.getTracks().find((t) => t.id === trackId);
+    this._announcer.forget(trackId, track?.clips.map((c) => c.id) ?? []);
     from.removeTrack(trackId, { undoable: false });
     this._onTrackRemoved(trackId);
   }

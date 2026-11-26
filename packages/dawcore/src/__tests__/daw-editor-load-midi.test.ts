@@ -334,8 +334,12 @@ describe('<daw-editor>.loadMidi', () => {
     const p = editor.loadMidi('/midi/swap.mid');
     await new Promise((r) => setTimeout(r, 0));
     expect(x.getTracks().map((t) => t.name)).toEqual(['Track 1']);
+    const removed: unknown[] = [];
+    editor.addEventListener('daw-track-removed', (e) => removed.push(e));
     editor.arrangement = null; // x is swapped out: the call aborts
     await expect(p).rejects.toMatchObject({ name: 'AbortError' });
     expect(x.getTracks()).toHaveLength(0);
+    // A track of an arrangement not played: the editor announces nothing for it.
+    expect(removed).toEqual([]);
   });
 });
