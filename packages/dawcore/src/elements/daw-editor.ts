@@ -50,7 +50,13 @@ import type {
   PlayoutAdapter,
   TrackMixerValues,
 } from '@waveform-playlist/engine';
-import { DEFAULT_TRACK_MIX, clampNumber, mixOfElement, pickMix } from '../utils/track-mix';
+import {
+  DEFAULT_TRACK_MIX,
+  clampNumber,
+  mixOfElement,
+  mixOfTrack,
+  pickMix,
+} from '../utils/track-mix';
 import '../elements/daw-track-controls';
 import '../elements/daw-grid';
 import { hostStyles, clipStyles } from '../styles/theme';
@@ -1096,10 +1102,14 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }));
   }
   /**
-   * A track's mix, from its one owner, the arrangement (#843). A track still
+   * A track's mix, from its one owner, the arrangement (#843), as the engine
+   * plays it: its projection carries the take's mute, which `getMixer()`
+   * leaves out (the stored mute comes back when the take ends). A track still
    * waiting to enter shows what its element declares.
    */
   _mixOf(trackId: string): TrackMixerValues {
+    const played = this._engineTracks.get(trackId);
+    if (played) return mixOfTrack(played);
     const mix = this._arrangement.getMixer().get(trackId);
     if (mix) return mix;
     const el = this._trackElements.get(trackId);
@@ -1244,6 +1254,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this.removeEventListener('daw-track-reorder-grab', this._onTrackReorderGrab as EventListener);
     // Before the engine is disposed: a clip drag's cancel aborts its transaction.
     this._cancelDrags(true);
+    // No audio loads while detached (the decode context goes with the engine).
+    for (const cancel of [...this._loadWaitCancels]) {
+      cancel(new Error('<daw-editor> was disconnected while the track was loading'));
+    }
     this._childObserver?.disconnect();
     this._childObserver = null;
     this._trackElements.clear();
@@ -1433,6 +1447,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // event so it only fires for a track that was actually registered.
     const existed = this._tracks.has(trackId);
     this._entryQueue = this._entryQueue.filter((id) => id !== trackId);
+    this._settleEntry(trackId, new Error('track "' + trackId + '" was removed before it entered'));
     const arrangementTrack = this._arrangement.getTracks().find((t) => t.id === trackId);
     const clipIds = arrangementTrack?.clips.map((c) => c.id) ?? [];
     this._announcer.forget(trackId, clipIds);
@@ -1785,9 +1800,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   };
   private _onClipRemovedFromDom(clipEl: DawClipElement) {
     const clipId = clipEl.clipId;
-    for (const [trackId, t] of this._engineTracks.entries()) {
+    for (const t of this._arrangement.getTracks()) {
       if (t.clips.some((c) => c.id === clipId)) {
-        this._removeClipFromTrack(trackId, clipId);
+        this._removeClipFromTrack(t.id, clipId);
         return;
       }
     }
@@ -1825,6 +1840,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const clip = clipIsMidi
       ? buildMidiClip(clipDesc, this.effectiveSampleRate)
       : buildLoadingClip(clipDesc);
+    if (!clipIsMidi) this._announcer.expectClip(clipDesc.clipId);
     try {
       if (kindError) throw kindError;
       // The function form: the track's loading clips stay as they are.
@@ -1894,15 +1910,14 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._spectrogramController?.unregisterClipAudio(clipId);
   }
   /**
-   * Recompute duration and forward an updated track to the engine. Single
-   * source of truth for the incremental-vs-full-rebuild policy used by every
-   * clip-level mutation (addClip, updateClip, removeClip, _applyClipUpdate).
-   * Use the engine's incremental updateTrack when available; otherwise fall
-   * back to full setTracks (legacy adapters).
+   * Replace one loaded clip of a track in the arrangement: an undo step. The
+   * function form, so the track's loading clips stay as they are (#848).
    */
-  private _commitTrackChange(trackId: string, updatedTrack: ClipTrack) {
-    this._recomputeDuration();
-    this._engine?.updateTrack(trackId, updatedTrack);
+  private _replaceClip(trackId: string, clipId: string, clip: AudioClip) {
+    this._arrangement.updateTrack(trackId, (current) => ({
+      ...current,
+      clips: current.clips.map((c) => (c.id === clipId ? clip : c)),
+    }));
   }
   private _applyClipUpdate(trackId: string, clipId: string, clipEl: DawClipElement) {
     const t = this._engineTracks.get(trackId);
@@ -1912,12 +1927,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
     const idx = t.clips.findIndex((c) => c.id === clipId);
     if (idx === -1) {
+      const loading = this._arrangement
+        .getTracks()
+        .find((track) => track.id === trackId)
+        ?.clips.some((c) => c.id === clipId);
       console.warn(
         '[dawcore] _applyClipUpdate: clip "' +
           clipId +
-          '" not found in track "' +
-          trackId +
-          '" (DOM/engine clip-id misalignment?)'
+          '" ' +
+          (loading
+            ? 'is still loading; the change is dropped'
+            : 'not found in track "' + trackId + '" (DOM/engine clip-id misalignment?)')
       );
       return;
     }
@@ -1970,13 +1990,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         midiChannel: clipEl.midiChannel ?? undefined,
         midiProgram: clipEl.midiProgram ?? undefined,
       };
-      const updatedClips = [...t.clips];
-      updatedClips[idx] = updatedClip;
-      const updatedTrack: ClipTrack = { ...t, clips: updatedClips };
-      this._engineTracks = new Map(this._engineTracks).set(trackId, updatedTrack);
       // Drop any audio caches in case this clip was previously loaded as audio.
       this._purgeClipCaches(clipId);
-      this._commitTrackChange(trackId, updatedTrack);
+      this._replaceClip(trackId, clipId, updatedClip);
       return;
     }
 
@@ -1992,11 +2008,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       gain: clipEl.gain,
       name: clipEl.name || oldClip.name,
     };
-    const updatedClips = [...t.clips];
-    updatedClips[idx] = updatedClip;
-    const updatedTrack: ClipTrack = { ...t, clips: updatedClips };
-    this._engineTracks = new Map(this._engineTracks).set(trackId, updatedTrack);
-
     const boundsChanged =
       oldClip.offsetSamples !== newOffsetSamples || oldClip.durationSamples !== newDurationSamples;
     if (boundsChanged) {
@@ -2010,42 +2021,39 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       }
     }
 
-    this._commitTrackChange(trackId, updatedTrack);
+    this._replaceClip(trackId, clipId, updatedClip);
   }
+  /** Remove a clip (loaded or still loading) from a track of the arrangement: an undo step. */
   private _removeClipFromTrack(trackId: string, clipId: string) {
-    const t = this._engineTracks.get(trackId);
-    if (!t) {
-      console.warn('[dawcore] _removeClipFromTrack: no engine track for id "' + trackId + '"');
+    const track = this._arrangement.getTracks().find((t) => t.id === trackId);
+    if (!track) {
+      console.warn('[dawcore] _removeClipFromTrack: no track for id "' + trackId + '"');
       return;
     }
-    const updatedClips = t.clips.filter((c) => c.id !== clipId);
-    if (updatedClips.length === t.clips.length) {
+    if (!track.clips.some((c) => c.id === clipId)) {
       console.warn(
         '[dawcore] _removeClipFromTrack: clip "' + clipId + '" not found in track "' + trackId + '"'
       );
       return;
     }
-    const updatedTrack: ClipTrack = { ...t, clips: updatedClips };
-    this._engineTracks = new Map(this._engineTracks).set(trackId, updatedTrack);
-
-    const nextBuffers = new Map(this._clipBuffers);
-    nextBuffers.delete(clipId);
-    this._clipBuffers = nextBuffers;
-    this._clipOffsets.delete(clipId);
-    const nextPeaks = new Map(this._peaksData);
-    nextPeaks.delete(clipId);
-    this._peaksData = nextPeaks;
-
+    this._purgeClipCaches(clipId);
+    this._previewWaveforms.delete(clipId);
+    if (this._previewPeaks.has(clipId)) {
+      const nextPreview = new Map(this._previewPeaks);
+      nextPreview.delete(clipId);
+      this._previewPeaks = nextPreview;
+    }
     const desc = this._tracks.get(trackId);
     if (desc) {
       this._tracks = new Map(this._tracks).set(trackId, {
         ...desc,
-        // Descriptors without an id (file drops, the <daw-track src>
-        // shorthand) are kept — their identity is the descriptor itself.
         clips: desc.clips.filter((c) => c.clipId !== clipId),
       });
     }
-    this._commitTrackChange(trackId, updatedTrack);
+    this._arrangement.updateTrack(trackId, (current) => ({
+      ...current,
+      clips: current.clips.filter((c) => c.id !== clipId),
+    }));
   }
   private _readTrackDescriptor(trackEl: DawTrackElement): StoredTrackDescriptor {
     const clipEls = trackEl.querySelectorAll('daw-clip') as NodeListOf<DawClipElement>;
@@ -2191,12 +2199,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           this._arrangement.getTracks().map((t) => t.id)
         )
       : undefined;
-    // Before the add: the announcement it causes counts the refused clips.
+    // Before the add: the announcement it causes counts the refused clips,
+    // and a clip whose source is loaded already is still announced ready.
     this._announcer.expect(trackId, built.refused.length);
+    for (const clip of built.track.clips) {
+      if (isLoadingClip(clip)) this._announcer.expectClip(clip.id);
+    }
     try {
       this._arrangement.addTrack(built.track, index === undefined ? undefined : { index });
     } catch (err) {
       console.warn('[dawcore] Failed to add track "' + trackId + '": ' + String(err));
+      this._settleEntry(trackId, err instanceof Error ? err : new Error(String(err)));
       this.dispatchEvent(
         new CustomEvent<DawTrackErrorDetail>('daw-track-error', {
           bubbles: true,
@@ -2206,6 +2219,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       );
       return false;
     }
+    this._settleEntry(trackId, null);
     for (const clipDesc of built.descriptor.clips) {
       if (clipDesc.peaksSrc && clipDesc.clipId && clipSourceOf(clipDesc)) {
         this._requestPreview(clipDesc.clipId, clipDesc.peaksSrc);
@@ -2273,6 +2287,125 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const next = new Map(this._previewPeaks);
     next.delete(clipId);
     this._previewPeaks = next;
+  }
+  /** Who waits for a track to enter (addTrack, a dropped file). */
+  private _entryWaiters = new Map<
+    string,
+    { resolve: (trackId: string) => void; reject: (error: Error) => void }
+  >();
+  private _waitForEntry(trackId: string): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      this._entryWaiters.set(trackId, { resolve, reject });
+    });
+  }
+  /** Settle the wait for a track's entry: entered (`null`), or refused or gone. */
+  private _settleEntry(trackId: string, error: Error | null): void {
+    const waiter = this._entryWaiters.get(trackId);
+    if (!waiter) return;
+    this._entryWaiters.delete(trackId);
+    if (error) waiter.reject(error);
+    else waiter.resolve(trackId);
+  }
+  /**
+   * A dropped file as a track with no element (a File cannot be an attribute):
+   * one loading clip whose source is the file. Resolves with the track id once
+   * it has entered, an undo step like any track an editor method adds.
+   */
+  _addDroppedFile(file: File): Promise<string> {
+    const trackId = crypto.randomUUID();
+    const name = file.name.replace(/\.\w+$/, '');
+    this._tracks = new Map(this._tracks).set(trackId, {
+      name,
+      src: '',
+      kind: 'audio',
+      renderMode: trackDescriptorRenderMode('audio', 'waveform'),
+      clips: [
+        {
+          kind: 'drop',
+          file,
+          src: '',
+          peaksSrc: '',
+          start: 0,
+          duration: 0,
+          offset: 0,
+          gain: 1,
+          name,
+          fadeIn: 0,
+          fadeOut: 0,
+          fadeType: 'linear',
+          midiNotes: null,
+          midiChannel: null,
+          midiProgram: null,
+        },
+      ],
+    });
+    const entered = this._waitForEntry(trackId);
+    this._queueEntry(trackId);
+    return entered;
+  }
+  /**
+   * Take a track out for good: no undo step, and no undo or redo brings it
+   * back (a dropped file that could not be loaded was never a declaration).
+   */
+  _discardTrack(trackId: string): void {
+    this._arrangement.removeTrack(trackId, { undoable: false });
+    this._onTrackRemoved(trackId);
+  }
+  /** Rejects the waits of `_whenTrackLoaded` when the editor is disconnected. */
+  private _loadWaitCancels = new Set<(error: Error) => void>();
+  /**
+   * Resolves once the track has loaded (`daw-track-ready`), rejects when its
+   * audio failed (`daw-track-error`) or the editor is disconnected meanwhile.
+   */
+  _whenTrackLoaded(trackId: string): Promise<void> {
+    const state = this._announcer.stateOf(trackId);
+    if (state === 'ready') return Promise.resolve();
+    if (state === 'failed') return Promise.reject(this._announcer.errorOf(trackId));
+    return new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        this.removeEventListener('daw-track-ready', onReady);
+        this.removeEventListener('daw-track-error', onError);
+        this._loadWaitCancels.delete(cancel);
+      };
+      const onReady = (e: Event) => {
+        if ((e as CustomEvent<DawTrackIdDetail>).detail.trackId !== trackId) return;
+        cleanup();
+        resolve();
+      };
+      const onError = (e: Event) => {
+        const detail = (e as CustomEvent<DawTrackErrorDetail>).detail;
+        if (detail.trackId !== trackId) return;
+        cleanup();
+        reject(detail.error instanceof Error ? detail.error : new Error(String(detail.error)));
+      };
+      const cancel = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+      this.addEventListener('daw-track-ready', onReady);
+      this.addEventListener('daw-track-error', onError);
+      this._loadWaitCancels.add(cancel);
+    });
+  }
+  /**
+   * Load again every failed source the track's clips name (#848). A track
+   * whose audio failed stays in the editor, like a broken `<img>`;
+   * `daw-track-ready` follows when it loads.
+   */
+  retryTrack(trackId: string): void {
+    const track = this._arrangement.getTracks().find((t) => t.id === trackId);
+    if (!track) {
+      console.warn('[dawcore] retryTrack: no track found for id "' + trackId + '"');
+      return;
+    }
+    const sources = this._arrangement.sources.getSnapshot().sources;
+    const failed = new Set(
+      track.clips
+        .filter(isLoadingClip)
+        .map((clip) => clip.src)
+        .filter((src) => sources.get(src)?.status === 'failed')
+    );
+    for (const src of failed) this._arrangement.retry(src);
   }
   private _fetchPeaks(src: string): Promise<import('waveform-data').default> {
     const cached = this._peaksCache.get(src);
@@ -2602,12 +2735,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     });
   }
   /**
-   * Append a `<daw-track>` element built from `config` and resolve once the
-   * track finishes loading (or reject on `daw-track-error`). Goes through
-   * the same `_loadTrack` pipeline as declarative tracks, so descriptors,
-   * peaks, and clip buffers are populated correctly.
+   * Append a `<daw-track>` element built from `config` and resolve with its
+   * track id once the track has entered the arrangement (#848): before its
+   * audio has loaded (follow that with `daw-track-ready` / `daw-track-error`
+   * or the arrangement's `sources`). Without `editor.adapter` it waits for
+   * one. Rejects when the track is refused or removed before it enters.
    */
-  addTrack(config: TrackConfig = {}): Promise<DawTrackElement> {
+  addTrack(config: TrackConfig = {}): Promise<string> {
     const trackEl = document.createElement('daw-track') as DawTrackElement;
     // An editor method's track: an undo step, also at page load (#848).
     this._editorMadeTracks.add(trackEl);
@@ -2635,13 +2769,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       trackEl.appendChild(this._buildClipElement(clipConfig));
     }
 
-    return this._awaitId(
-      'daw-track-ready',
-      'daw-track-error',
-      (d) => d.trackId === trackEl.trackId,
-      trackEl,
-      () => this.appendChild(trackEl)
-    );
+    const entered = this._waitForEntry(trackEl.trackId);
+    this.appendChild(trackEl);
+    return entered;
   }
   /**
    * Remove a track by id. Equivalent to `trackElement.remove()` —
@@ -2652,8 +2782,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const trackEl = this._trackElements.get(trackId);
     if (trackEl) {
       trackEl.remove();
-    } else if (this._engineTracks.has(trackId)) {
-      // File-dropped tracks have no DOM element; clean up engine state directly.
+    } else if (this._tracks.has(trackId) || this._isEntered(trackId)) {
+      // File-dropped and undo-restored tracks have no DOM element.
       this._onTrackRemoved(trackId);
     } else {
       console.warn('[dawcore] removeTrack: no track found for id "' + trackId + '"');
@@ -2801,7 +2931,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         return;
       }
     }
-    if (this._engineTracks.has(trackId)) {
+    if (this._isEntered(trackId)) {
       this._removeClipFromTrack(trackId, clipId);
       return;
     }
@@ -2864,10 +2994,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       ...(partial.gain !== undefined && { gain: partial.gain }),
       ...(partial.name !== undefined && { name: partial.name }),
     };
-    const updatedClips = [...t.clips];
-    updatedClips[idx] = updatedClip;
-    const updatedTrack: ClipTrack = { ...t, clips: updatedClips };
-    this._engineTracks = new Map(this._engineTracks).set(trackId, updatedTrack);
     // Keep editor.tracks truthful for element-less clips that carry their
     // engine id (recorded takes, #659) — no <daw-clip> element re-reads them.
     const desc = this._tracks.get(trackId);
@@ -2888,7 +3014,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         ),
       });
     }
-    this._commitTrackChange(trackId, updatedTrack);
+    this._replaceClip(trackId, clipId, updatedClip);
   }
   private _buildClipElement(config: ClipConfig): DawClipElement {
     const clipEl = document.createElement('daw-clip') as DawClipElement;

@@ -74,12 +74,13 @@ async function makeEditor() {
 
 /**
  * `editor.addTrack()` makes an undo step (#848). These tests count the mixer's
- * steps, so each starts from the track with an empty history.
+ * steps, so each starts from the track with an empty history. Resolves with
+ * the `<daw-track>` element addTrack appended (addTrack resolves with its id).
  */
 async function addBaseTrack(editor: any, config: ReturnType<typeof midiTrackConfig>) {
-  const trackEl = await editor.addTrack(config);
+  const trackId: string = await editor.addTrack(config);
   editor.engine.clearHistory();
-  return trackEl;
+  return [...editor.querySelectorAll('daw-track')].find((t: any) => t.trackId === trackId);
 }
 
 function controlsFor(editor: any, trackId: string): any {

@@ -30,6 +30,8 @@ interface TrackRecord {
   state: TrackLoadState | null;
   /** Clips refused for their kind when the track entered (never in the arrangement). */
   refused: number;
+  /** What `daw-track-error` carried, while the track is failed. */
+  error?: Error;
 }
 
 export class LoadAnnouncer {
@@ -44,6 +46,20 @@ export class LoadAnnouncer {
   /** A track is about to enter, with `refused` clips left out for their kind. */
   expect(trackId: string, refused: number): void {
     this._tracks.set(trackId, { state: null, refused });
+  }
+
+  /**
+   * A clip is about to enter while loading: it is announced ready when it
+   * loads, also when its source was loaded already and it is never seen
+   * loading.
+   */
+  expectClip(clipId: string): void {
+    this._loadingClips.add(clipId);
+  }
+
+  /** The error a failed track was announced with. */
+  errorOf(trackId: string): Error {
+    return this._tracks.get(trackId)?.error ?? new Error('track "' + trackId + '" failed to load');
   }
 
   /** A track was removed by the page or an editor method: nothing more is said of it. */
@@ -109,6 +125,7 @@ export class LoadAnnouncer {
       pending > 0 ? 'pending' : loaded > 0 || failed + record.refused === 0 ? 'ready' : 'failed';
     if (next === record.state) return;
     record.state = next;
+    record.error = undefined;
     if (next === 'ready') {
       this._send<DawTrackIdDetail>('daw-track-ready', { trackId: track.id });
     } else if (next === 'failed') {
@@ -119,6 +136,7 @@ export class LoadAnnouncer {
           : new Error(
               'all ' + requested + ' clip(s) failed to load — see prior daw-clip-error events'
             );
+      record.error = error;
       this._send<DawTrackErrorDetail>('daw-track-error', { trackId: track.id, error });
     }
   }

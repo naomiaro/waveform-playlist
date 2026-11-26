@@ -24,6 +24,12 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** The `<daw-track>` element `editor.addTrack()` appended, from the id it resolved with. */
+async function addTrackElement(editor: any, config: unknown): Promise<any> {
+  const trackId: string = await editor.addTrack(config);
+  return [...editor.querySelectorAll('daw-track')].find((t: any) => t.trackId === trackId);
+}
+
 function makeMockAdapter() {
   // Minimal PlayoutAdapter stub — engine accepts but doesn't actually play.
   const ctx = {
@@ -164,7 +170,7 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.appendChild(editor);
 
     const notes = [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }];
-    const track = await editor.addTrack({
+    const track = await addTrackElement(editor, {
       name: 'Lead',
       midi: { notes, channel: 0, program: 24 },
     });
@@ -318,7 +324,7 @@ describe('<daw-editor> MIDI loading', () => {
     editor.adapter = makeMockAdapter();
     document.body.appendChild(editor);
 
-    const track = await editor.addTrack({ name: 'Test' });
+    const track = await addTrackElement(editor, { name: 'Test' });
     expect(track.getAttribute('render-mode')).toBeNull();
 
     editor.updateTrack(track.trackId, { renderMode: 'spectrogram' });
@@ -332,7 +338,7 @@ describe('<daw-editor> MIDI loading', () => {
     editor.adapter = makeMockAdapter();
     document.body.appendChild(editor);
 
-    const track = await editor.addTrack({ name: 'Audio Track' }); // no midi
+    const track = await addTrackElement(editor, { name: 'Audio Track' }); // no midi
     const clipsBefore = track.querySelectorAll('daw-clip').length;
 
     // updateTrack with midi field — should be silently ignored per JSDoc contract
@@ -395,7 +401,7 @@ describe('<daw-editor> MIDI loading', () => {
       const editor = document.createElement('daw-editor') as any;
       editor.adapter = makeMockAdapter();
       document.body.appendChild(editor);
-      const track = await editor.addTrack({
+      const track = await addTrackElement(editor, {
         name: 'M',
         midi: { notes: [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }] },
       });
@@ -425,7 +431,7 @@ describe('<daw-editor> MIDI loading', () => {
       const editor = document.createElement('daw-editor') as any;
       editor.adapter = makeMockAdapter();
       document.body.appendChild(editor);
-      const track = await editor.addTrack({
+      const track = await addTrackElement(editor, {
         name: 'M',
         midi: { notes: [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }] },
       });

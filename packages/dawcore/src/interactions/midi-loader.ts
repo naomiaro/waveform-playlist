@@ -9,7 +9,6 @@
 
 import type { MidiLoadOptions, MidiLoadResult } from '@dawcore/midi';
 import type { TrackConfig } from '../types';
-import type { DawTrackElement } from '../elements/daw-track';
 import { installCommand } from '../utils/install-command';
 
 export type { MidiLoadOptions, MidiLoadResult };
@@ -23,7 +22,8 @@ export type { MidiLoadOptions, MidiLoadResult };
  * value, so we need DOM observation to find them).
  */
 export interface MidiLoaderHost {
-  addTrack(config: TrackConfig): Promise<DawTrackElement>;
+  /** Resolves with the track id once the track has entered (#848). */
+  addTrack(config: TrackConfig): Promise<string>;
   querySelectorAll(selector: string): NodeListOf<Element>;
 }
 
@@ -119,7 +119,7 @@ export async function loadMidiImpl(
 
   // (5) Partition fulfilled vs rejected. Capture EVERY rejection (not just
   // the first) for diagnosability of multi-track failures.
-  const succeeded: DawTrackElement[] = [];
+  const succeeded: string[] = [];
   const rejections: unknown[] = [];
   for (const s of settlements) {
     if (s.status === 'fulfilled') {
@@ -176,7 +176,7 @@ export async function loadMidiImpl(
 
   // (7) Build the result.
   return {
-    trackIds: succeeded.map((el) => el.trackId),
+    trackIds: succeeded,
     bpm: parsed.bpm,
     timeSignature: parsed.timeSignature,
     duration: parsed.duration,

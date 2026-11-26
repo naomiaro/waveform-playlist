@@ -103,9 +103,11 @@ async function makeEditor() {
   const editor = document.createElement('daw-editor') as any;
   editor.adapter = makeMockAdapter();
   document.body.appendChild(editor);
-  const a = await editor.addTrack({ name: 'A' });
-  const b = await editor.addTrack({ name: 'B' });
-  return { editor, aId: a.trackId as string, bId: b.trackId as string };
+  const aId: string = await editor.addTrack({ name: 'A' });
+  const bId: string = await editor.addTrack({ name: 'B' });
+  // The two adds are undo steps; a take's mute is measured from a clear history.
+  editor.engine.clearHistory();
+  return { editor, aId, bId };
 }
 
 function controlsFor(editor: any, trackId: string): any {

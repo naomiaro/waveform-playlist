@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import { isLoadingClip } from '@waveform-playlist/core';
 import {
   makeAudioBuffer,
+  makeAudioFile,
   makeFakeAdapter,
   mountEditor,
   restoreFetch,
@@ -360,5 +361,130 @@ describe('daw-editor: draws loading and failed clips (#848)', () => {
       (row: any) => row.dataset.trackId
     );
     expect(rows).toEqual([bass, keys]);
+  });
+});
+
+describe("daw-editor's methods on the arrangement (#848)", () => {
+  it('addTrack resolves with the track id once the track has entered, before its audio', async () => {
+    const fake = makeFakeAdapter();
+    stubFetch({ '/a.wav': 'ok' });
+    fake.holdDecode('/a.wav');
+    const editor = await mount(fake, '');
+    const id = await editor.addTrack({ name: 'A', clips: [{ src: '/a.wav', duration: 2 }] });
+    expect(typeof id).toBe('string');
+    expect(editor._arrangement.getTracks().map((t: { id: string }) => t.id)).toEqual([id]);
+    expect(isLoadingClip(editor._arrangement.getTracks()[0].clips[0])).toBe(true);
+  });
+
+  it('addTrack before the adapter resolves once the adapter is set', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    stubFetch({ '/a.wav': 'ok' });
+    const editor = (await mountEditor({ adapter: null })) as any;
+    let id: string | null = null;
+    const pending = editor.addTrack({ name: 'A', clips: [{ src: '/a.wav' }] }).then((v: string) => {
+      id = v;
+    });
+    await tick(2);
+    expect(id).toBeNull();
+    stubPeakPipeline(editor);
+    editor.adapter = makeFakeAdapter().adapter;
+    await pending;
+    expect(names(editor)).toEqual(['A']);
+  });
+
+  it('addClip adds a loading clip as one undo step and resolves on daw-clip-ready', async () => {
+    const fake = makeFakeAdapter();
+    stubFetch({ '/a.wav': 'ok', '/b.wav': 'ok' });
+    const editor = await mount(fake, audioTrack('A', '/a.wav'));
+    await settle(editor);
+    const trackId = editor._arrangement.getTracks()[0].id;
+    const held = fake.holdDecode('/b.wav');
+    const pending = editor.addClip(trackId, { src: '/b.wav', start: 3, duration: 1 });
+    await tick();
+    const clips = editor._arrangement.getTracks()[0].clips;
+    expect(clips).toHaveLength(2);
+    expect(isLoadingClip(clips[1])).toBe(true);
+    expect(editor._arrangement.canUndo).toBe(true);
+    held.resolve();
+    const clipId = await pending;
+    expect(clipId).toBe(clips[1].id);
+  });
+
+  it('addClip of a source that is already loaded resolves', async () => {
+    const fake = makeFakeAdapter();
+    stubFetch({ '/a.wav': 'ok' });
+    const editor = await mount(fake, audioTrack('A', '/a.wav'));
+    await settle(editor);
+    const trackId = editor._arrangement.getTracks()[0].id;
+    const clipId = await editor.addClip(trackId, { src: '/a.wav', start: 3, duration: 1 });
+    expect(typeof clipId).toBe('string');
+  });
+
+  it("an edit of a loaded clip keeps the track's loading clips", async () => {
+    const fake = makeFakeAdapter();
+    stubFetch({ '/a.wav': 'ok', '/b.wav': 'ok' });
+    fake.holdDecode('/b.wav');
+    const editor = await mount(
+      fake,
+      '<daw-track name="T"><daw-clip src="/a.wav" duration="1"></daw-clip>' +
+        '<daw-clip src="/b.wav" start="2" duration="1"></daw-clip></daw-track>'
+    );
+    await vi.waitFor(() =>
+      expect(isLoadingClip(editor._arrangement.getTracks()[0].clips[0])).toBe(false)
+    );
+    const trackId = editor._arrangement.getTracks()[0].id;
+    const [loadedId, loadingId] = [...editor.querySelectorAll('daw-clip')].map(
+      (c: any) => c.clipId
+    );
+    editor.updateClip(trackId, loadedId, { start: 0.5 });
+    await tick();
+    const clips = editor._arrangement.getTracks()[0].clips;
+    expect(clips.map((c: { id: string }) => c.id)).toEqual([loadedId, loadingId]);
+    expect(clips[0].startSample).toBe(24000);
+    expect(isLoadingClip(clips[1])).toBe(true);
+  });
+
+  it('removing a loading clip removes it from the arrangement', async () => {
+    const fake = makeFakeAdapter();
+    stubFetch({ '/a.wav': 'ok' });
+    fake.holdDecode('/a.wav');
+    const editor = await mount(fake, audioTrack('A', '/a.wav'));
+    const trackId = editor._arrangement.getTracks()[0].id;
+    editor.removeClip(trackId, editor.querySelector('daw-clip').clipId);
+    await tick();
+    expect(editor._arrangement.getTracks()[0].clips).toEqual([]);
+  });
+
+  it('a dropped file enters as an element-less track; a failed one is removed and cannot be brought back by undo', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fake = makeFakeAdapter();
+    fake.setDecoded('bad.wav', new Error('cannot decode'));
+    const editor = await mount(fake, MIDI_TRACK);
+    editor._arrangement.setTrackVolume(editor._arrangement.getTracks()[0].id, 0.5);
+    const good = makeAudioFile('good.wav');
+    const bad = makeAudioFile('bad.wav');
+    const result = await editor.loadFiles([good, bad]);
+    expect(result.loaded).toHaveLength(1);
+    expect(result.failed.map((f: { file: File }) => f.file)).toEqual([bad]);
+    expect(editor.querySelectorAll('daw-track')).toHaveLength(1);
+    expect(names(editor)).toEqual(['Keys', 'good']);
+    editor._arrangement.undo();
+    expect(names(editor)).toEqual(['Keys']);
+    editor._arrangement.redo();
+    expect(names(editor)).toEqual(['Keys', 'good']);
+    expect(editor.tracks.map((t: { name: string }) => t.name)).toEqual(['Keys', 'good']);
+  });
+
+  it('retryTrack loads a failed track', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fake = makeFakeAdapter();
+    stubFetch({ '/gone.wav': 503 });
+    const editor = await mount(fake, audioTrack('Gone', '/gone.wav'));
+    await settle(editor);
+    const trackId = editor._arrangement.getTracks()[0].id;
+    stubFetch({ '/gone.wav': 'ok' });
+    editor.retryTrack(trackId);
+    await settle(editor);
+    expect(isLoadingClip(editor._arrangement.getTracks()[0].clips[0])).toBe(false);
   });
 });

@@ -1,17 +1,21 @@
 /**
- * File loading: routes dropped files through the same element pipeline as
- * editor.addTrack() — each file becomes a real `<daw-track><daw-clip>` in the
- * editor's light DOM, "as a fresh page load would have" (#612). The existing
- * daw-track-connected → _loadTrack pipeline does the fetch/decode.
+ * File loading (#848): each dropped file enters the editor's arrangement as a
+ * track with one loading clip whose source is the `File` itself (a File
+ * cannot be an attribute, so a dropped track has no `<daw-track>` element).
+ * The arrangement reads and decodes it. A file that cannot be loaded is
+ * removed again without an undo step: it was never a declaration.
  */
 
-import type { DawTrackElement } from '../elements/daw-track';
 import type { DawFilesLoadErrorDetail, LoadFilesResult } from '../events';
-import type { TrackConfig } from '../types';
 
 export interface FileLoaderHost {
   readonly isConnected: boolean;
-  addTrack(config: TrackConfig): Promise<DawTrackElement>;
+  /** Add the file as a track; resolves with its id once it has entered. */
+  _addDroppedFile(file: File): Promise<string>;
+  /** Resolves when the track has loaded; rejects when its audio failed. */
+  _whenTrackLoaded(trackId: string): Promise<void>;
+  /** Take a track out for good: no undo step, and no undo brings it back. */
+  _discardTrack(trackId: string): void;
   dispatchEvent(event: Event): boolean;
 }
 
@@ -50,20 +54,16 @@ export async function loadFiles(
       dispatchLoadError(file, error);
       continue;
     }
-
-    const blobUrl = URL.createObjectURL(file);
-    const name = file.name.replace(/\.\w+$/, '');
+    let trackId: string | null = null;
     try {
-      // Sequential on purpose: preserves drop order as DOM/track order.
-      const trackEl = await host.addTrack({ name, clips: [{ src: blobUrl, name }] });
-      loaded.push(trackEl.trackId);
-      // daw-track-ready was dispatched by the load pipeline — don't re-dispatch.
+      // Sequential on purpose: preserves drop order as track order.
+      trackId = await host._addDroppedFile(file);
+      await host._whenTrackLoaded(trackId);
+      loaded.push(trackId);
     } catch (err) {
       console.warn('[dawcore] Failed to load file: ' + file.name + ' — ' + String(err));
+      if (trackId !== null) host._discardTrack(trackId);
       dispatchLoadError(file, err);
-    } finally {
-      // The decode is complete either way; the blob URL is dead weight.
-      URL.revokeObjectURL(blobUrl);
     }
   }
 
