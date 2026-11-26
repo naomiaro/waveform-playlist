@@ -837,3 +837,34 @@ describe('review fixes, round 3 (#917)', () => {
     expect(errors).toEqual([]);
   });
 });
+
+describe('review fixes, round 4 (#917)', () => {
+  const pending = (p: Promise<unknown>) =>
+    Promise.race([
+      p.then(
+        () => 'resolved',
+        (err: Error) => err.message
+      ),
+      tick(10).then(() => 'still pending'),
+    ]);
+
+  it('G1: addClip then an Undo of its track arrival in the same task rejects', async () => {
+    stubFetch({ '/a.wav': 'ok' });
+    const editor = await mount(makeFakeAdapter(), MIDI_TRACK);
+    editor._arrangement.setTrackVolume(editor._arrangement.getTracks()[0].id, 0.5);
+    const id = await editor.addTrack({ name: 'Added', clips: [] });
+    const outcome = pending(editor.addClip(id, { src: '/a.wav', duration: 1 }));
+    editor._arrangement.undo();
+    expect(await outcome).toMatch(/not in the editor|removed before/);
+  });
+
+  it('addClip then its <daw-clip> removed from the DOM in the same task rejects', async () => {
+    stubFetch({ '/a.wav': 'ok', '/b.wav': 'ok' });
+    const editor = await mount(makeFakeAdapter(), audioTrack('A', '/a.wav'));
+    await settle(editor);
+    const trackId = editor._arrangement.getTracks()[0].id;
+    const outcome = pending(editor.addClip(trackId, { src: '/b.wav', duration: 1 }));
+    editor.querySelector('daw-track').lastElementChild.remove();
+    expect(await outcome).toMatch(/removed before/);
+  });
+});

@@ -85,7 +85,7 @@ export class DawClipElement extends LitElement {
     //     this event is the canonical late-append signal.
     // _onClipConnected adds the clip to the descriptor of a track that has not
     // entered the arrangement yet, and appends it to an entered track as a
-    // loading clip (#848).
+    // loading clip (a loaded one for MIDI) (#848).
     setTimeout(() => {
       this.dispatchEvent(
         new CustomEvent('daw-clip-connected', {

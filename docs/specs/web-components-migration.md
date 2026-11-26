@@ -530,7 +530,7 @@ midi-program     Number    —        MIDI program number (0-127)
 clip.midiNotes: MidiNoteData[] | null        // Parsed MIDI notes
 ```
 
-Decoded audio is held by the editor's arrangement (#848), not exposed as properties on the element. There is no way to pass a pre-decoded buffer or peaks through `<daw-clip>` or `addClip`; use `peaks-src` for pre-computed peaks.
+Decoded audio is held by the editor's arrangement (#848), not exposed as properties on the element. There is no way to pass a decoded buffer or peak data through `<daw-clip>` or `addClip`; give pre-computed peaks by URL (`peaks-src`, or `peaksSrc` in `addClip`).
 
 Attributes use seconds for human readability. The element converts to the internal sample-based model (`startSample`, `offsetSamples`, `durationSamples`) automatically.
 

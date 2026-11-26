@@ -1791,6 +1791,16 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // are already there). No descriptor: the parent's own deferred connect
     // has not run yet and will read this clip.
     if (!this._isEntered(trackId)) {
+      // Neither entered nor waiting to enter: an Undo took the track out
+      // between an addClip() and this deferred connect. Nothing will take the
+      // clip, so its addClip() is rejected (#917).
+      if (!this._entryQueue.includes(trackId)) {
+        this._rejectAwaitedClips(
+          (id) => id === clipEl.clipId,
+          'addClip: track "' + trackId + '" is not in the editor (an Undo took it out)'
+        );
+        return;
+      }
       const desc = this._tracks.get(trackId);
       if (desc && !desc.clips.some((c) => isDomClip(c) && c.clipId === clipEl.clipId)) {
         this._tracks = new Map(this._tracks).set(trackId, {
@@ -1857,6 +1867,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       this._rejectAwaitedClips((id) => id === clipId, 'the clip was removed before it loaded');
       return;
     }
+    // Removed before its deferred connect (in the task of its addClip()): the
+    // connect will never reach the editor, so the addClip() is rejected (#917).
+    this._rejectAwaitedClips((id) => id === clipId, 'the clip was removed before it loaded');
     // No matching engine clip. May be benign (clip was removed before its load
     // completed), but it can also indicate a DOM/engine id mismatch — purge any
     // orphan cache entries and warn so the leak is visible.
