@@ -509,3 +509,41 @@ describe('editor.tracks follows the arrangement (#848)', () => {
     expect(editor.tracks.map((t: { name: string }) => t.name)).toEqual(['Bass', 'Keys']);
   });
 });
+
+// Behaviour the old tests covered under other rules (#848: they expected a
+// rejection and a warning; a track is in the arrangement while it loads).
+describe('clips appended while a track loads or waits (#848)', () => {
+  it('addClip onto a track whose audio is still loading adds a loading clip and resolves when it loads', async () => {
+    const fake = makeFakeAdapter();
+    stubFetch({ '/a.wav': 'ok', '/b.wav': 'ok' });
+    const heldA = fake.holdDecode('/a.wav');
+    const editor = await mount(fake, audioTrack('A', '/a.wav'));
+    const trackId = editor._arrangement.getTracks()[0].id;
+    const pending = editor.addClip(trackId, { src: '/b.wav', start: 3, duration: 1 });
+    await tick();
+    expect(editor._arrangement.getTracks()[0].clips.map((c: { src?: string }) => c.src)).toEqual([
+      '/a.wav',
+      '/b.wav',
+    ]);
+    const clipId = await pending; // /b.wav decodes while /a.wav is still held
+    expect(isLoadingClip(editor._arrangement.getTracks()[0].clips[1])).toBe(false);
+    expect(clipId).toBe(editor._arrangement.getTracks()[0].clips[1].id);
+    heldA.resolve();
+    await settle(editor);
+  });
+
+  it('a <daw-clip> appended to a track waiting for the adapter enters with it', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    stubFetch({ '/a.wav': 'ok', '/b.wav': 'ok' });
+    const editor = (await mountEditor({ adapter: null, html: audioTrack('A', '/a.wav') })) as any;
+    editor
+      .querySelector('daw-track')
+      .insertAdjacentHTML('beforeend', '<daw-clip src="/b.wav" start="3" duration="1"></daw-clip>');
+    await tick(2);
+    stubPeakPipeline(editor);
+    editor.adapter = makeFakeAdapter().adapter;
+    const clips = editor._arrangement.getTracks()[0].clips;
+    expect(clips.map((c: { src?: string }) => c.src)).toEqual(['/a.wav', '/b.wav']);
+    expect(console.warn).not.toHaveBeenCalledWith(expect.stringContaining('still loading'));
+  });
+});
