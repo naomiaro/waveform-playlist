@@ -1260,12 +1260,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
     this._childObserver?.disconnect();
     this._childObserver = null;
+    // Re-filled by the children's reconnect (`_onTrackConnected`).
     this._trackElements.clear();
     this._peaksCache.clear();
-    this._clipBuffers.clear();
-    this._clipOffsets.clear();
+    // The worker goes; the pipeline makes a new one on its next use.
     this._peakPipeline.terminate();
-    this._minSamplesPerPixel = 0;
     this._spectrogramController?.dispose();
     this._spectrogramController = null;
     this._lastSpectrogramViewport = null;
@@ -1283,19 +1282,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     if (hadEngine) {
       this._externalAdapter = null;
     }
-    // Symmetric teardown: the caches above are gone and the engine (and the
-    // consumer's adapter through it) disposed — retaining the render state
-    // would make a reconnected editor show ghost waveforms that can never
-    // play. Declarative AND programmatic (addTrack) tracks are element-backed
-    // and re-register on reconnect (failing LOUDLY via the disposed-adapter
-    // guard in _buildEngine until a fresh adapter is set); file-dropped
-    // element-less content does not survive a reparent.
-    this._tracks = new Map();
-    this._engineTracks = new Map();
-    this._peaksData = new Map();
-    this._previewPeaks = new Map();
-    this._previewWaveforms.clear();
-    this._recomputeDuration();
+    // The arrangement stays, as a moved <input> keeps its value (#848), and
+    // so do the descriptors and the peak caches that draw it: the editor
+    // shows its tracks while detached, and a fresh adapter plays them. The
+    // children's reconnect finds their descriptors and enters nothing again.
   }
   willUpdate(changedProperties: Map<string, unknown>) {
     if (changedProperties.has('eagerResume')) {
@@ -2528,8 +2518,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     });
     engine.on('stop', () => this._onEngineStop(engine));
     this._engine = engine;
-    // A kept arrangement (a reconnect) already has tracks: draw them now.
+    // A kept arrangement (a reconnect) already has tracks: draw them now,
+    // and give a spectrogram track its audio again (the controller went with
+    // the disconnect).
     this._onEngineState(engine.getState());
+    for (const track of this._engineTracks.values()) {
+      for (const clip of track.clips) this._maybeRegisterSpectrogramClipAudio(track.id, clip);
+    }
     this._flushTrackEntries();
     return engine;
   }

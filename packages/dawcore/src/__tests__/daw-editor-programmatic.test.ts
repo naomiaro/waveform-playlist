@@ -1174,26 +1174,6 @@ describe('zoom floor recompute (audit wave 5 review)', () => {
 });
 
 describe('audit wave 6 — lifecycle & rendering state', () => {
-  it('a reparented editor does not retain ghost render state', async () => {
-    const { editor } = await setupLoadingEditor();
-    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
-    await settle(editor);
-    expect(editor._engineTracks.size).toBe(1);
-
-    const other = document.createElement('div');
-    document.body.appendChild(other);
-    other.appendChild(editor); // synchronous disconnect → reconnect
-
-    // The engine (and the consumer's adapter through it) was disposed and
-    // the clip caches cleared — retained render state would show waveforms
-    // that can never play. Element-backed tracks re-register via their own
-    // deferred connect events; element-less content does not survive.
-    expect(editor._engineTracks.size).toBe(0);
-    expect(editor._peaksData.size).toBe(0);
-    expect(editor.tracks).toHaveLength(0);
-    other.remove();
-  });
-
   it('synthesizes descriptors for engine tracks restored by undo', async () => {
     const { editor } = await setupLoadingEditor();
     const id = await editor.addTrack({ name: 'Guitar', volume: 0.7, pan: -0.2 });
