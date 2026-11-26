@@ -1176,6 +1176,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   // --- Lifecycle ---
   connectedCallback() {
     super.connectedCallback();
+    // Capture on window: runs before <daw-keyboard-shortcuts>' document listener.
+    window.addEventListener('keydown', this._onDragEscape, { capture: true });
     this.addEventListener('daw-track-connected', this._onTrackConnected as EventListener);
     this.addEventListener('daw-track-update', this._onTrackUpdate as EventListener);
     this.addEventListener('daw-track-control', this._onTrackControl as EventListener);
@@ -1241,6 +1243,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   }
   disconnectedCallback() {
     super.disconnectedCallback();
+    window.removeEventListener('keydown', this._onDragEscape, { capture: true });
     this._effectsManager?.disposeAll();
     this._effectsManager = null;
     this.removeEventListener('daw-track-connected', this._onTrackConnected as EventListener);
@@ -1256,7 +1259,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this.removeEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
     this.removeEventListener('daw-track-reorder', this._onTrackReorder as EventListener);
     this.removeEventListener('daw-track-reorder-grab', this._onTrackReorderGrab as EventListener);
-    this._trackReorderDrag.cancel();
+    // Before the engine is disposed: a clip drag's cancel aborts its transaction.
+    this._cancelDrags();
     this._childObserver?.disconnect();
     this._childObserver = null;
     this._trackElements.clear();
@@ -3362,8 +3366,44 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     );
   }
 
-  /** Undo the last structural edit. */
+  /**
+   * A clip or track drag is in progress: undo and redo do nothing until it
+   * ends (#848). A clip counts once its pointer has moved past the drag
+   * threshold; annotation drags do not count (annotations are not in the
+   * undo history).
+   */
+  get _dragInProgress(): boolean {
+    return this._clipPointer.isDragging || this._trackReorderDrag.isActive;
+  }
+
+  /** Cancel every drag in progress, as a `pointercancel` would. Returns whether one was. */
+  _cancelDrags(): boolean {
+    let cancelled = this._pointer.cancelClipDrag();
+    if (this._trackReorderDrag.isActive) {
+      this._trackReorderDrag.cancel();
+      cancelled = true;
+    }
+    if (this._annotationDrag.isActive) {
+      this._annotationDrag.cancel();
+      cancelled = true;
+    }
+    return cancelled;
+  }
+
+  /**
+   * Escape during a drag cancels it and does nothing else: the default is
+   * prevented, so `<daw-keyboard-shortcuts>` (core's `handleKeyboardEvent`)
+   * does not also stop playback. No `stopPropagation`: an app's own listener
+   * can read `defaultPrevented`.
+   */
+  private _onDragEscape = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return;
+    if (this._cancelDrags()) e.preventDefault();
+  };
+
+  /** Undo the last structural edit. Does nothing while a drag is in progress. */
   undo(): void {
+    if (this._dragInProgress) return;
     if (!this._engine) {
       console.warn('[dawcore] undo: engine not ready, call ignored');
       return;
@@ -3371,8 +3411,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._engine.undo();
   }
 
-  /** Redo the last undone edit. */
+  /** Redo the last undone edit. Does nothing while a drag is in progress. */
   redo(): void {
+    if (this._dragInProgress) return;
     if (!this._engine) {
       console.warn('[dawcore] redo: engine not ready, call ignored');
       return;
