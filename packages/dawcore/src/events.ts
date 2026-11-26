@@ -50,14 +50,13 @@ export interface DawTrackUpdateDetail {
   changed: readonly string[];
 }
 
+/**
+ * `daw-track-error`: every clip of the track failed to load or was refused
+ * for its kind. The track stays in the editor; `retryTrack` loads it again.
+ */
 export interface DawTrackErrorDetail {
   trackId: string;
   error: unknown;
-  /** Present when the load was CANCELLED rather than failed: the track was
-   * removed (or the editor disconnected) while its clips were still loading.
-   * Consumer error UIs should filter these — nothing actually failed; the
-   * event exists so addTrack()/loadMidi() awaiters settle. */
-  reason?: 'removed' | 'disconnected';
 }
 
 export interface DawFilesLoadErrorDetail {

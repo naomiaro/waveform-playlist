@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 import { installSpecs } from '../../../../scripts/build/install-specs.mjs';
+import { makeFakeAdapter, mountEditor } from './helpers/editor-harness';
 
 // What each dawcore hint names (#884): a caret on the version in the manifests
 // where dawcore's peer floor admits it, else the peer range; playout (no peer) a caret.
@@ -133,28 +134,6 @@ describe('DawEditorElement', () => {
     expect(el.effectiveSampleRate).toBe(48000);
   });
 
-  it('resolveAudioContextSampleRate sets effective rate', () => {
-    const el = document.createElement('daw-editor') as any;
-    el.resolveAudioContextSampleRate(44100);
-    expect(el.effectiveSampleRate).toBe(44100);
-  });
-
-  it('resolveAudioContextSampleRate only sets once (first wins)', () => {
-    const el = document.createElement('daw-editor') as any;
-    el.resolveAudioContextSampleRate(44100);
-    el.resolveAudioContextSampleRate(96000);
-    expect(el.effectiveSampleRate).toBe(44100);
-  });
-
-  it('decoded audio _resolvedSampleRate takes precedence over resolveAudioContextSampleRate', () => {
-    const el = document.createElement('daw-editor') as any;
-    // Simulate what _loadTrack does
-    el._resolvedSampleRate = 44100;
-    // This should be a no-op since _resolvedSampleRate is already set
-    el.resolveAudioContextSampleRate(48000);
-    expect(el.effectiveSampleRate).toBe(44100);
-  });
-
   describe('adapter pluggability', () => {
     it('throws when _ensureEngine is called without adapter', async () => {
       const editor = document.createElement('daw-editor') as any;
@@ -187,13 +166,14 @@ describe('DawEditorElement', () => {
 
     it('warns when adapter set after engine is built', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const editor = document.createElement('daw-editor') as any;
-      // Simulate engine being built
-      editor._engine = {};
-      editor.adapter = { audioContext: { state: 'running', sampleRate: 48000 } };
+      // The first adapter builds the engine at connect (#848); a second one warns.
+      const editor = (await mountEditor()) as any;
+      expect(editor.engine).not.toBeNull();
+      editor.adapter = makeFakeAdapter().adapter;
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('adapter set after engine is built')
       );
+      editor.remove();
       warnSpy.mockRestore();
     });
   });

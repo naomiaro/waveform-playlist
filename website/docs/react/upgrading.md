@@ -3740,15 +3740,15 @@ await editor.addTrack({ name: 'Piano', kind: 'midi', clips: [{ midiNotes }] });
 
 Put audio clips and MIDI clips on separate `<daw-track>` elements.
 
-**What happens to a clip of the wrong kind:** it is not added, and the editor dispatches `daw-clip-error` with `{ trackId, clipId, error }` (`clipId` is `''` for a clip with no `<daw-clip>` element, such as the `<daw-track src>` shorthand). This covers:
+**What happens to a clip of the wrong kind:** it is not added, and the editor dispatches `daw-clip-error` with `{ trackId, clipId, error }` (for a clip with no `<daw-clip>` element, such as the `<daw-track src>` shorthand, `clipId` is the id the editor gave it). This covers:
 
 - when a track loads: a MIDI clip (no `src`) on an audio track, and a `<daw-clip src>` on a MIDI track;
 - `editor.addClip()` with a `src` onto a MIDI track (the promise rejects, nothing is fetched);
 - `midiNotes` assigned to a source-less clip of an audio track.
 
-If every clip of a track is refused, `daw-track-error` follows and `addTrack()` rejects. Listen for `daw-clip-error`: an un-migrated `render-mode="piano-roll"` track shows up as that event and an empty track.
+If every clip of a track is refused, the track enters with no clips, `daw-track-error` follows, and `addTrack()` still resolves with its id. Listen for `daw-clip-error`: an un-migrated `render-mode="piano-roll"` track shows up as that event and an empty track.
 
-Not covered: a source-less `<daw-clip>` appended to a track that has already loaded is ignored without an event, on a track of either kind. Adding a MIDI clip to a loaded track was not supported before this release either; put MIDI clips in the track when you create it.
+A `<daw-clip>` appended to a track later is checked the same way: a source-less clip on a MIDI track is added (one undo step), on an audio track it is refused with `daw-clip-error`.
 
 Also:
 

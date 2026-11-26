@@ -22,15 +22,17 @@
  * v2 (#843): the mixer setters take options and are undo steps, the history
  * holds the mix (`'restoreMix'`), and the arrangement has the take's mute
  * (`setTrackRecording`, `recordingTrackIds`, `'recording'`).
+ *
+ * v3 (#848): `addTrack(track, { index })` puts the track at a place in the order.
  */
 
 import type { Arrangement } from './types';
 
 export const ARRANGEMENT_ATTACH_DECODE = Symbol.for(
-  '@waveform-playlist/engine/arrangement/attach-decode/v2'
+  '@waveform-playlist/engine/arrangement/attach-decode/v3'
 );
 export const ARRANGEMENT_ATTACH_TIME_BASE = Symbol.for(
-  '@waveform-playlist/engine/arrangement/time-base/v2'
+  '@waveform-playlist/engine/arrangement/time-base/v3'
 );
 
 /** How the arrangement converts time. The engine provides it from its adapter and tempo. */

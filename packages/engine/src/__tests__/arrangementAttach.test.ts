@@ -419,15 +419,25 @@ describe('an arrangement made by another copy of the package', () => {
     engine.dispose();
   });
 
-  // #843: the history holds the mix, the setters take options and the
-  // arrangement has the take's mute, so the interface reached by name changed and
-  // the keys moved to v2.
-  it('the key strings end in /v2', () => {
+  // #843 moved the keys to v2 (the history holds the mix, the setters take
+  // options, the take's mute); #848 to v3 (addTrack takes an index), so the
+  // interface reached by name changed again.
+  it('the key strings end in /v3', () => {
     expect(ARRANGEMENT_ATTACH_DECODE.description).toBe(
-      '@waveform-playlist/engine/arrangement/attach-decode/v2'
+      '@waveform-playlist/engine/arrangement/attach-decode/v3'
     );
     expect(ARRANGEMENT_ATTACH_TIME_BASE.description).toBe(
-      '@waveform-playlist/engine/arrangement/time-base/v2'
+      '@waveform-playlist/engine/arrangement/time-base/v3'
+    );
+  });
+
+  it('an arrangement of the v2 keys is refused by the engine', () => {
+    const v2 = {
+      [Symbol.for('@waveform-playlist/engine/arrangement/time-base/v2')]: () => () => {},
+      [Symbol.for('@waveform-playlist/engine/arrangement/attach-decode/v2')]: () => () => {},
+    };
+    expect(() => new PlaylistEngine({ arrangement: v2 as unknown as Arrangement })).toThrow(
+      /the `arrangement` option must be an arrangement made by createArrangement\(\)/
     );
   });
 

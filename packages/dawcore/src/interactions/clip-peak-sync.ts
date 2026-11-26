@@ -10,6 +10,8 @@ export interface ClipPeakSyncHost {
   _clipOffsets: Map<string, { offsetSamples: number; durationSamples: number }>;
   _peaksData: Map<string, PeakData>;
   _peakPipeline: PeakPipeline;
+  /** Told when a clip's peaks are made (the zoom floor, a preview to drop). */
+  _clipPeaksReady?(clipId: string, audioBuffer: AudioBuffer): void;
 }
 
 /**
@@ -70,6 +72,7 @@ export function syncPeaksForChangedClips(
         )
         .then((peakData) => {
           host._peaksData = new Map(host._peaksData).set(clip.id, peakData);
+          host._clipPeaksReady?.(clip.id, audioBuffer);
         })
         .catch((err) => {
           console.warn(

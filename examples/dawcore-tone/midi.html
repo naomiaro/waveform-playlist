@@ -90,6 +90,9 @@
       name: 'C Major Scale',
       midi: { notes },
     });
+    // A track an editor method adds is an undo step. This one is the page's
+    // starting content, so Undo right after load should not remove it.
+    editor.engine.clearHistory();
   </script>
 </body>
 </html>

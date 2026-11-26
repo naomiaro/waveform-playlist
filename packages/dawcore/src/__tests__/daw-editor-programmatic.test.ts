@@ -1,4 +1,18 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
+import { createClip, createTrack } from '@waveform-playlist/core';
+import {
+  makeAudioBuffer as makeDecodedBuffer,
+  makeAudioFile,
+  makeFakeAdapter,
+  mountEditor,
+  restoreFetch,
+  settle,
+  stubFetch,
+  stubPeakPipeline,
+  tick,
+} from './helpers/editor-harness';
+import type { FakeAdapter } from './helpers/editor-harness';
 
 beforeAll(async () => {
   await import('../elements/daw-clip');
@@ -61,10 +75,59 @@ function stubAudioPipeline(editor: any) {
   };
 }
 
+const AUDIO_URLS = [
+  '/a.opus',
+  '/b.opus',
+  '/c.opus',
+  '/late.opus',
+  '/good1.opus',
+  '/good2.opus',
+  '/bad.opus',
+  '/missing.opus',
+];
+
+afterEach(() => {
+  restoreFetch();
+});
+
+/**
+ * An editor on the shared harness (#848): a real engine on a fake adapter,
+ * `fetch` stubbed for the URLs above, and a peak pipeline that resolves at
+ * once. The editor's arrangement fetches and decodes; a test sets what a URL
+ * decodes to with `fake.setDecoded` / `fake.holdDecode`.
+ */
+async function setupLoadingEditor(): Promise<{
+  editor: any;
+  fake: FakeAdapter;
+  pipeline: Record<string, Mock>;
+}> {
+  const fake = makeFakeAdapter();
+  stubFetch(Object.fromEntries(AUDIO_URLS.map((url) => [url, 'ok' as const])));
+  let pipeline!: Record<string, Mock>;
+  const editor = await mountEditor({
+    adapter: fake.adapter,
+    before: (e) => {
+      pipeline = stubPeakPipeline(e);
+    },
+  });
+  return { editor, fake, pipeline };
+}
+
+/** A method of the fake adapter, as the mock it is. */
+function mockOf(fake: FakeAdapter, method: string): Mock {
+  return fake.adapter[method] as Mock;
+}
+
+/** The `<daw-track>` element of a track id (`editor.addTrack()` resolves with the id). */
+function trackElement(editor: any, trackId: string): any {
+  return [...editor.querySelectorAll('daw-track')].find((t: any) => t.trackId === trackId);
+}
+
 function setupEditor(): any {
   const editor = document.createElement('daw-editor') as any;
-  // Mock adapter so audioContext getter works.
-  editor.adapter = { audioContext: { state: 'running', sampleRate: 48000 } };
+  // A complete fake: the editor builds a real engine on it at connect (#848),
+  // and a track entering calls the adapter.
+  editor.adapter = makeFakeAdapter().adapter;
   document.body.appendChild(editor);
   stubAudioPipeline(editor);
   return editor;
@@ -88,19 +151,17 @@ describe('editor.ready()', () => {
 
 describe('editor.addTrack()', () => {
   it('appends a <daw-track> element to the editor', async () => {
-    const editor = setupEditor();
+    const { editor } = await setupLoadingEditor();
 
     const promise = editor.addTrack({ name: 'Test', volume: 0.7 });
-    // Element is appended synchronously even though the promise resolves on daw-track-ready
+    // Element is appended synchronously; the promise resolves with its id once it has entered
     expect(editor.querySelectorAll('daw-track').length).toBe(1);
 
-    // Simulate _loadTrack completion by dispatching daw-track-ready
-    await new Promise((r) => setTimeout(r, 60));
     const trackEl = editor.querySelector('daw-track');
-    const t = await promise;
-    expect(t).toBe(trackEl);
-    expect(t.name).toBe('Test');
-    expect(t.volume).toBe(0.7);
+    const id = await promise;
+    expect(id).toBe(trackEl.trackId);
+    expect(trackEl.name).toBe('Test');
+    expect(trackEl.volume).toBe(0.7);
     editor.remove();
   });
 
@@ -120,25 +181,6 @@ describe('editor.addTrack()', () => {
     expect((clips[1] as any).start).toBe(4);
     editor.remove();
   });
-
-  it('rejects when all requested clips fail to load', async () => {
-    const editor = setupEditor();
-    // Per-clip failures dispatch daw-clip-error and skip; if every requested
-    // clip fails, the track surfaces a track-level error so addTrack rejects.
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    editor._fetchAndDecode = vi.fn().mockRejectedValue(new Error('decode failed'));
-    const clipErrors: CustomEvent[] = [];
-    editor.addEventListener('daw-clip-error', (e: CustomEvent) => clipErrors.push(e));
-    const promise = editor.addTrack({
-      name: 'Bad',
-      clips: [{ src: '/missing.opus' }],
-    });
-    await expect(promise).rejects.toThrow(/all 1 clip\(s\) failed/);
-    expect(clipErrors).toHaveLength(1);
-    expect(String(clipErrors[0].detail.error)).toContain('decode failed');
-    warnSpy.mockRestore();
-    editor.remove();
-  });
 });
 
 describe('editor.removeTrack()', () => {
@@ -153,13 +195,15 @@ describe('editor.removeTrack()', () => {
     editor.remove();
   });
 
-  it('falls back to direct cleanup for tracks without a DOM element', () => {
-    const editor = setupEditor();
-    // Simulate file-dropped track: present in _engineTracks but no <daw-track>
-    editor._engineTracks = new Map([['file-id', { id: 'file-id', clips: [], name: 'X' }]]);
+  it('falls back to direct cleanup for tracks without a DOM element', async () => {
+    const { editor } = await setupLoadingEditor();
+    // A file-dropped track: in the arrangement, with no <daw-track>
+    const { loaded } = await editor.loadFiles([makeAudioFile('drop.wav')]);
+    expect(editor.querySelectorAll('daw-track').length).toBe(0);
     expect(editor._engineTracks.size).toBe(1);
-    editor.removeTrack('file-id');
+    editor.removeTrack(loaded[0]);
     expect(editor._engineTracks.size).toBe(0);
+    expect(editor._arrangement.getTracks()).toEqual([]);
     editor.remove();
   });
 
@@ -175,11 +219,10 @@ describe('editor.removeTrack()', () => {
 
 describe('editor.updateTrack()', () => {
   it('mutates reflected attributes on the <daw-track> element', async () => {
-    const editor = setupEditor();
-    editor.addTrack({ name: 'Original', volume: 1, pan: 0 });
-    await new Promise((r) => setTimeout(r, 60));
-    const trackEl = editor.querySelector('daw-track') as any;
-    editor.updateTrack(trackEl.trackId, {
+    const { editor } = await setupLoadingEditor();
+    const id = await editor.addTrack({ name: 'Original', volume: 1, pan: 0 });
+    const trackEl = trackElement(editor, id);
+    editor.updateTrack(id, {
       name: 'Updated',
       volume: 0.3,
       muted: true,
@@ -190,24 +233,25 @@ describe('editor.updateTrack()', () => {
     editor.remove();
   });
 
-  it('applies directly to engine for non-DOM tracks (file drops)', () => {
-    const editor = setupEditor();
-    const desc = { name: 'File', src: '', clips: [] };
-    editor._tracks = new Map([['file-id', desc]]);
-    editor._engineTracks = new Map([['file-id', { id: 'file-id', clips: [] }]]);
+  it('applies directly to the arrangement for non-DOM tracks (file drops)', async () => {
+    const { editor } = await setupLoadingEditor();
+    const { loaded } = await editor.loadFiles([makeAudioFile('file.wav')]);
+    const id = loaded[0];
+    const setVolume = vi.spyOn(editor._arrangement, 'setTrackVolume');
+    const setMute = vi.spyOn(editor._arrangement, 'setTrackMute');
+    const setPan = vi.spyOn(editor._arrangement, 'setTrackPan');
 
-    editor.updateTrack('file-id', { volume: 0.5, muted: true });
+    editor.updateTrack(id, { volume: 0.5, muted: true });
     // One call is one undo step (#843): both setters carry one gesture id.
     const gesture = { gesture: expect.any(String) };
-    expect(editor._engine.setTrackVolume).toHaveBeenCalledWith('file-id', 0.5, gesture);
-    expect(editor._engine.setTrackMute).toHaveBeenCalledWith('file-id', true, gesture);
-    expect(editor._engine.setTrackVolume.mock.calls[0][2]).toEqual(
-      editor._engine.setTrackMute.mock.calls[0][2]
-    );
-    expect(editor._engine.setTrackPan).not.toHaveBeenCalled();
+    expect(setVolume).toHaveBeenCalledWith(id, 0.5, gesture);
+    expect(setMute).toHaveBeenCalledWith(id, true, gesture);
+    expect(setVolume.mock.calls[0][2]).toEqual(setMute.mock.calls[0][2]);
+    expect(setPan).not.toHaveBeenCalled();
+    expect(editor._arrangement.getMixer().get(id)).toMatchObject({ volume: 0.5, muted: true });
     // The mix is the arrangement's (#843): the descriptor holds no copy.
-    expect(editor._tracks.get('file-id')).not.toHaveProperty('volume');
-    expect(editor._tracks.get('file-id')).not.toHaveProperty('muted');
+    expect(editor._tracks.get(id)).not.toHaveProperty('volume');
+    expect(editor._tracks.get(id)).not.toHaveProperty('muted');
     editor.remove();
   });
 });
@@ -268,25 +312,18 @@ describe('editor.addClip() / removeClip() / updateClip()', () => {
     editor.remove();
   });
 
-  it('updateClip applies directly to engine for non-DOM clips', () => {
-    const editor = setupEditor();
-    const trackId = 'file-track';
-    const clipId = 'file-clip';
-    const clip = {
-      id: clipId,
-      startSample: 0,
-      durationSamples: 96000,
-      offsetSamples: 0,
-      gain: 1,
-      name: 'Original',
-      sampleRate: 48000,
-    };
-    editor._engineTracks = new Map([[trackId, { id: trackId, clips: [clip], name: 'T' }]]);
+  it('updateClip applies directly to engine for non-DOM clips', async () => {
+    const { editor, fake } = await setupLoadingEditor();
+    // A file-dropped track's clip has no <daw-clip> element
+    const { loaded } = await editor.loadFiles([makeAudioFile('take.wav')]);
+    const trackId = loaded[0];
+    const clipId = editor._engineTracks.get(trackId).clips[0].id;
+    mockOf(fake, 'updateTrack').mockClear();
     editor.updateClip(trackId, clipId, { start: 1.5, gain: 0.25 });
     const updated = editor._engineTracks.get(trackId).clips[0];
     expect(updated.startSample).toBe(72000); // 1.5s * 48000
     expect(updated.gain).toBe(0.25);
-    expect(editor._engine.updateTrack).toHaveBeenCalled();
+    expect(fake.adapter.updateTrack).toHaveBeenCalled();
     editor.remove();
   });
 });
@@ -323,6 +360,24 @@ describe('descriptor sync for element-less clips addressed by id (#659)', () => 
       midiChannel: null,
       midiProgram: null,
     });
+    // editor.tracks lists the tracks of the arrangement (#848): the take's
+    // track is there too, before the hand-set engine cache and descriptors.
+    const arrangementClip = (id: string, startSample: number) => ({
+      ...createClip({
+        startSample,
+        durationSamples: 96000,
+        offsetSamples: 0,
+        sampleRate: 48000,
+        sourceDurationSamples: 96000,
+        name: 'Recording',
+      }),
+      id,
+    });
+    editor._arrangement.addTrack({
+      ...createTrack({ name: 'T', clips: [] }),
+      id: trackId,
+      clips: [arrangementClip('take-1', 0), arrangementClip('take-2', 96000)],
+    });
     editor._engineTracks = new Map([[trackId, { id: trackId, clips: [clip, other], name: 'T' }]]);
     editor._tracks = new Map([
       [
@@ -354,8 +409,9 @@ describe('descriptor sync for element-less clips addressed by id (#659)', () => 
     editor.remove();
   });
 
-  it('removeClip by engine id drops the descriptor too', () => {
-    const editor = setupEditor();
+  it('removeClip by engine id drops the descriptor too', async () => {
+    const { editor } = await setupLoadingEditor();
+    // seedRecordedTake puts the take's track in the arrangement too (#848).
     const trackId = seedRecordedTake(editor);
 
     editor.removeClip(trackId, 'take-1');
@@ -467,40 +523,13 @@ describe('Phase 1 regression fixes', () => {
   });
 
   it('addClip rejects when daw-clip-error fires (decode failure)', async () => {
-    const editor = setupEditor();
-    editor.addTrack({ name: 'T' });
-    await new Promise((r) => setTimeout(r, 60));
-    const trackEl = editor.querySelector('daw-track') as any;
+    const { editor, fake } = await setupLoadingEditor();
+    const trackId = await editor.addTrack({ name: 'T' });
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    editor._fetchAndDecode = vi.fn().mockRejectedValue(new Error('decode failed'));
-    await expect(editor.addClip(trackEl.trackId, { src: '/missing.opus' })).rejects.toThrow(
+    fake.setDecoded('/missing.opus', new Error('decode failed'));
+    await expect(editor.addClip(trackId, { src: '/missing.opus' })).rejects.toThrow(
       'decode failed'
     );
-    warnSpy.mockRestore();
-    editor.remove();
-  });
-
-  it('_loadAndAppendClip rolls back per-clip caches when peak generation fails', async () => {
-    const editor = setupEditor();
-    editor.addTrack({ name: 'T' });
-    await new Promise((r) => setTimeout(r, 60));
-    const trackEl = editor.querySelector('daw-track') as any;
-
-    // Fail peak generation specifically (audio decode succeeds)
-    editor._peakPipeline.generatePeaks = vi.fn().mockRejectedValue(new Error('worker crash'));
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    const buffersBefore = editor._clipBuffers.size;
-    const offsetsBefore = editor._clipOffsets.size;
-    const peaksBefore = editor._peaksData.size;
-
-    await expect(editor.addClip(trackEl.trackId, { src: '/a.opus' })).rejects.toThrow(
-      'worker crash'
-    );
-
-    expect(editor._clipBuffers.size).toBe(buffersBefore);
-    expect(editor._clipOffsets.size).toBe(offsetsBefore);
-    expect(editor._peaksData.size).toBe(peaksBefore);
     warnSpy.mockRestore();
     editor.remove();
   });
@@ -564,7 +593,7 @@ describe('Phase 1 regression fixes', () => {
   });
 });
 
-describe('Phase 3 refactor: _resolvePeaks + peaks-first flow', () => {
+describe('Phase 3 refactor: _resolvePeaks + .dat preview', () => {
   function makeWaveformData(sampleRate: number, scale = 256, durationSec = 2) {
     return {
       sample_rate: sampleRate,
@@ -575,89 +604,84 @@ describe('Phase 3 refactor: _resolvePeaks + peaks-first flow', () => {
     } as any;
   }
 
-  it('peaks-first path uses pre-computed WaveformData when sample-rate matches', async () => {
-    const editor = setupEditor();
-    editor._fetchPeaks = vi.fn().mockResolvedValue(makeWaveformData(48000));
-    // Stub extractPeaks via mocking — _peakPipeline.cacheWaveformData is also called
-    editor._peakPipeline.cacheWaveformData = vi.fn();
-    await editor.addTrack({
-      name: 'T',
-      clips: [{ src: '/a.opus', peaksSrc: '/a.dat' }],
-    });
-    expect(editor._fetchPeaks).toHaveBeenCalledWith('/a.dat');
-    expect(editor._peakPipeline.cacheWaveformData).toHaveBeenCalled();
-    editor.remove();
-  });
-
-  it('peaks-first path warns + falls back when peaks sample-rate mismatches AudioContext', async () => {
-    const editor = setupEditor(); // adapter sampleRate is 48000
+  it('a .dat preview warns + falls back when peaks sample-rate mismatches AudioContext', async () => {
+    const { editor, pipeline } = await setupLoadingEditor(); // adapter sampleRate is 48000
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     // .dat at 44100 — mismatch
     editor._fetchPeaks = vi.fn().mockResolvedValue(makeWaveformData(44100));
-    editor._peakPipeline.cacheWaveformData = vi.fn();
     await editor.addTrack({
       name: 'T',
       clips: [{ src: '/a.opus', peaksSrc: '/a.dat' }],
     });
+    await settle(editor);
+    expect(editor._fetchPeaks).toHaveBeenCalledWith('/a.dat');
     const mismatchWarns = warnSpy.mock.calls
       .map((args) => String(args[0]))
       .filter((m) => m.includes('Pre-computed peaks'));
     expect(mismatchWarns.length).toBeGreaterThanOrEqual(1);
-    // Fell back to standard path — cacheWaveformData NOT called
-    expect(editor._peakPipeline.cacheWaveformData).not.toHaveBeenCalled();
+    // Fell back to peaks from the audio — no preview drawn, cacheWaveformData NOT called
+    expect(editor._previewPeaks.size).toBe(0);
+    expect(pipeline.cacheWaveformData).not.toHaveBeenCalled();
     warnSpy.mockRestore();
     editor.remove();
   });
 
-  it('peaks-first path warns + falls back when peaks fetch fails', async () => {
-    const editor = setupEditor();
+  it('a .dat preview warns + falls back when peaks fetch fails', async () => {
+    const { editor, pipeline } = await setupLoadingEditor();
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     editor._fetchPeaks = vi.fn().mockRejectedValue(new Error('404 not found'));
-    editor._peakPipeline.cacheWaveformData = vi.fn();
     await editor.addTrack({
       name: 'T',
       clips: [{ src: '/a.opus', peaksSrc: '/missing.dat' }],
     });
+    await settle(editor);
     const fetchWarns = warnSpy.mock.calls
       .map((args) => String(args[0]))
       .filter((m) => m.includes('Failed to load peaks'));
     expect(fetchWarns.length).toBeGreaterThanOrEqual(1);
-    expect(editor._peakPipeline.cacheWaveformData).not.toHaveBeenCalled();
+    expect(editor._previewPeaks.size).toBe(0);
+    expect(pipeline.cacheWaveformData).not.toHaveBeenCalled();
     warnSpy.mockRestore();
     editor.remove();
   });
 
-  it('_loadAndAppendClip raises _minSamplesPerPixel only after generatePeaks succeeds', async () => {
-    const editor = setupEditor();
-    editor._fetchPeaks = vi.fn().mockResolvedValue(makeWaveformData(48000, 512));
-    editor._peakPipeline.cacheWaveformData = vi.fn();
-    // generatePeaks succeeds first, then track loads, then we addClip with peaks
-    await editor.addTrack({ name: 'T' });
-    await new Promise((r) => setTimeout(r, 60));
-    const trackEl = editor.querySelector('daw-track') as any;
+  it('a loaded clip raises _minSamplesPerPixel only after generatePeaks succeeds', async () => {
+    // No .dat here: a .dat preview raises the floor to its own scale as soon as
+    // it is drawn (#848), before any peaks are generated from the audio.
+    const { editor, pipeline } = await setupLoadingEditor();
+    pipeline.getCachedScale.mockReturnValue(512);
+    let releasePeaks!: (peaks: unknown) => void;
+    pipeline.generatePeaks.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releasePeaks = resolve;
+        })
+    );
+    const trackId = await editor.addTrack({ name: 'T' });
     const beforeFloor = editor._minSamplesPerPixel;
-    await editor.addClip(trackEl.trackId, { src: '/a.opus', peaksSrc: '/a.dat' });
-    // After successful load, _minSamplesPerPixel was raised to peaks scale (512)
-    expect(editor._minSamplesPerPixel).toBe(Math.max(beforeFloor, 512));
+    await editor.addClip(trackId, { src: '/a.opus' });
+    // The audio has loaded; its peaks are still being generated
+    expect(editor._minSamplesPerPixel).toBe(beforeFloor);
+    releasePeaks(makePeakData());
+    // After the peaks were generated, _minSamplesPerPixel was raised to their scale (512)
+    await vi.waitFor(() => expect(editor._minSamplesPerPixel).toBe(Math.max(beforeFloor, 512)));
     editor.remove();
   });
 
-  it('_loadAndAppendClip does NOT raise _minSamplesPerPixel when generatePeaks fails', async () => {
-    const editor = setupEditor();
-    editor._fetchPeaks = vi.fn().mockResolvedValue(makeWaveformData(48000, 512));
-    editor._peakPipeline.cacheWaveformData = vi.fn();
-    await editor.addTrack({ name: 'T' });
-    await new Promise((r) => setTimeout(r, 60));
-    const trackEl = editor.querySelector('daw-track') as any;
+  it('a loaded clip does NOT raise _minSamplesPerPixel when generatePeaks fails', async () => {
+    const { editor, pipeline } = await setupLoadingEditor();
+    pipeline.getCachedScale.mockReturnValue(512);
+    const trackId = await editor.addTrack({ name: 'T' });
     const beforeFloor = editor._minSamplesPerPixel;
 
     // Fail generatePeaks specifically
-    editor._peakPipeline.generatePeaks = vi.fn().mockRejectedValue(new Error('worker crash'));
+    pipeline.generatePeaks.mockRejectedValue(new Error('worker crash'));
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    await expect(
-      editor.addClip(trackEl.trackId, { src: '/a.opus', peaksSrc: '/a.dat' })
-    ).rejects.toThrow('worker crash');
+    await editor.addClip(trackId, { src: '/a.opus' });
+    await vi.waitFor(() =>
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('worker crash'))
+    );
     // Floor is unchanged — no peaks survived, no zoom-floor stranded
     expect(editor._minSamplesPerPixel).toBe(beforeFloor);
     warnSpy.mockRestore();
@@ -665,31 +689,23 @@ describe('Phase 3 refactor: _resolvePeaks + peaks-first flow', () => {
   });
 });
 
-describe('Phase 3 refactor: _loadTrack per-clip isolation', () => {
+describe('Phase 3 refactor: per-clip load isolation', () => {
   it('one bad clip does not abort the whole track — successful clips load, bad clip dispatches daw-clip-error', async () => {
-    const editor = setupEditor();
+    const { editor, fake } = await setupLoadingEditor();
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    // Reject only one src so others succeed
-    editor._fetchAndDecode = vi.fn().mockImplementation((src: string) => {
-      if (src === '/bad.opus') return Promise.reject(new Error('decode failed'));
-      return Promise.resolve({
-        length: 96000,
-        duration: 2,
-        sampleRate: 48000,
-        numberOfChannels: 1,
-        getChannelData: () => new Float32Array(96000),
-      } as unknown as AudioBuffer);
-    });
+    // Fail only one src so others succeed
+    fake.setDecoded('/bad.opus', new Error('decode failed'));
     const clipErrors: CustomEvent[] = [];
     editor.addEventListener('daw-clip-error', (e: CustomEvent) => clipErrors.push(e));
 
-    const t = await editor.addTrack({
+    const trackId = await editor.addTrack({
       name: 'Mixed',
       clips: [{ src: '/good1.opus' }, { src: '/bad.opus' }, { src: '/good2.opus' }],
     });
+    await settle(editor);
 
     // Track loaded with 2 successful clips
-    const engineTrack = editor._engineTracks.get(t.trackId);
+    const engineTrack = editor._engineTracks.get(trackId);
     expect(engineTrack.clips.length).toBe(2);
     // Per-clip error dispatched for the failed one
     expect(clipErrors).toHaveLength(1);
@@ -701,11 +717,8 @@ describe('Phase 3 refactor: _loadTrack per-clip isolation', () => {
 
 describe('Phase 2: end-to-end engine state assertions', () => {
   it('addClip resolves with clipId and engine track gains the clip', async () => {
-    const editor = setupEditor();
-    editor.addTrack({ name: 'T' });
-    await new Promise((r) => setTimeout(r, 60));
-    const trackEl = editor.querySelector('daw-track') as any;
-    const trackId = trackEl.trackId;
+    const { editor } = await setupLoadingEditor();
+    const trackId = await editor.addTrack({ name: 'T' });
 
     const clipsBefore = editor._engineTracks.get(trackId)?.clips.length ?? 0;
     const clipId = await editor.addClip(trackId, { src: '/a.opus', start: 4 });
@@ -717,34 +730,31 @@ describe('Phase 2: end-to-end engine state assertions', () => {
     // `start: 4` × 48000 = 192000 samples
     expect(newClip.startSample).toBe(192000);
     expect(editor._clipBuffers.has(clipId)).toBe(true);
-    expect(editor._peaksData.has(clipId)).toBe(true);
+    await vi.waitFor(() => expect(editor._peaksData.has(clipId)).toBe(true));
     editor.remove();
   });
 
   it('addClip dispatches daw-clip-ready and the engine receives the updated track', async () => {
-    const editor = setupEditor();
-    editor.addTrack({ name: 'T' });
-    await new Promise((r) => setTimeout(r, 60));
-    const trackEl = editor.querySelector('daw-track') as any;
+    const { editor, fake } = await setupLoadingEditor();
+    const trackId = await editor.addTrack({ name: 'T' });
 
     const readyEvents: CustomEvent[] = [];
     editor.addEventListener('daw-clip-ready', (e: CustomEvent) => readyEvents.push(e));
 
-    const updateTrackBefore = editor._engine.updateTrack.mock.calls.length;
-    await editor.addClip(trackEl.trackId, { src: '/a.opus' });
+    // The engine hands the updated track on to the adapter.
+    const updateTrackBefore = mockOf(fake, 'updateTrack').mock.calls.length;
+    await editor.addClip(trackId, { src: '/a.opus' });
 
     expect(readyEvents).toHaveLength(1);
-    expect(readyEvents[0].detail.trackId).toBe(trackEl.trackId);
-    expect(editor._engine.updateTrack.mock.calls.length).toBeGreaterThan(updateTrackBefore);
+    expect(readyEvents[0].detail.trackId).toBe(trackId);
+    expect(mockOf(fake, 'updateTrack').mock.calls.length).toBeGreaterThan(updateTrackBefore);
     editor.remove();
   });
 
-  it('late-append <daw-clip> via direct appendChild triggers _loadAndAppendClip', async () => {
-    const editor = setupEditor();
-    editor.addTrack({ name: 'T' });
-    await new Promise((r) => setTimeout(r, 60));
-    const trackEl = editor.querySelector('daw-track') as any;
-    const trackId = trackEl.trackId;
+  it('late-append <daw-clip> via direct appendChild loads the clip into the engine', async () => {
+    const { editor } = await setupLoadingEditor();
+    const trackId = await editor.addTrack({ name: 'T' });
+    const trackEl = trackElement(editor, trackId);
     const clipsBefore = editor._engineTracks.get(trackId).clips.length;
 
     // Directly construct + append, no editor.addClip API
@@ -753,28 +763,27 @@ describe('Phase 2: end-to-end engine state assertions', () => {
     clipEl.setAttribute('start', '5');
     trackEl.appendChild(clipEl);
 
-    // Wait for daw-clip-connected (deferred via setTimeout(0)) → _loadAndAppendClip
-    await new Promise((r) => setTimeout(r, 60));
-    expect(editor._engineTracks.get(trackId).clips.length).toBe(clipsBefore + 1);
+    // Wait for daw-clip-connected (deferred via setTimeout(0)) and the clip's audio
+    await vi.waitFor(() =>
+      expect(editor._engineTracks.get(trackId).clips.length).toBe(clipsBefore + 1)
+    );
     const added = editor._engineTracks.get(trackId).clips.find((c: any) => c.id === clipEl.clipId);
     expect(added).toBeDefined();
     editor.remove();
   });
 
   it('removeClip cleans up engine state, _clipBuffers, _clipOffsets, _peaksData', async () => {
-    const editor = setupEditor();
-    // Await the load promise — a fixed delay races the clip load on slow CI.
-    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
-    const trackEl = editor.querySelector('daw-track') as any;
-    const clipEl = trackEl.querySelector('daw-clip') as any;
-    const clipId = clipEl.clipId;
-    const trackId = trackEl.trackId;
+    const { editor, fake } = await setupLoadingEditor();
+    const trackId = await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    await settle(editor);
+    const clipId = trackElement(editor, trackId).querySelector('daw-clip').clipId;
 
     // Sanity — clip exists in engine and caches
     expect(editor._engineTracks.get(trackId).clips.length).toBe(1);
     expect(editor._clipBuffers.has(clipId)).toBe(true);
-    expect(editor._peaksData.has(clipId)).toBe(true);
+    await vi.waitFor(() => expect(editor._peaksData.has(clipId)).toBe(true));
 
+    mockOf(fake, 'updateTrack').mockClear();
     editor.removeClip(trackId, clipId);
     // MutationObserver cleanup is async — retry instead of one macrotask.
     await vi.waitFor(() => {
@@ -783,47 +792,50 @@ describe('Phase 2: end-to-end engine state assertions', () => {
       expect(editor._clipOffsets.has(clipId)).toBe(false);
       expect(editor._peaksData.has(clipId)).toBe(false);
     });
-    expect(editor._engine.updateTrack).toHaveBeenCalledWith(trackId, expect.any(Object));
+    // The engine hands the updated track on to the adapter.
+    expect(fake.adapter.updateTrack).toHaveBeenCalledWith(trackId, expect.any(Object));
     editor.remove();
   });
 
   it('removing a track with clips cascades cleanup to engine state', async () => {
-    const editor = setupEditor();
+    const { editor } = await setupLoadingEditor();
     // Stub _stopPlayhead — happy-dom playhead controller isn't fully realized
     // and throws when the engine empties at the end of MutationObserver work.
     editor._stopPlayhead = vi.fn();
-    // Await the load promise — a fixed delay races the clip loads on slow CI
-    // runners, and a removal that lands mid-load purges caches through the
-    // async cancellation path, after a single-macrotask wait has elapsed.
-    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }, { src: '/b.opus' }] });
-    const trackEl = editor.querySelector('daw-track') as any;
-    const clipIds = [...trackEl.querySelectorAll('daw-clip')].map((c: any) => c.clipId);
+    const trackId = await editor.addTrack({
+      name: 'T',
+      clips: [{ src: '/a.opus' }, { src: '/b.opus' }],
+    });
+    await settle(editor);
+    const clipIds = [...trackElement(editor, trackId).querySelectorAll('daw-clip')].map(
+      (c: any) => c.clipId
+    );
     expect(clipIds.length).toBe(2);
+    expect(editor._engineTracks.get(trackId).clips.length).toBe(2);
 
-    editor.removeTrack(trackEl.trackId);
+    editor.removeTrack(trackId);
     // MutationObserver cleanup is async — retry instead of one macrotask.
     await vi.waitFor(() => {
       for (const id of clipIds) {
         expect(editor._clipBuffers.has(id)).toBe(false);
         expect(editor._peaksData.has(id)).toBe(false);
       }
-      expect(editor._engineTracks.has(trackEl.trackId)).toBe(false);
+      expect(editor._engineTracks.has(trackId)).toBe(false);
     });
     editor.remove();
   });
 
   it('updateClip DOM-path triggers _applyClipUpdate which mutates engine startSample', async () => {
-    const editor = setupEditor();
-    editor.addTrack({ name: 'T', clips: [{ src: '/a.opus', start: 0 }] });
-    await new Promise((r) => setTimeout(r, 60));
-    const trackEl = editor.querySelector('daw-track') as any;
-    const clipEl = trackEl.querySelector('daw-clip') as any;
+    const { editor } = await setupLoadingEditor();
+    const trackId = await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus', start: 0 }] });
+    await settle(editor);
+    const clipEl = trackElement(editor, trackId).querySelector('daw-clip') as any;
 
-    editor.updateClip(trackEl.trackId, clipEl.clipId, { start: 3 });
+    editor.updateClip(trackId, clipEl.clipId, { start: 3 });
     await clipEl.updateComplete; // Lit fires daw-clip-update post-render
 
     const engineClip = editor._engineTracks
-      .get(trackEl.trackId)
+      .get(trackId)
       .clips.find((c: any) => c.id === clipEl.clipId);
     // start: 3 × 48000 = 144000
     expect(engineClip.startSample).toBe(144000);
@@ -831,24 +843,27 @@ describe('Phase 2: end-to-end engine state assertions', () => {
   });
 
   it('updateClip with changed bounds invokes reextractPeaks', async () => {
-    const editor = setupEditor();
-    editor.addTrack({ name: 'T', clips: [{ src: '/a.opus', start: 0, duration: 4 }] });
-    await new Promise((r) => setTimeout(r, 60));
-    const trackEl = editor.querySelector('daw-track') as any;
-    const clipEl = trackEl.querySelector('daw-clip') as any;
+    const { editor, fake, pipeline } = await setupLoadingEditor();
+    fake.setDecoded('/a.opus', makeDecodedBuffer(8)); // longer than the clip
+    const trackId = await editor.addTrack({
+      name: 'T',
+      clips: [{ src: '/a.opus', start: 0, duration: 4 }],
+    });
+    await settle(editor);
+    const clipEl = trackElement(editor, trackId).querySelector('daw-clip') as any;
 
-    const reextractCalls = editor._peakPipeline.reextractPeaks.mock.calls.length;
-    editor.updateClip(trackEl.trackId, clipEl.clipId, { duration: 2 });
+    const reextractCalls = pipeline.reextractPeaks.mock.calls.length;
+    editor.updateClip(trackId, clipEl.clipId, { duration: 2 });
     await clipEl.updateComplete;
 
-    expect(editor._peakPipeline.reextractPeaks.mock.calls.length).toBeGreaterThan(reextractCalls);
+    expect(pipeline.reextractPeaks.mock.calls.length).toBeGreaterThan(reextractCalls);
     editor.remove();
   });
 });
 
 describe("Phase 2: in-flight track load doesn't false-warn for pre-captured clips", () => {
   it('addTrack({clips:[..]}) does not warn when deferred daw-clip-connected fires for pre-read clips', async () => {
-    const editor = setupEditor();
+    const { editor } = await setupLoadingEditor();
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await editor.addTrack({
       name: 'T',
@@ -857,54 +872,13 @@ describe("Phase 2: in-flight track load doesn't false-warn for pre-captured clip
         { src: '/b.opus', start: 4 },
       ],
     });
+    await settle(editor);
     // None of the warns should mention "still loading" — those clips were
     // captured by _readTrackDescriptor and the deferred events are redundant.
     const loadingWarns = warnSpy.mock.calls
       .map((args) => String(args[0]))
       .filter((msg) => msg.includes('still loading'));
     expect(loadingWarns).toEqual([]);
-    warnSpy.mockRestore();
-    editor.remove();
-  });
-
-  it('genuine late-append during in-flight load still warns', async () => {
-    const editor = setupEditor();
-    // Slow the decode so the track is in-flight when we late-append
-    let resolveDecode!: (b: AudioBuffer) => void;
-    editor._fetchAndDecode = vi
-      .fn()
-      .mockImplementation(() => new Promise<AudioBuffer>((r) => (resolveDecode = r)));
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    const promise = editor.addTrack({
-      name: 'Slow',
-      clips: [{ src: '/a.opus' }],
-    });
-    // Wait for daw-track-connected microtask to run; track now in _tracks but not _engineTracks.
-    await new Promise((r) => setTimeout(r, 0));
-
-    // Append a NEW clip that wasn't in the original config
-    const trackEl = editor.querySelector('daw-track') as any;
-    const lateClip = document.createElement('daw-clip');
-    lateClip.setAttribute('src', '/late.opus');
-    trackEl.appendChild(lateClip);
-    // Wait for the late clip's deferred daw-clip-connected
-    await new Promise((r) => setTimeout(r, 0));
-
-    const loadingWarns = warnSpy.mock.calls
-      .map((args) => String(args[0]))
-      .filter((msg) => msg.includes('still loading'));
-    expect(loadingWarns.length).toBe(1);
-
-    // Let the addTrack promise resolve so the test can clean up
-    resolveDecode({
-      length: 96000,
-      duration: 2,
-      sampleRate: 48000,
-      numberOfChannels: 1,
-      getChannelData: () => new Float32Array(96000),
-    } as unknown as AudioBuffer);
-    await promise;
     warnSpy.mockRestore();
     editor.remove();
   });
@@ -945,10 +919,10 @@ describe('Phase 2: silent no-op warns', () => {
 });
 
 describe('engine clip-id alignment', () => {
-  it('engine clip ids match <daw-clip>.clipId after _loadTrack', async () => {
-    const editor = setupEditor();
-    editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }, { src: '/b.opus' }] });
-    await new Promise((r) => setTimeout(r, 80));
+  it('engine clip ids match <daw-clip>.clipId after loading', async () => {
+    const { editor } = await setupLoadingEditor();
+    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }, { src: '/b.opus' }] });
+    await settle(editor);
 
     const domClipIds = [...editor.querySelectorAll('daw-clip')].map((c: any) => c.clipId);
     const engineTracks = [...editor._engineTracks.values()] as any[];
@@ -961,82 +935,22 @@ describe('engine clip-id alignment', () => {
 });
 
 describe('load races (audit wave 2)', () => {
-  it('a track removed while its clips are loading is not resurrected into the engine', async () => {
-    const editor = setupEditor();
-    let releaseDecode!: (b: AudioBuffer) => void;
-    editor._fetchAndDecode = vi.fn(
-      () =>
-        new Promise<AudioBuffer>((resolve) => {
-          releaseDecode = resolve;
-        })
-    );
+  it('a load that completes after the editor was detached is not committed to the disposed adapter', async () => {
+    const { editor, fake } = await setupLoadingEditor();
+    const held = fake.holdDecode('/a.opus');
+    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
 
-    const promise = editor.addTrack({
-      name: 'Doomed',
-      clips: [{ src: '/a.opus', start: 0, duration: 2 }],
-    });
-    await vi.waitFor(() => expect(editor._fetchAndDecode).toHaveBeenCalled());
-    const trackEl = editor.querySelector('daw-track') as any;
-    const trackId = trackEl.trackId;
-
-    editor.removeTrack(trackId);
-    // Element removal is observed via MutationObserver (async)
-    await vi.waitFor(() => expect(editor._tracks.has(trackId)).toBe(false));
-
-    const errorEvents: CustomEvent[] = [];
-    editor.addEventListener('daw-track-error', (e: Event) => errorEvents.push(e as CustomEvent));
-    editor._peakPipeline.getMaxCachedScale.mockClear();
-    releaseDecode(makeAudioBuffer());
-
-    // The addTrack promise must settle (rejected — the track was removed),
-    // and the rejection must be discriminable from a real load failure so
-    // consumer error UIs can filter intentional removals.
-    const err = await Promise.race([
-      promise.then(
-        () => new Error('unexpectedly resolved'),
-        (e: Error) => e
-      ),
-      new Promise<Error>((r) => setTimeout(() => r(new Error('hung')), 500)),
-    ]);
-    expect(err.name).toBe('TrackLoadCancelledError');
-    expect(errorEvents[0]?.detail.reason).toBe('removed');
-
-    // ...the removed track must NOT reappear in engine/UI state, and the
-    // zoom floor raised during the load must be recomputed away
-    expect(editor._engineTracks.has(trackId)).toBe(false);
-    expect(editor.tracks.find((t: any) => t.trackId === trackId)).toBeUndefined();
-    expect(editor._peakPipeline.getMaxCachedScale).toHaveBeenCalled();
-    editor.remove();
-  });
-
-  it('a load that completes after the editor was detached is cancelled, not committed to a dead engine', async () => {
-    const editor = setupEditor();
-    let releaseDecode!: (b: AudioBuffer) => void;
-    editor._fetchAndDecode = vi.fn(
-      () =>
-        new Promise<AudioBuffer>((resolve) => {
-          releaseDecode = resolve;
-        })
-    );
-
-    const promise = editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
-    await vi.waitFor(() => expect(editor._fetchAndDecode).toHaveBeenCalled());
-
-    const engineStub = editor._engine; // disconnectedCallback nulls the field
     editor.remove(); // detach — disconnectedCallback disposed the engine
-    releaseDecode(makeAudioBuffer()); // decode SUCCEEDS on the dead editor
+    expect(fake.adapter.dispose).toHaveBeenCalled();
+    for (const method of ['setTracks', 'addTrack', 'updateTrack']) mockOf(fake, method).mockClear();
+    held.resolve(); // decode SUCCEEDS on the detached editor
+    await tick(3);
 
-    const err = await Promise.race([
-      promise.then(
-        () => new Error('unexpectedly resolved'),
-        (e: Error) => e
-      ),
-      new Promise<Error>((r) => setTimeout(() => r(new Error('hung')), 500)),
-    ]);
-    // Committing would rebuild an engine (and adapter graph) on a detached
-    // element that nothing will ever dispose.
-    expect(err.name).toBe('TrackLoadCancelledError');
-    expect(engineStub.setTracks).not.toHaveBeenCalled();
+    // Committing would rebuild tracks in an adapter graph that nothing will
+    // ever play or dispose again.
+    expect(fake.adapter.setTracks).not.toHaveBeenCalled();
+    expect(fake.adapter.addTrack).not.toHaveBeenCalled();
+    expect(fake.adapter.updateTrack).not.toHaveBeenCalled();
   });
 
   it('a clip connect event arriving before its parent registers a descriptor is silently skipped', () => {
@@ -1057,72 +971,15 @@ describe('load races (audit wave 2)', () => {
     expect(errorEvents.length).toBe(0);
     editor.remove();
   });
-
-  it('addTrack rejects instead of hanging when the load fails after the editor is detached', async () => {
-    const editor = setupEditor();
-    let rejectDecode!: (e: Error) => void;
-    editor._fetchAndDecode = vi.fn(
-      () =>
-        new Promise<AudioBuffer>((_resolve, reject) => {
-          rejectDecode = reject;
-        })
-    );
-
-    const promise = editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
-    await vi.waitFor(() => expect(editor._fetchAndDecode).toHaveBeenCalled());
-
-    editor.remove(); // page transition / framework re-render mid-load
-    rejectDecode(new Error('network error'));
-
-    const outcome = await Promise.race([
-      promise.then(
-        () => 'resolved',
-        () => 'rejected'
-      ),
-      new Promise((r) => setTimeout(() => r('hung'), 500)),
-    ]);
-    expect(outcome).toBe('rejected');
-  });
-
-  it('addClip during the parent track load rejects instead of hanging forever', async () => {
-    const editor = setupEditor();
-    let releaseDecode!: (b: AudioBuffer) => void;
-    editor._fetchAndDecode = vi
-      .fn()
-      .mockImplementationOnce(
-        () =>
-          new Promise<AudioBuffer>((resolve) => {
-            releaseDecode = resolve;
-          })
-      )
-      .mockResolvedValue(makeAudioBuffer());
-
-    const trackPromise = editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
-    await vi.waitFor(() => expect(editor._fetchAndDecode).toHaveBeenCalled());
-    const trackId = (editor.querySelector('daw-track') as any).trackId;
-
-    const clipPromise = editor.addClip(trackId, { src: '/b.opus', start: 2 });
-    const outcome = await Promise.race([
-      clipPromise.then(
-        () => 'resolved',
-        () => 'rejected'
-      ),
-      new Promise((r) => setTimeout(() => r('hung'), 500)),
-    ]);
-    expect(outcome).toBe('rejected');
-
-    releaseDecode(makeAudioBuffer());
-    await trackPromise;
-    editor.remove();
-  });
 });
 
 describe('removeTrack timeline sync (audit wave 2)', () => {
   it('removing the last track rewinds the engine to 0, matching the UI', async () => {
-    const editor = setupEditor();
-    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
-    const trackId = editor.tracks[0].trackId;
+    const { editor } = await setupLoadingEditor();
+    const trackId = await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    await settle(editor);
     editor._currentTime = 30; // prior seek — engine holds 30 too
+    const seek = vi.spyOn(editor.engine, 'seek');
 
     editor.removeTrack(trackId);
     await vi.waitFor(() => expect(editor._tracks.has(trackId)).toBe(false));
@@ -1130,16 +987,19 @@ describe('removeTrack timeline sync (audit wave 2)', () => {
     // Without engine.seek(0), the display shows 0 but the next play()
     // resumes from the engine's stale position (engine.removeTrack never
     // touches time).
-    expect(editor._engine.seek).toHaveBeenCalledWith(0);
+    expect(seek).toHaveBeenCalledWith(0);
     expect(editor.currentTime).toBe(0);
     editor.remove();
   });
 
   it('removing the last track during playback stops the engine (isPlaying not stranded)', async () => {
-    const editor = setupEditor();
-    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
-    const trackId = editor.tracks[0].trackId;
-    editor._isPlaying = true;
+    const { editor } = await setupLoadingEditor();
+    const trackId = await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    await settle(editor);
+    // Rolling for real: the engine's statechange is what sets _isPlaying.
+    editor.engine.play(0);
+    expect(editor._isPlaying).toBe(true);
+    const stop = vi.spyOn(editor.engine, 'stop');
 
     const events: string[] = [];
     editor.addEventListener('daw-stop', (e: Event) => events.push(e.type));
@@ -1151,7 +1011,7 @@ describe('removeTrack timeline sync (audit wave 2)', () => {
     // strands isPlaying=true with a dead playhead RAF. Transport UIs key on
     // daw-play/daw-stop, so this stop must be announced like every other
     // stop path (editor.stop() is otherwise the only daw-stop dispatcher).
-    expect(editor._engine.stop).toHaveBeenCalled();
+    expect(stop).toHaveBeenCalled();
     expect(events).toContain('daw-stop');
     editor.remove();
   });
@@ -1244,9 +1104,10 @@ describe('seekTo error surfacing (audit wave 4)', () => {
 
 describe('zoom floor (audit wave 5)', () => {
   it('worker-generated peaks raise the zoom floor to the cached base scale', async () => {
-    const editor = setupEditor();
-    editor._peakPipeline.getCachedScale = vi.fn().mockReturnValue(128);
+    const { editor, pipeline } = await setupLoadingEditor();
+    pipeline.getCachedScale.mockReturnValue(128);
     await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    await settle(editor);
 
     // Worker peaks can only be extracted at >= their cached scale (128) —
     // a finer zoom draws the waveform at a fraction of its clip container.
@@ -1256,11 +1117,12 @@ describe('zoom floor (audit wave 5)', () => {
   });
 
   it('a floor raised above the current samplesPerPixel re-clamps the live zoom', async () => {
-    const editor = setupEditor();
+    const { editor, pipeline } = await setupLoadingEditor();
     editor.samplesPerPixel = 64;
-    editor._peakPipeline.getCachedScale = vi.fn().mockReturnValue(256);
+    pipeline.getCachedScale.mockReturnValue(256);
 
     await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    await settle(editor);
 
     // The setter only clamps FUTURE sets — without re-clamping, layout keeps
     // spp 64 while peaks clamp to 256: waveform at a quarter width,
@@ -1301,11 +1163,11 @@ describe('recording preview position parity (audit wave 5)', () => {
 
 describe('zoom floor recompute (audit wave 5 review)', () => {
   it('a floor recompute on track removal re-clamps the live zoom', async () => {
-    const editor = setupEditor();
+    const { editor, pipeline } = await setupLoadingEditor();
     editor.samplesPerPixel = 64;
-    editor._peakPipeline.getMaxCachedScale = vi.fn().mockReturnValue(128);
-    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
-    const trackId = editor.tracks[0].trackId;
+    pipeline.getMaxCachedScale.mockReturnValue(128);
+    const trackId = await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    await settle(editor);
 
     editor.removeTrack(trackId);
     await vi.waitFor(() => expect(editor._tracks.has(trackId)).toBe(false));
@@ -1320,45 +1182,18 @@ describe('zoom floor recompute (audit wave 5 review)', () => {
 });
 
 describe('audit wave 6 — lifecycle & rendering state', () => {
-  it('a reparented editor does not retain ghost render state', async () => {
-    const editor = setupEditor();
-    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
-    expect(editor._engineTracks.size).toBe(1);
+  it('synthesizes descriptors for engine tracks restored by undo', async () => {
+    const { editor } = await setupLoadingEditor();
+    const id = await editor.addTrack({ name: 'Guitar', volume: 0.7, pan: -0.2 });
+    trackElement(editor, id).remove();
+    await vi.waitFor(() => expect(editor._tracks.has(id)).toBe(false));
 
-    const other = document.createElement('div');
-    document.body.appendChild(other);
-    other.appendChild(editor); // synchronous disconnect → reconnect
-
-    // The engine (and the consumer's adapter through it) was disposed and
-    // the clip caches cleared — retained render state would show waveforms
-    // that can never play. Element-backed tracks re-register via their own
-    // deferred connect events; element-less content does not survive.
-    expect(editor._engineTracks.size).toBe(0);
-    expect(editor._peaksData.size).toBe(0);
-    expect(editor.tracks).toHaveLength(0);
-    other.remove();
-  });
-
-  it('synthesizes descriptors for engine tracks restored by undo', () => {
-    const editor = setupEditor();
-    const ghost = {
-      id: 'ghost',
-      name: 'Guitar',
-      volume: 0.7,
-      pan: -0.2,
-      muted: false,
-      soloed: false,
-      clips: [],
-    };
-    // As the statechange handler does: the engine tracks first (the mix is
-    // read from them, #843), then the reconcile.
-    editor._engineTracks = new Map([['ghost', ghost]]);
-    editor._reconcileDescriptorsWithEngineTracks([ghost]);
+    editor.engine.undo(); // the removal: the track comes back without an element
 
     // Undo restores the track in ENGINE state, but _tracks was purged at
     // removal — without a synthesized descriptor the track plays and renders
     // yet shows "Untitled" controls and is missing from editor.tracks.
-    const t = editor.tracks.find((x: any) => x.trackId === 'ghost');
+    const t = editor.tracks.find((x: any) => x.trackId === id);
     expect(t?.name).toBe('Guitar');
     expect(t?.volume).toBe(0.7);
     editor.remove();
@@ -1387,49 +1222,48 @@ describe('audit wave 6 — lifecycle & rendering state', () => {
   });
 
   it('does not prune descriptors for tracks that are still loading or element-backed', async () => {
-    const editor = setupEditor();
-    let releaseDecode!: (b: AudioBuffer) => void;
-    editor._fetchAndDecode = vi.fn(
-      () =>
-        new Promise<AudioBuffer>((resolve) => {
-          releaseDecode = resolve;
-        })
-    );
-    const promise = editor.addTrack({ name: 'Loading', clips: [{ src: '/a.opus' }] });
-    await vi.waitFor(() => expect(editor._fetchAndDecode).toHaveBeenCalled());
+    const { editor, fake } = await setupLoadingEditor();
+    const held = fake.holdDecode('/a.opus');
+    await editor.addTrack({ name: 'Loading', clips: [{ src: '/a.opus' }] });
 
     // A statechange arriving mid-load doesn't contain the loading track —
     // its descriptor must survive (it is loading, not removed).
     editor._reconcileDescriptorsWithEngineTracks([]);
     expect(editor.tracks).toHaveLength(1);
 
-    releaseDecode(makeAudioBuffer());
-    await promise;
+    held.resolve();
+    await settle(editor);
     editor.remove();
   });
 
-  it('refuses to rebuild an engine on an adapter its own teardown disposed', async () => {
-    const editor = setupEditor();
+  it('lets go of an adapter its own teardown disposed', async () => {
+    const { editor } = await setupLoadingEditor();
     await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    await settle(editor);
 
     const other = document.createElement('div');
     document.body.appendChild(other);
     other.appendChild(editor); // teardown disposed the consumer's adapter
 
-    // NativePlayoutAdapter.dispose() leaves the AudioContext open, so decode
-    // SUCCEEDS on reconnect and tracks wire into a dead transport graph —
-    // waveforms render, play() runs, no audio. The rebuild must fail loudly
-    // instead.
-    const err = await editor.addTrack({ name: 'U', clips: [{ src: '/b.opus' }] }).then(
-      () => null,
-      (e: Error) => e
-    );
-    expect(err?.message).toMatch(/adapter.*disposed|fresh/i);
+    // NativePlayoutAdapter.dispose() leaves the AudioContext open, so building
+    // on it again would wire tracks into a dead transport graph: waveforms,
+    // no audio. The editor lets go of it (#848) and asks for a fresh one:
+    // a track added meanwhile waits for it.
+    expect(editor.adapter).toBeNull();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    let entered: string | null = null;
+    const pending = editor
+      .addTrack({ name: 'U', clips: [{ src: '/b.opus' }] })
+      .then((id: string) => (entered = id));
+    await tick(2);
+    expect(entered).toBeNull();
 
     // Setting a fresh adapter restores service
-    editor.adapter = { audioContext: { state: 'running', sampleRate: 48000 } };
-    stubAudioPipeline(editor);
-    await expect(editor.addTrack({ name: 'V', clips: [{ src: '/c.opus' }] })).resolves.toBeTruthy();
+    stubPeakPipeline(editor);
+    editor.adapter = makeFakeAdapter().adapter;
+    await pending;
+    expect(editor._arrangement.getTracks().map((t: { id: string }) => t.id)).toContain(entered);
+    warnSpy.mockRestore();
     other.remove();
   });
 
@@ -1482,21 +1316,6 @@ describe('audit wave 6 — lifecycle & rendering state', () => {
     // silently swallowed drop.
     expect(events).toHaveLength(1);
     expect(events[0].detail.file.name).toBe('notes.txt');
-    editor.remove();
-  });
-
-  it('loadFiles creates a <daw-track> element per dropped file', async () => {
-    const editor = setupEditor();
-    const file = new File([new ArrayBuffer(8)], 'kick.wav', { type: 'audio/wav' });
-    const result = await editor.loadFiles([file]);
-    expect(result.loaded).toHaveLength(1);
-    expect(result.failed).toHaveLength(0);
-    const trackEls = editor.querySelectorAll('daw-track');
-    expect(trackEls.length).toBe(1);
-    expect(trackEls[0].getAttribute('name')).toBe('kick');
-    expect(trackEls[0].querySelectorAll('daw-clip').length).toBe(1);
-    // The engine knows the track under the same id
-    expect(result.loaded[0]).toBe(trackEls[0].trackId);
     editor.remove();
   });
 

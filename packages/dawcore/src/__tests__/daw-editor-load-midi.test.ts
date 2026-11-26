@@ -223,9 +223,12 @@ describe('<daw-editor>.loadMidi', () => {
         throw new Error('synthetic — track 0 fails fast');
       }
       // Second resolves after a microtask tick — proving cleanup waits.
-      const el = await originalAddTrack(config);
-      lateResolveTrack = el as unknown as HTMLElement;
-      return el;
+      const id = await originalAddTrack(config);
+      lateResolveTrack =
+        Array.from(editor.querySelectorAll('daw-track')).find(
+          (t) => (t as unknown as { trackId: string }).trackId === id
+        ) ?? null;
+      return id;
     });
 
     await expect(editor.loadMidi('/midi/race.mid')).rejects.toThrow(/track 0 fails fast/);

@@ -12,6 +12,7 @@ export type {
   LoadSource,
   MixerChangeOptions,
   RemoveTrackOptions,
+  AddTrackOptions,
   TrackMixerValues,
 } from './arrangement';
 

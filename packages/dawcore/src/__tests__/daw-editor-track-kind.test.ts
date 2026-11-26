@@ -1,6 +1,15 @@
 // #756: a track holds one kind of clip. <daw-track kind="audio|midi"> declares
 // it; a clip of the other kind is not added and is reported.
 import { describe, it, expect, beforeAll, vi, beforeEach, afterEach } from 'vitest';
+import {
+  makeAudioBuffer,
+  makeFakeAdapter,
+  mountEditor,
+  restoreFetch,
+  settle,
+  stubFetch,
+  stubPeakPipeline,
+} from './helpers/editor-harness';
 
 beforeAll(async () => {
   await import('../elements/daw-editor');
@@ -22,6 +31,7 @@ beforeEach(() => {
 afterEach(() => {
   for (const editor of editors) editor.remove();
   editors = [];
+  restoreFetch();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -197,10 +207,10 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
 
   it('addClip with a src onto a loaded MIDI track rejects and fetches nothing', async () => {
     const { editor, adapter } = makeEditor();
-    const track = await editor.addTrack({ name: 'Keys', midi: { notes: NOTES } });
+    const trackId = await editor.addTrack({ name: 'Keys', midi: { notes: NOTES } });
     adapter.updateTrack.mockClear();
 
-    await expect(editor.addClip(track.trackId, { src: '/audio/take.mp3' })).rejects.toThrow(
+    await expect(editor.addClip(trackId, { src: '/audio/take.mp3' })).rejects.toThrow(
       /audio clip on MIDI track "Keys"/
     );
 
@@ -210,7 +220,10 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
 
   it('changing kind after the track has loaded is ignored with a warning', async () => {
     const { editor } = makeEditor();
-    const track = await editor.addTrack({ name: 'Keys', midi: { notes: NOTES } });
+    const trackId = await editor.addTrack({ name: 'Keys', midi: { notes: NOTES } });
+    const track = [...editor.querySelectorAll('daw-track')].find(
+      (t: any) => t.trackId === trackId
+    ) as any;
 
     track.kind = 'audio';
     await track.updateComplete;
@@ -233,42 +246,24 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
     expect(kindWarnings()).toBe(1);
   });
 
-  it('a clip with both src and midiNotes on an audio track is an audio clip and can still be updated', () => {
-    const { editor, clipErrors } = makeEditor();
-    const buffer = { length: 48000, sampleRate: 48000, numberOfChannels: 1 } as AudioBuffer;
-    const audioClip = {
-      id: 'clip-1',
-      audioBuffer: buffer,
-      startSample: 0,
-      durationSamples: 48000,
-      offsetSamples: 0,
-      sourceDurationSamples: 48000,
-      sampleRate: 48000,
-      gain: 1,
-    };
-    editor._engineTracks = new Map().set('track-1', {
-      id: 'track-1',
-      kind: 'audio',
-      name: 'Gtr',
-      volume: 1,
-      pan: 0,
-      muted: false,
-      soloed: false,
-      clips: [audioClip],
-    });
-    editor._tracks = new Map().set('track-1', {
-      name: 'Gtr',
-      src: '',
-      volume: 1,
-      pan: 0,
-      muted: false,
-      soloed: false,
-      kind: 'audio',
-      renderMode: 'waveform',
-      clips: [],
-    });
+  it('a clip with both src and midiNotes on an audio track is an audio clip and can still be updated', async () => {
+    const fake = makeFakeAdapter();
+    const buffer = makeAudioBuffer(1);
+    fake.setDecoded('/audio/gtr.mp3', buffer);
+    stubFetch({ '/audio/gtr.mp3': 'ok' });
+    const editor = (await mountEditor({
+      adapter: fake.adapter,
+      html: '<daw-track name="Gtr"><daw-clip src="/audio/gtr.mp3" duration="1"></daw-clip></daw-track>',
+      before: (e) => stubPeakPipeline(e),
+    })) as any;
+    editors.push(editor);
+    const clipErrors: any[] = [];
+    editor.addEventListener('daw-clip-error', (e: CustomEvent) => clipErrors.push(e.detail));
+    await settle(editor);
+    const trackId = editor._arrangement.getTracks()[0].id;
+    const clipId = editor.querySelector('daw-clip').clipId;
 
-    editor._applyClipUpdate('track-1', 'clip-1', {
+    editor._applyClipUpdate(trackId, clipId, {
       src: '/audio/gtr.mp3',
       midiNotes: NOTES, // ignored at load ("treating as audio"), so ignored here too
       midiChannel: null,
@@ -281,7 +276,7 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
     });
 
     expect(clipErrors).toEqual([]);
-    const after = editor._engineTracks.get('track-1').clips[0];
+    const after = editor._engineTracks.get(trackId).clips[0];
     expect(after.startSample).toBe(48000);
     expect(after.audioBuffer).toBe(buffer);
     expect(after.midiNotes).toBeUndefined();
@@ -289,16 +284,16 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
 
   it('startRecording onto a MIDI track dispatches daw-recording-error and starts nothing', async () => {
     const { editor } = makeEditor();
-    const track = await editor.addTrack({ name: 'Keys', midi: { notes: NOTES } });
+    const trackId = await editor.addTrack({ name: 'Keys', midi: { notes: NOTES } });
     const start = vi.spyOn(editor._recordingController, 'startRecording');
     const errors: any[] = [];
     editor.addEventListener('daw-recording-error', (e: CustomEvent) => errors.push(e.detail));
 
-    await editor.startRecording({} as MediaStream, { trackId: track.trackId });
+    await editor.startRecording({} as MediaStream, { trackId });
 
     expect(start).not.toHaveBeenCalled();
     expect(errors).toHaveLength(1);
-    expect(errors[0].trackId).toBe(track.trackId);
+    expect(errors[0].trackId).toBe(trackId);
     expect(errors[0].error.message).toMatch(/Cannot record onto MIDI track "Keys"/);
   });
 
@@ -310,11 +305,13 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
 
     editor.updateTrack('a', { renderMode: 'piano-roll' });
 
-    expect(editor.tracks[0].renderMode).toBe('waveform');
+    // The descriptor: this track is not in the arrangement, so editor.tracks
+    // (the arrangement's tracks since #848) does not list it.
+    expect(editor._tracks.get('a').renderMode).toBe('waveform');
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('set kind="midi"'));
 
     editor.updateTrack('a', { renderMode: 'spectrogram' });
-    expect(editor.tracks[0].renderMode).toBe('spectrogram');
+    expect(editor._tracks.get('a').renderMode).toBe('spectrogram');
   });
 
   it('an undo-restored MIDI track gets a MIDI descriptor', () => {
@@ -324,7 +321,8 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
       { id: 'a', kind: 'audio', name: 'Gtr', clips: [], volume: 1, pan: 0 },
     ]);
 
-    const byName = Object.fromEntries(editor.tracks.map((t: any) => [t.name, t]));
+    // The synthesized descriptors (these tracks are not in the arrangement).
+    const byName = Object.fromEntries([...editor._tracks.values()].map((t: any) => [t.name, t]));
     expect(byName.Keys).toMatchObject({ kind: 'midi', renderMode: 'waveform' });
     expect(byName.Gtr).toMatchObject({ kind: 'audio', renderMode: 'waveform' });
   });

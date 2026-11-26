@@ -101,7 +101,6 @@ export interface RecordingHost extends ReactiveControllerHost {
    * position and misplaces punch-in (record-during-playback) clips. */
   readonly currentTime: number;
   readonly shadowRoot: ShadowRoot | null;
-  resolveAudioContextSampleRate(rate: number): void;
   _addRecordedClip?(
     trackId: string,
     buf: AudioBuffer,
@@ -227,9 +226,6 @@ export class RecordingController implements ReactiveController {
 
     try {
       const rawCtx = this._host.audioContext;
-
-      // Resolve editor sample rate from AudioContext before computing startSample
-      this._host.resolveAudioContextSampleRate(rawCtx.sampleRate);
 
       // A suspended context delivers no samples while the UI shows recording
       // (worklet process() never runs). Resume before wiring the capture

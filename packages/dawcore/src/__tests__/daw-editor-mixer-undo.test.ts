@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 
 // #843: the arrangement owns a track's mix in <daw-editor> too. The controls
-// and editor.tracks read it from the engine's tracks (`_engineTracks`, which
-// follows `mixerVersion`), so an engine undo moves them back. A track that
-// is still loading has no entry in the arrangement yet: the editor holds the
-// values it will enter with (the seed), and a control moved meanwhile
-// changes the seed, not the history.
+// and editor.tracks read it from the arrangement, so an engine undo moves
+// them back. Since #848 a track is in the arrangement while it loads, so a
+// control moved meanwhile is an undo step like any other
+// (daw-editor-loading.test.ts).
 
 beforeAll(async () => {
   await import('../elements/daw-editor');
@@ -65,34 +64,23 @@ function midiTrackConfig(name: string, volume?: number) {
   };
 }
 
-function makeAudioBuffer(durationSec = 2, sampleRate = 48000): AudioBuffer {
-  const length = Math.round(durationSec * sampleRate);
-  return {
-    length,
-    duration: durationSec,
-    sampleRate,
-    numberOfChannels: 1,
-    getChannelData: () => new Float32Array(length),
-  } as unknown as AudioBuffer;
-}
-
-function stubPeakPipeline(editor: any) {
-  editor._peakPipeline = {
-    generatePeaks: vi.fn().mockResolvedValue({ data: [new Int16Array(0)], length: 0, bits: 16 }),
-    cacheWaveformData: vi.fn(),
-    getMaxCachedScale: vi.fn().mockReturnValue(0),
-    getCachedScale: vi.fn().mockReturnValue(0),
-    reextractPeaks: vi.fn().mockReturnValue(new Map()),
-    terminate: vi.fn(),
-  };
-}
-
 async function makeEditor() {
   const editor = document.createElement('daw-editor') as any;
   const adapter = makeMockAdapter();
   editor.adapter = adapter;
   document.body.appendChild(editor);
   return { editor, adapter };
+}
+
+/**
+ * `editor.addTrack()` makes an undo step (#848). These tests count the mixer's
+ * steps, so each starts from the track with an empty history. Resolves with
+ * the `<daw-track>` element addTrack appended (addTrack resolves with its id).
+ */
+async function addBaseTrack(editor: any, config: ReturnType<typeof midiTrackConfig>) {
+  const trackId: string = await editor.addTrack(config);
+  editor.engine.clearHistory();
+  return [...editor.querySelectorAll('daw-track')].find((t: any) => t.trackId === trackId);
 }
 
 function controlsFor(editor: any, trackId: string): any {
@@ -113,7 +101,7 @@ function moveControl(editor: any, trackId: string, prop: string, value: unknown)
 describe('<daw-editor> draws the arrangement mix (#843)', () => {
   it('the controls follow an engine undo of a volume change', async () => {
     const { editor } = await makeEditor();
-    const trackEl = await editor.addTrack(midiTrackConfig('A', 0.8));
+    const trackEl = await addBaseTrack(editor, midiTrackConfig('A', 0.8));
     const id: string = trackEl.trackId;
     const engine = editor.engine;
 
@@ -132,7 +120,7 @@ describe('<daw-editor> draws the arrangement mix (#843)', () => {
 
   it('editor.tracks reports the arrangement mix after an undo', async () => {
     const { editor } = await makeEditor();
-    const trackEl = await editor.addTrack(midiTrackConfig('A', 0.8));
+    const trackEl = await addBaseTrack(editor, midiTrackConfig('A', 0.8));
     const id: string = trackEl.trackId;
 
     moveControl(editor, id, 'volume', 0.5);
@@ -144,75 +132,10 @@ describe('<daw-editor> draws the arrangement mix (#843)', () => {
     expect(editor.tracks[0]).toMatchObject({ trackId: id, volume: 0.8, muted: false });
   });
 
-  it('a control moved while the track is loading is the volume it enters with, and is not a step', async () => {
-    const { editor } = await makeEditor();
-    stubPeakPipeline(editor);
-    const a = await editor.addTrack(midiTrackConfig('A'));
-    const engine = editor.engine;
-    engine.setTrackVolume(a.trackId, 0.5); // one step in the history
-    expect(engine.canUndo).toBe(true);
-
-    let releaseDecode!: (b: AudioBuffer) => void;
-    editor._fetchAndDecode = vi.fn(
-      () =>
-        new Promise<AudioBuffer>((resolve) => {
-          releaseDecode = resolve;
-        })
-    );
-    const setVolume = vi.spyOn(engine, 'setTrackVolume');
-    const pending = editor.addTrack({ name: 'B', volume: 0.8, clips: [{ src: '/b.opus' }] });
-    await vi.waitFor(() => expect(editor._fetchAndDecode).toHaveBeenCalled());
-    const bId = [...editor._tracks.keys()].find((k: string) => k !== a.trackId) as string;
-
-    moveControl(editor, bId, 'volume', 0.3);
-    await editor.updateComplete;
-
-    // The seed holds it: shown and reported, nothing sent to the engine.
-    expect(editor.tracks.find((t: any) => t.trackId === bId).volume).toBe(0.3);
-    expect(setVolume).not.toHaveBeenCalled();
-    // Not a step: one undo takes back A's volume and leaves nothing to undo.
-    engine.undo();
-    expect(engine.canUndo).toBe(false);
-
-    releaseDecode(makeAudioBuffer());
-    await pending;
-    await editor.updateComplete;
-
-    const entered = engine.getState().tracks.find((t: any) => t.id === bId);
-    expect(entered.volume).toBe(0.3);
-    expect(controlsFor(editor, bId).volume).toBe(0.3);
-    // The seed is gone once the arrangement holds the track.
-    expect(editor._seedMix.has(bId)).toBe(false);
-  });
-
-  it('a control moved while the load waits for the engine is the volume the track enters with', async () => {
-    const { editor } = await makeEditor();
-    const engine = await editor.ready();
-    // A first statechange, as a loaded track would have brought: the
-    // editor's first one always refreshes its engine-track cache.
-    engine.setTracks([]);
-    // Hold the load at its last await, after the track is built.
-    let release!: () => void;
-    editor._ensureEngine = () =>
-      new Promise((resolve) => {
-        release = () => resolve(engine);
-      });
-    const pending = editor.addTrack(midiTrackConfig('A', 0.8));
-    await vi.waitFor(() => expect(release).toBeDefined());
-    const id = [...editor._tracks.keys()][0] as string;
-
-    moveControl(editor, id, 'volume', 0.3);
-    release();
-    await pending;
-
-    expect(engine.getState().tracks.find((t: any) => t.id === id).volume).toBe(0.3);
-    expect(editor.tracks[0].volume).toBe(0.3);
-  });
-
   it('a synthesized descriptor after an undo has no mixer fields of its own', async () => {
     const { editor } = await makeEditor();
-    await editor.addTrack(midiTrackConfig('A'));
-    const b = await editor.addTrack(midiTrackConfig('B', 0.6));
+    await addBaseTrack(editor, midiTrackConfig('A'));
+    const b = await addBaseTrack(editor, midiTrackConfig('B', 0.6));
     const bId: string = b.trackId;
 
     b.remove(); // the MutationObserver removes the track from the engine
@@ -246,7 +169,7 @@ describe('<daw-editor> track updates and undo steps (#843)', () => {
 
   it("a name change after an undo does not write the element's volume back", async () => {
     const { editor } = await makeEditor();
-    const trackEl = await editor.addTrack(midiTrackConfig('A', 0.8));
+    const trackEl = await addBaseTrack(editor, midiTrackConfig('A', 0.8));
     const id: string = trackEl.trackId;
     const engine = editor.engine;
 
@@ -269,7 +192,7 @@ describe('<daw-editor> track updates and undo steps (#843)', () => {
 
   it('setting volume and pan in one update is one step', async () => {
     const { editor } = await makeEditor();
-    const trackEl = await editor.addTrack(midiTrackConfig('A', 0.8));
+    const trackEl = await addBaseTrack(editor, midiTrackConfig('A', 0.8));
     const id: string = trackEl.trackId;
     const engine = editor.engine;
 
@@ -287,7 +210,7 @@ describe('<daw-editor> track updates and undo steps (#843)', () => {
 
   it('two updates of the element are two steps', async () => {
     const { editor } = await makeEditor();
-    const trackEl = await editor.addTrack(midiTrackConfig('A', 0.8));
+    const trackEl = await addBaseTrack(editor, midiTrackConfig('A', 0.8));
     const id: string = trackEl.trackId;
     const engine = editor.engine;
 
@@ -304,7 +227,7 @@ describe('<daw-editor> track updates and undo steps (#843)', () => {
 
   it('editor.updateTrack(id, { volume, pan }) is one step, with an element', async () => {
     const { editor } = await makeEditor();
-    const trackEl = await editor.addTrack(midiTrackConfig('A', 0.8));
+    const trackEl = await addBaseTrack(editor, midiTrackConfig('A', 0.8));
     const id: string = trackEl.trackId;
     const engine = editor.engine;
 
@@ -323,7 +246,7 @@ describe('<daw-editor> track updates and undo steps (#843)', () => {
   // property fires no Lit update: updateTrack writes the mix itself.
   it('editor.updateTrack applies a value again after an undo took it back, with an element', async () => {
     const { editor } = await makeEditor();
-    const trackEl = await editor.addTrack(midiTrackConfig('A', 1));
+    const trackEl = await addBaseTrack(editor, midiTrackConfig('A', 1));
     const id: string = trackEl.trackId;
     const engine = editor.engine;
 
@@ -344,7 +267,7 @@ describe('<daw-editor> track updates and undo steps (#843)', () => {
 
   it('editor.updateTrack applies a mute again after an undo took it back, with an element', async () => {
     const { editor } = await makeEditor();
-    const trackEl = await editor.addTrack(midiTrackConfig('A'));
+    const trackEl = await addBaseTrack(editor, midiTrackConfig('A'));
     const id: string = trackEl.trackId;
     const engine = editor.engine;
     const mutedOf = () => engine.getState().tracks.find((t: any) => t.id === id).muted;
@@ -363,7 +286,7 @@ describe('<daw-editor> track updates and undo steps (#843)', () => {
 
   it("editor.updateTrack to the element's value after a control drag applies it", async () => {
     const { editor } = await makeEditor();
-    const trackEl = await editor.addTrack(midiTrackConfig('A', 1));
+    const trackEl = await addBaseTrack(editor, midiTrackConfig('A', 1));
     const id: string = trackEl.trackId;
     const engine = editor.engine;
 
@@ -380,7 +303,7 @@ describe('<daw-editor> track updates and undo steps (#843)', () => {
 
   it('editor.updateTrack(id, { volume, pan }) is one step, without an element', async () => {
     const { editor } = await makeEditor();
-    const trackEl = await editor.addTrack(midiTrackConfig('A', 0.8));
+    const trackEl = await addBaseTrack(editor, midiTrackConfig('A', 0.8));
     const id: string = trackEl.trackId;
     const engine = editor.engine;
     // As a file drop: a track the editor holds with no <daw-track>.
@@ -393,34 +316,6 @@ describe('<daw-editor> track updates and undo steps (#843)', () => {
     engine.undo();
     expect(volumeOf(editor, id)).toBe(0.8);
     expect(panOf(editor, id)).toBe(0);
-    expect(engine.canUndo).toBe(false);
-  });
-
-  it('editor.updateTrack on a loading track without an element changes the seed, not the history', async () => {
-    const { editor } = await makeEditor();
-    stubPeakPipeline(editor);
-    const engine = await editor.ready();
-    let releaseDecode!: (b: AudioBuffer) => void;
-    editor._fetchAndDecode = vi.fn(
-      () =>
-        new Promise<AudioBuffer>((resolve) => {
-          releaseDecode = resolve;
-        })
-    );
-    const setVolume = vi.spyOn(engine, 'setTrackVolume');
-    const pending = editor.addTrack({ name: 'B', volume: 0.8, clips: [{ src: '/b.opus' }] });
-    await vi.waitFor(() => expect(editor._fetchAndDecode).toHaveBeenCalled());
-    const id = [...editor._tracks.keys()][0] as string;
-    editor._trackElements.delete(id);
-
-    editor.updateTrack(id, { volume: 0.3, pan: 0.5 });
-    expect(setVolume).not.toHaveBeenCalled();
-    expect(editor._seedMix.get(id)).toMatchObject({ volume: 0.3, pan: 0.5 });
-
-    releaseDecode(makeAudioBuffer());
-    await pending;
-    expect(volumeOf(editor, id)).toBe(0.3);
-    expect(panOf(editor, id)).toBe(0.5);
     expect(engine.canUndo).toBe(false);
   });
 });
@@ -445,7 +340,7 @@ describe('<daw-editor> control gestures (#843)', () => {
   }
   async function editorWithTrack() {
     const { editor } = await makeEditor();
-    const trackEl = await editor.addTrack(midiTrackConfig('A', 0.8));
+    const trackEl = await addBaseTrack(editor, midiTrackConfig('A', 0.8));
     await editor.updateComplete;
     return { editor, id: trackEl.trackId as string, engine: editor.engine };
   }

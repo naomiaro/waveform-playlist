@@ -51,7 +51,6 @@ function createMockHost() {
     samplesPerPixel: 1024,
     renderSamplesPerPixel: 1024,
     effectiveSampleRate: 48000,
-    resolveAudioContextSampleRate: vi.fn(),
     _addRecordedClip: vi.fn(),
     play: vi.fn(() => Promise.resolve()),
     stop: vi.fn(),
@@ -247,22 +246,12 @@ describe('RecordingController', () => {
     warnSpy.mockRestore();
   });
 
-  it('resolves editor sampleRate from AudioContext on start', async () => {
-    host.audioContext.sampleRate = 44100;
-    const controller = new RecordingController(host);
-    await controller.startRecording(createMockStream(), { trackId: 'track-1' });
-
-    expect(host.resolveAudioContextSampleRate).toHaveBeenCalledWith(44100);
-  });
-
-  it('computes startSample using resolved effectiveSampleRate', async () => {
-    // Simulate: host effectiveSampleRate updated by resolveAudioContextSampleRate
+  // #848: the editor's rate is its adapter context's, so the controller has
+  // nothing to resolve (resolveAudioContextSampleRate is gone).
+  it('computes startSample using the editor effectiveSampleRate', async () => {
     host.audioContext.sampleRate = 44100;
     host.currentTime = 2.0;
     host.effectiveSampleRate = 44100;
-    host.resolveAudioContextSampleRate = vi.fn(() => {
-      host.effectiveSampleRate = 44100;
-    });
 
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });
@@ -1229,8 +1218,7 @@ describe('RecordingController', () => {
   it('labels the recorded AudioBuffer with the capture-time context rate (#576)', async () => {
     const { createAudioBuffer } = await import('@waveform-playlist/core');
     vi.mocked(createAudioBuffer).mockClear();
-    // Capture context runs at 44100; the editor-space sticky rate lags at 48000
-    // (resolveAudioContextSampleRate only sets it when unset).
+    // Capture context runs at 44100 while the editor-space rate says 48000.
     host.audioContext.sampleRate = 44100;
     host.effectiveSampleRate = 48000;
 

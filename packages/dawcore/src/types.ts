@@ -96,8 +96,8 @@ interface BaseClipDescriptor {
 /**
  * A clip descriptor sourced from a `<daw-clip>` DOM element. `clipId` is
  * always set — `<daw-clip>.clipId` is a `crypto.randomUUID()` generated at
- * construction. Engine `clip.id` is aligned with this id in `_loadTrack`
- * and `_loadAndAppendClip` so DOM and engine reference the same clip.
+ * construction. The arrangement clip's id is this id (`buildArrangementTrack`,
+ * `_loadAndAppendClip`), so the DOM and the arrangement name the same clip.
  */
 export interface DomClipDescriptor extends BaseClipDescriptor {
   kind: 'dom';
@@ -107,16 +107,18 @@ export interface DomClipDescriptor extends BaseClipDescriptor {
 /**
  * A clip descriptor synthesized from a non-DOM source — file drops, the
  * `<daw-track src>` shorthand fallback, or recording-clip insertion. There
- * is no DOM element to align with; the engine generates its own id at
- * clip-creation time.
+ * is no DOM element to align with.
  *
- * `clipId` is that engine clip id when the editor knows it at descriptor
- * creation — currently recorded takes (#659). Pass it to
- * `editor.updateClip()` / `removeClip()` to address the clip.
+ * `clipId` is the arrangement clip's id: set at creation for a recorded take
+ * (#659), and written in when a dropped file or the shorthand enters the
+ * arrangement (#848). Pass it to `editor.updateClip()` / `removeClip()` to
+ * address the clip.
  */
 export interface DropClipDescriptor extends BaseClipDescriptor {
   kind: 'drop';
   clipId?: string;
+  /** A dropped file the clip loads (`src` is then ''): a File cannot be an attribute (#848). */
+  file?: File;
 }
 
 export type ClipDescriptor = DomClipDescriptor | DropClipDescriptor;

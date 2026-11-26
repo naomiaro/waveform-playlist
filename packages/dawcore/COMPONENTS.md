@@ -26,28 +26,30 @@ The central orchestrator. Manages the audio engine, loads tracks, renders wavefo
 | `interactive-clips`     | boolean | `false` | Enable clip move/trim/split interactions                                                                                                                       |
 | `indefinite-playback`   | boolean | `false` | Disable the end-of-timeline auto-stop — roll until explicit stop (DAW style). Implies `fill-viewport`. Recording sessions suppress the auto-stop automatically |
 | `fill-viewport`         | boolean | `false` | Timeline fills the visible viewport even when audio is shorter (layout only)                                                                                   |
-| `sample-rate`           | number  | `48000` | Sample rate hint for AudioContext and peaks matching                                                                                                           |
 | `track-reordering`      | boolean | `false` | Show a drag grip + move up/down buttons on `<daw-track-controls>` for vertical track reordering (drag and buttons both undoable)                               |
 
 **JS Properties:**
 
 | Property          | Type                   | Description                                                                                                                                                              |
 | ----------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `audioContext`    | `AudioContext \| null` | Custom AudioContext for decode, playback, and recording. Set before tracks load.                                                                                         |
+| `adapter`         | `PlayoutAdapter \| null` | The audio backend (`NativePlayoutAdapter` from `@dawcore/transport`, or `createToneAdapter()` from `@waveform-playlist/playout`). The engine is built as soon as the editor is connected with one; tracks wait for it, silently (`play()` without one warns and fires `daw-error` with `operation: 'play'` and the no-adapter error). `null` after the editor is removed from the document once an engine had been built (the engine disposed it): set a fresh one when the editor is inserted again. |
+| `audioContext`    | `AudioContext`         | Read-only: the adapter's AudioContext, used for decoding and recording. Throws when no adapter is set.                                                   |
 | `recordingStream` | `MediaStream \| null`  | Mic stream for recording. Consumer provides via `getUserMedia`.                                                                                                          |
-| `tracks`          | `TrackWithId[]`        | Read-only. Every track's id, descriptor and mix. The mix is the arrangement's, so it follows Undo and Redo; a track still loading reports the values it will enter with. |
+| `tracks`          | `TrackWithId[]`        | Read-only. Every track's id, descriptor and mix: the tracks of the arrangement, in its order, then those waiting for `editor.adapter` (with the values their elements declare). The mix is the arrangement's, so it follows Undo and Redo, and a track an Undo took out is not listed until a Redo brings it back. |
 | `samplesPerPixel` | number                 | Zoom level (same as attribute, but with validation and clamping)                                                                                                         |
 
 **Methods:**
 
 | Method                           | Returns                    | Description                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | -------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `loadFiles(files)`               | `Promise<LoadFilesResult>` | Load audio files as new tracks                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `addTrack(config)`               | `Promise<string>`          | Append a `<daw-track>` built from `config` (`name`, `kind`, the mix, `renderMode`, `clips`, `midi`); resolves with its track id once the track has entered the editor, before its audio has loaded. Add a `daw-track-ready` / `daw-track-error` listener BEFORE calling it: for a track with nothing to fetch, or whose audio is already loaded, the event fires before the promise resolves. Waits for `editor.adapter` when none is set. An undo step. |
+| `retryTrack(trackId)`            | `void`                     | Load again every source of the track whose load failed. `daw-track-ready` follows when it loads. A source that loaded but could not make a clip (an offset past its end) is not loaded again. |
+| `loadFiles(files)`               | `Promise<LoadFilesResult>` | Add each audio file as a track with no `<daw-track>` element (its clip's source is the `File`), one after another, and resolve once each has loaded or failed. A file that cannot be loaded is removed again, with no undo step. When the editor is removed from the document meanwhile, it resolves at once: a file whose track has entered and is still loading is kept and listed in `loaded` (it loads after a reparent), a file still waiting to enter and the files not started are listed in `failed`. |
 | `startRecording(stream?)`        | `Promise<void>`            | Start recording on selected track                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `stopRecording()`                | `void`                     | Stop recording                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `pauseRecording()`               | `void`                     | Pause recording                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | `resumeRecording()`              | `void`                     | Resume recording                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `updateTrack(trackId, partial)`  | `void`                     | Change a track's `name`, `renderMode`, `volume`, `pan`, `muted` or `soloed`. The mixer fields go to the track's mix directly, so a value takes effect also when a `<daw-track>` element already holds it (after an Undo); a track with an element gets the values written to the element too. The mixer fields of one call are one undo step; while the track is loading they set the values it enters with, which is not a step. |
+| `updateTrack(trackId, partial)`  | `void`                     | Change a track's `name`, `renderMode`, `volume`, `pan`, `muted` or `soloed`. The mixer fields go to the track's mix directly, so a value takes effect also when a `<daw-track>` element already holds it (after an Undo); a track with an element gets the values written to the element too. The mixer fields of one call are one undo step. |
 | `reorderTrack(trackId, toIndex)` | `void`                     | Move a track to a new position in the vertical order (0-based, among `<daw-track>` elements). Element-backed tracks move their DOM element (the MutationObserver syncs the engine); element-less tracks reorder the engine directly. Undoable.                                                                                                                                                                                    |
 
 **Events:**
@@ -61,8 +63,10 @@ The central orchestrator. Manages the audio engine, loads tracks, renders wavefo
 | `daw-selection`          | `{ start, end }`                                                        | Selection region changed                                                                                       |
 | `daw-track-select`       | `{ trackId }`                                                           | Track selected                                                                                                 |
 | `daw-track-connected`    | `{ trackId }`                                                           | Track element connected to DOM                                                                                 |
-| `daw-track-ready`        | `{ trackId }`                                                           | Track audio loaded and peaks rendered                                                                          |
-| `daw-track-error`        | `{ trackId, error }`                                                    | Track failed to load                                                                                           |
+| `daw-track-ready`        | `{ trackId }`                                                           | The track's audio has loaded (its peaks are drawn a moment later), or the track asked for no audio. Fires again each time the track has loaded again after loading or failing (a clip added later, `retryTrack`) |
+| `daw-track-error`        | `{ trackId, error }`                                                    | Every clip of the track failed to load (or was refused for its kind). The track stays in the editor; its clip is drawn failed where its length is known |
+| `daw-clip-ready`         | `{ trackId, clipId }`                                                   | A clip's audio has loaded |
+| `daw-clip-error`         | `{ trackId, clipId, error }`                                            | A clip's audio failed to load, or the clip was refused (a clip of the other kind than its track) |
 | `daw-track-control`      | `{ trackId, prop, value, gesture? }`                                    | Volume, pan, mute or solo changed; `gesture`: the slider's id (one drag or key press is one undo step)         |
 | `daw-track-remove`       | `{ trackId }`                                                           | Track removed                                                                                                  |
 | `daw-track-reorder`      | `{ trackId, fromIndex, toIndex }`                                       | Move up/down button clicked on `<daw-track-controls>` (bubbles to the editor, which calls `reorderTrack`)      |
@@ -374,11 +378,11 @@ Render-less element that adds keyboard shortcuts to the editor. Must be a direct
 
 ## Engine Lifecycle
 
-1. Import `@dawcore/components` registers all custom elements
-2. `<daw-track>` connects to DOM → dispatches `daw-track-connected`
-3. `<daw-editor>` receives event → fetches + decodes audio → generates peaks
-4. First track load creates `PlaylistEngine` + audio adapter (lazy)
-5. Waveforms render immediately from peaks (no play required)
+1. Import `@dawcore/components` registers all custom elements. A `<daw-editor>` owns an arrangement (`createArrangement()` from `@waveform-playlist/engine`) from the moment it is created.
+2. Setting `editor.adapter` on a connected editor (or connecting an editor that has one) builds the `PlaylistEngine` on that arrangement. Without an adapter, tracks wait.
+3. `<daw-track>` connects to the DOM → dispatches `daw-track-connected` → enters the arrangement at its DOM position, each audio `<daw-clip>` as a loading clip. The arrangement fetches and decodes; `daw-clip-ready` / `daw-track-ready` (or `daw-clip-error` / `daw-track-error`) follow.
+4. A clip still loading is drawn dimmed where its length is known (a `duration`, or its `peaks-src` `.dat`); a clip whose audio failed stays, drawn failed where its length is known, until `retryTrack(trackId)` loads it or the app removes the track.
+5. Waveforms render from peaks as each clip loads (no play required)
 6. First play click resumes `AudioContext` (user gesture requirement)
 
 ## Undo and Escape During a Drag
@@ -393,13 +397,13 @@ Mixer moves are undo steps, like clip and track edits: a control gesture, a `<da
 
 **A take mutes the track it records onto.** During a take the recorded track plays muted (`engine.setTrackRecording`): its controls and `editor.tracks` show it muted, and `exportAudio()` during the take leaves it out. The take's mute is not an undo step and does not change the track's own mute: a mute set during the take (through the element, `updateTrack` or the engine) stays after it, and the take's end only clears the take's mute.
 
-**Loading a track clears the history (#848).** Every track load ends in `engine.setTracks`, which starts a new undo history. Steps made while a track is still loading, mixer moves included, cannot be undone once it has finished; the same happens when a track is added later, a file is dropped or a `src` changes.
+**Loading does not clear the history (#848).** A track is in the arrangement while its audio loads, so a step made meanwhile, a mixer move included, stays undoable. A `<daw-track>` element of the page that enters while the history is empty is not an undo step (Undo right after load removes nothing); one the page adds once the history has steps, a track from `editor.addTrack()` or `loadMidi()`, and a file drop are one undo step each. A page that adds its starting content with `addTrack()` calls `editor.engine.clearHistory()` after it if Undo right after load should remove nothing.
 
 ## File Drop
 
 When `file-drop` is enabled, drag audio files onto the editor:
 
-- Each file creates a new track
+- Each file creates a new track with no `<daw-track>` element (its clip's source is the `File`); a file that cannot be loaded is removed again, with no undo step
 - Supports any format the browser can decode (mp3, wav, ogg, opus, flac, etc.)
 - Files with non-audio MIME types are rejected
 - `daw-files-load-error` event fired for individual failures

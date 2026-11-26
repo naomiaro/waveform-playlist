@@ -83,8 +83,7 @@ describe('<daw-editor> mixer-change persistence (#501)', () => {
     document.body.appendChild(editor);
 
     // Add track A and mute it via the track-controls UI path.
-    const trackAEl = await editor.addTrack(midiTrackConfig('A'));
-    const trackAId: string = trackAEl.trackId;
+    const trackAId: string = await editor.addTrack(midiTrackConfig('A'));
 
     editor.dispatchEvent(
       new CustomEvent('daw-track-control', {
@@ -97,7 +96,8 @@ describe('<daw-editor> mixer-change persistence (#501)', () => {
     // The engine cache should reflect the mute synchronously (statechange fired).
     expect(editor._engineTracks.get(trackAId).muted).toBe(true);
 
-    // Adding an unrelated track rebuilds the engine from `_engineTracks`.
+    // Adding an unrelated track rebuilds the adapter's tracks (this adapter has
+    // no addTrack, so the engine sends them all with setTracks).
     adapter.setTracks.mockClear();
     await editor.addTrack(midiTrackConfig('B'));
 
@@ -116,8 +116,7 @@ describe('<daw-editor> mixer-change persistence (#501)', () => {
     editor.adapter = adapter;
     document.body.appendChild(editor);
 
-    const trackAEl = await editor.addTrack(midiTrackConfig('A'));
-    const trackAId: string = trackAEl.trackId;
+    const trackAId: string = await editor.addTrack(midiTrackConfig('A'));
 
     // Stand in an effects manager so we can observe rewireTrackChains() — the
     // live audio-graph reconnect that must NOT run on every mixer change (#501).

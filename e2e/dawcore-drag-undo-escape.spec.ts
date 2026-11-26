@@ -88,7 +88,13 @@ test.describe('dawcore: undo and Escape during a drag (#848)', () => {
         return (
           !!editor?.engine &&
           editor.engine.getState().tracks.length === count &&
-          (editor.shadowRoot?.querySelectorAll('daw-track-controls').length ?? 0) === count
+          (editor.shadowRoot?.querySelectorAll('daw-track-controls').length ?? 0) === count &&
+          // Tracks enter before their audio has loaded (#848): wait for every source.
+          !(
+            editor as unknown as {
+              _arrangement: { sources: { getSnapshot(): { isLoading: boolean } } };
+            }
+          )._arrangement.sources.getSnapshot().isLoading
         );
       },
       TRACK_COUNT,

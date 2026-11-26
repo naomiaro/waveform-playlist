@@ -461,6 +461,8 @@ daw-editor {
   --daw-controls-text: #e0d4c8;
   --daw-clip-header-background: rgba(0, 0, 0, 0.4);
   --daw-clip-header-text: #e0d4c8;
+  --daw-placeholder-clip-opacity: 0.5; /* a clip whose audio is still loading */
+  --daw-clip-failed-color: #e06c75; /* the outline and tint of a clip whose audio failed */
   --daw-controls-width: 180px;
   --daw-min-height: 200px;
   --daw-piano-roll-note-color: #2a7070;
@@ -510,7 +512,7 @@ Methods:
 
 ### `<daw-track>`
 
-Declarative track data. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`, `kind` (`'audio' | 'midi'`, default `'audio'`: what the track holds; set it before the track is added), `render-mode` (`'waveform' | 'spectrogram'`, default `'waveform'`: how an audio track is drawn; a MIDI track is always a piano roll). JS property: `spectrogramConfig` (per-track spectrogram override). Also exposes the per-track effects API (see [Effects](#effects)). Fires `daw-track-update` `{ trackId, changed }` after a property changes (`changed` names them). A `volume`, `pan`, `muted` or `soloed` change after the track has loaded is one undo step per update; while it loads, the change sets the values it enters with. The editor does not write the element back after an Undo: read the restored mix from `editor.tracks`. Every track load clears the undo history (a known limit, #848), so steps made while a track is still loading cannot be undone once it has finished.
+Declarative track data. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`, `kind` (`'audio' | 'midi'`, default `'audio'`: what the track holds; set it before the track is added), `render-mode` (`'waveform' | 'spectrogram'`, default `'waveform'`: how an audio track is drawn; a MIDI track is always a piano roll). JS property: `spectrogramConfig` (per-track spectrogram override). Also exposes the per-track effects API (see [Effects](#effects)). Fires `daw-track-update` `{ trackId, changed }` after a property changes (`changed` names them). A `volume`, `pan`, `muted` or `soloed` change is one undo step per update, also while the track loads. The editor does not write the element back after an Undo: read the restored mix from `editor.tracks`. Loading does not clear the undo history.
 
 ### `<daw-clip>`
 

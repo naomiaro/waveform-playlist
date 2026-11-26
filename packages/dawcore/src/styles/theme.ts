@@ -28,6 +28,18 @@ export const clipStyles = css`
     position: absolute;
     overflow: hidden;
   }
+  /* A clip whose audio is still loading (#848). */
+  .clip-container.placeholder {
+    opacity: var(--daw-placeholder-clip-opacity, 0.5);
+    background: color-mix(in srgb, var(--daw-wave-color, #c49a6c) 35%, transparent);
+  }
+  /* A clip whose audio failed to load: it stays, like a broken <img>. */
+  .clip-container.placeholder.failed {
+    opacity: 1;
+    background: color-mix(in srgb, var(--daw-clip-failed-color, #e06c75) 15%, transparent);
+    outline: 2px dashed var(--daw-clip-failed-color, #e06c75);
+    outline-offset: -2px;
+  }
   .clip-header {
     position: relative;
     z-index: 1;

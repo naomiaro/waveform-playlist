@@ -51,7 +51,7 @@
     "@dawcore/transport": ">=0.0.16-0",
     "@dawcore/wam": ">=0.0.1 || >=0.0.5-0",
     "@waveform-playlist/core": ">=12.7.0 || >=13.0.0-0",
-    "@waveform-playlist/engine": ">=13.5.0 || >=14.0.0-0",
+    "@waveform-playlist/engine": ">=14.0.0-next.3",
     "@waveform-playlist/worklets": ">=12.0.0 || >=13.0.1-0 || >=13.1.0-0 || >=14.0.0-0"
   },
   "peerDependenciesMeta": {

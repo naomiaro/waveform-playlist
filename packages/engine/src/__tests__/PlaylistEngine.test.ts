@@ -148,6 +148,14 @@ describe('PlaylistEngine', () => {
       engine.dispose();
     });
 
+    it('addTrack passes the index on to the arrangement (#848)', () => {
+      engine.addTrack(makeTrack('t1', []));
+      engine.addTrack(makeTrack('t2', []));
+      engine.addTrack(makeTrack('t3', []), { index: 0 });
+      expect(engine.getState().tracks.map((t) => t.id)).toEqual(['t3', 't1', 't2']);
+      engine.dispose();
+    });
+
     it('addTrack uses adapter.addTrack when available', () => {
       const mockAddTrack = vi.fn();
       const mockSetTracks = vi.fn();

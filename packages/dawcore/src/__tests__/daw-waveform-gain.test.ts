@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeAll, vi, beforeEach, afterEach } from 'vitest';
+import { createClip, createTrack } from '@waveform-playlist/core';
+import { makeFakeAdapter } from './helpers/editor-harness';
 
 // #662: a clip's waveform is drawn from its source audio, so a clip at
 // +17 dB looked identical to one at 0 dB. <daw-waveform gain> scales the
@@ -155,22 +157,26 @@ describe('<daw-editor gain-scaled-waveforms>', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const editor = document.createElement('daw-editor') as any;
     for (const [k, v] of Object.entries(attrs)) editor.setAttribute(k, v);
-    editor.adapter = { audioContext: { state: 'running', sampleRate: 48000 } };
+    editor.adapter = makeFakeAdapter().adapter;
     document.body.appendChild(editor);
     mounted.push(editor);
     const clip = (id: string, startSample: number, gain: number) => ({
+      ...createClip({
+        startSample,
+        durationSamples: 48000,
+        offsetSamples: 0,
+        sampleRate: 48000,
+        sourceDurationSamples: 48000,
+        gain,
+        name: id,
+      }),
       id,
-      startSample,
-      durationSamples: 48000,
-      offsetSamples: 0,
-      sampleRate: 48000,
-      sourceDurationSamples: 48000,
-      gain,
-      name: id,
     });
-    editor._engineTracks = new Map([
-      ['t1', { id: 't1', name: 'T', clips: [clip('loud', 0, 2), clip('unity', 48000, 1)] }],
-    ]);
+    // The rows are the arrangement's tracks (#848).
+    editor._arrangement.addTrack({
+      ...createTrack({ name: 'T', clips: [clip('loud', 0, 2), clip('unity', 48000, 1)] }),
+      id: 't1',
+    });
     return editor;
   }
 

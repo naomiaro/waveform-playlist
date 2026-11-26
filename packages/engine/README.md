@@ -111,7 +111,7 @@ A `setTempo` places every clip that has a tick on the tick grid of the engine it
 
 A different tempo is not converted. A tick is the musical position, so an engine built at another tempo than the one the ticks were made under has clips whose `startSample` and `startTick` disagree until the next `setTempo`, which moves `startSample` to follow the tick. Clips added under the new engine get their ticks at its tempo and keep their place at that `setTempo`, while the older ones move.
 
-An arrangement plays through one engine at a time: building a second engine on it while the first has not been disposed logs a warning. Two engines alive on one arrangement is unsupported, in particular with different `ppqn`: the second engine's time base replaces the first's, so ticks the first engine gives later are computed with the second engine's. The engine's own `undoLimit` option is ignored, with a warning, when an arrangement is passed; set it on `createArrangement({ undoLimit })`. The `arrangement` option accepts only an arrangement made by `createArrangement()`. The engine recognises one by a versioned `Symbol.for` key and not by `instanceof`, so an arrangement made by another installed copy of this package (an app and a library that pin different versions) is accepted as long as both copies use the same key version. The key version changed with the mixer undo steps (`/v2`): an engine and an arrangement from copies on either side of that change refuse each other.
+An arrangement plays through one engine at a time: building a second engine on it while the first has not been disposed logs a warning. Two engines alive on one arrangement is unsupported, in particular with different `ppqn`: the second engine's time base replaces the first's, so ticks the first engine gives later are computed with the second engine's. The engine's own `undoLimit` option is ignored, with a warning, when an arrangement is passed; set it on `createArrangement({ undoLimit })`. The `arrangement` option accepts only an arrangement made by `createArrangement()`. The engine recognises one by a versioned `Symbol.for` key and not by `instanceof`, so an arrangement made by another installed copy of this package (an app and a library that pin different versions) is accepted as long as both copies use the same key version. The key version changed with the mixer undo steps (`/v2`) and again with `addTrack`'s `index` (`/v3`): an engine and an arrangement from copies on either side of such a change refuse each other.
 
 The engine's track, clip, mixer, recording and history methods call the arrangement's, so a change made through either reaches the adapter and emits `statechange`. The arrangement's `removeTrack` also takes `{ undoable: false }` (no undo step, and the track is taken out of every undo and redo state, so no undo brings it back: for a dropped file that could not be decoded), and its `updateTrack` takes a function of the current track: `arrangement.updateTrack(id, (track) => ({ ...track, name: 'Bass' }))`.
 
@@ -255,7 +255,7 @@ class PlaylistEngine {
 
   // Tracks
   setTracks(tracks: readonly ClipTrack[]): void; // replaces every track, clears the undo history
-  addTrack(track: ClipTrack): void;
+  addTrack(track: ClipTrack, options?: AddTrackOptions): void; // { index }: where it enters (default: the end)
   removeTrack(trackId: string): void;
   updateTrack(trackId: string, track?: ClipTrack): void; // with a track: replace it; without: send the current one to the adapter again
   reorderTrack(trackId: string, toIndex: number): void;
@@ -333,7 +333,7 @@ interface Arrangement {
 
   // tracks
   setTracks(tracks: readonly ArrangementTrack[]): void;
-  addTrack(track: ArrangementTrack): void;
+  addTrack(track: ArrangementTrack, options?: AddTrackOptions): void; // { index }: where it enters (default: the end)
   removeTrack(trackId: string, options?: RemoveTrackOptions): void;
   updateTrack(
     trackId: string,
