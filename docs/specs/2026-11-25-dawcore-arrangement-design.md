@@ -189,7 +189,8 @@ Independent of PRs 2 and 3.
   by drag start and end only, and survive a drag that ends by unmount.
 
 **Not covered:** a change to the arrangement made by the app during a drag
-(an agent calling `arrangement.undo()` mid-drag). That is PR 3, below.
+(an agent calling `arrangement.undo()` mid-drag). That is PR 3, below, for
+both editors.
 
 ## PR 2: the arrangement from the start; loading through it
 
@@ -393,9 +394,16 @@ DOM order is not synced.
   array until the tracks change; untouched tracks keep their object), and the
   descriptors keep only the editor-only fields.
 - `editor.tracks` reads the arrangement's order and mix.
-- A change to the arrangement made elsewhere while a drag is in progress (an
-  app or agent calling `undo()`, `reorderTrack`, `removeTrack`) cancels the
-  drag, like `pointercancel`. Whether the clip drag keeps writing every
+- **A change to the arrangement made elsewhere while a drag is in progress
+  (an app or agent calling `undo()`, `reorderTrack`, `removeTrack`) cancels
+  the drag, like `pointercancel`, in BOTH editors (decided, 2026-11-25,
+  option a).** The outside change goes through. React apps already hold the
+  arrangement, so the React drags (clip move and trim in
+  `useClipDragHandlers`, the track reorder in `ClipInteractionProvider`)
+  get the same rule in PR 3. Rejected: b) a lock in the arrangement that
+  refuses `undo` / `redo` from anyone during a drag (new engine API, and
+  other outside changes would still need a); c) leaving it to the app.
+  PR 1's guards stay: they cover the editor's own undo and redo. Whether the clip drag keeps writing every
   pointer move into the arrangement inside a transaction, or moves to React's
   model (a view-only preview and one call on release, #864) so that its own
   writes cannot be confused with someone else's, is for the plan.
