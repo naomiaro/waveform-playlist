@@ -94,6 +94,7 @@
     "split-contexts-by-change-rate",
     "stable-controls-value",
     "stable-drag-handlers-keydown",
+    "steady-empty-timeline-zoom",
     "tone-next-sample-rate",
     "touch-optimized-single-source",
     "track-control-parts",
