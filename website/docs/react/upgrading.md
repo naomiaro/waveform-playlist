@@ -2683,6 +2683,17 @@ Do this only where it helps pointer users and the button is still reachable with
 
 If you call `handleKeyboardEvent` yourself, the rule is applied for you. For your own key listeners, `keyBelongsToFocusedControl(event)` from `@waveform-playlist/core` answers the same question.
 
+## Undo and Escape during a drag (#848)
+
+**Packages:** `@waveform-playlist/core` (`handleKeyboardEvent`), `@waveform-playlist/browser` (`useEditorControls`, `<KeyboardShortcuts>`, `useClipDragHandlers`, `ClipInteractionProvider`)
+
+- **Undo and redo do nothing while a clip move, a clip trim or a track-reorder drag is in progress:** the keys of `<KeyboardShortcuts undo />` and `useEditorControls().undo()` / `redo()`. Before, an undo pressed with the mouse button held undid the step before the drag, and the drop then landed the clip away from the pointer; during a track drag it left the control panels' DOM (tab) order out of step with the screen. The arrangement's own `undo()` is not stopped.
+- **An Escape that something other than a shortcut has already handled fires no shortcut.** `handleKeyboardEvent` skips an Escape whose default was prevented before it ran, unless a shortcut list prevented it (two lists that both bind Escape both run, as before). This is how Escape during a drag only cancels the drag: dnd-kit prevents the key's default when it cancels, so Stop and the annotation deselect do not also run, and a second Escape does them as usual.
+
+**Find:** code of yours that calls `preventDefault()` on an Escape `keydown` before the library's listener sees it (a listener on an element, or on `window` in the capture phase), for example to close a menu or popup, and that expects Escape to stop playback as well.
+
+**Replace with:** don't call `preventDefault()` on that Escape if Stop should run too; or call the action yourself (`usePlaybackControls().stop()`).
+
 ## Meter levels and recording progress are sources, not state
 
 **Packages:** `@waveform-playlist/browser` (`useOutputMeter`, `<Waveform recordingState>`), `@waveform-playlist/recording` (`useMicrophoneLevel`, `useRecording`, `useIntegratedRecording`). New types in `@waveform-playlist/core`; new hooks in `@waveform-playlist/ui-components` and `@waveform-playlist/recording`.
@@ -3610,12 +3621,7 @@ Between `beginTransaction()` and `commitTransaction()`, `undo()` and `redo()` no
 
 After an `undo()` that aborted the transaction there is no transaction any more. A drag handler that goes on calling `moveClip(…, skipAdapter)` for later pointer moves makes each of them an undo step of its own, and its `commitTransaction()` or `abortTransaction()` at the end logs a console warning and does nothing. A host that offers undo during a drag has to cancel the gesture when undo is pressed (stop handling its pointer moves), or not offer undo while a drag is in progress.
 
-Both built-in editors offer undo during a clip drag, and neither cancels the gesture ([#848](https://github.com/naomiaro/waveform-playlist/issues/848)). Run in Chromium with Cmd+Z pressed while the mouse button was held:
-
-- `<daw-editor>` with `<daw-keyboard-shortcuts undo>`: after the key, each further pointer move of a clip move is an undo step of its own, and the release logs the `commitTransaction` warning.
-- `<WaveformEditor />` with `<KeyboardShortcuts undo />`: the move or trim is applied once at the release, as one undo step, and the release logs the same warning.
-
-In both, the clip does not end where the pointer released it: the drag's distance is applied to the position the undo restored. That part is not new in this version; it happens in the version before as well, where the undo after such a drag returned to a state that had already been undone.
+The built-in editors do not offer undo during a drag ([#848](https://github.com/naomiaro/waveform-playlist/issues/848)): `<WaveformEditor />`'s `useEditorControls().undo()` / `redo()` and `<KeyboardShortcuts undo />` do nothing while a clip move, a clip trim or a track-reorder drag is in progress (see [Undo and Escape during a drag](#undo-and-escape-during-a-drag-848)), and `<daw-editor>` does the same and opens its drag's transaction only when the pointer has passed the drag threshold. Escape cancels the drag in both. A call to the arrangement's or the engine's own `undo()` is not stopped and still aborts a drag's transaction this way.
 
 ### The arrangement's own API: clips that are still loading
 

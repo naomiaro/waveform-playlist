@@ -285,7 +285,8 @@ export interface EditorControlsContextValue {
   setLoopRegionFromSelection: () => void;
   clearLoopRegion: () => void;
 
-  // Undo/redo: the arrangement's history, engine or not (#812).
+  // Undo/redo: the arrangement's history, engine or not (#812). Both do nothing
+  // while a clip move, a clip trim or a track-reorder drag is in progress (#848).
   undo: () => void;
   redo: () => void;
 
@@ -491,8 +492,8 @@ export const TrackReorderPreviewContext = slot<TrackReorderPreviewContextValue>(
 export const TrimPreviewContext = slot<TrimPreviewHandle>();
 export const TrimPreviewPeaksContext = slot<TrimPreviewPeaksValue>();
 /**
- * INTERNAL (#848; not exported from the package): the drags in progress that
- * undo and redo wait for. The provider owns it; the clip drag handlers and
+ * INTERNAL (#848; not exported from the package): the drags in progress,
+ * during which undo and redo do nothing. The provider owns it; the clip drag handlers and
  * `ClipInteractionProvider`'s track reorder write it.
  */
 export const DragGuardContext = slot<DragGuard>();

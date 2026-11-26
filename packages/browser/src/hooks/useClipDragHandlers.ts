@@ -200,7 +200,7 @@ export function useClipDragHandlers({
     endGuardRef.current?.();
     endGuardRef.current = null;
   }, []);
-  // A drag whose component unmounts mid-drag never gets its dragend.
+  // A drag whose component unmounts mid-drag may not get its dragend.
   React.useEffect(() => endGuard, [endGuard]);
 
   // A drag that never ends (its component unmounts mid-drag) must not leave

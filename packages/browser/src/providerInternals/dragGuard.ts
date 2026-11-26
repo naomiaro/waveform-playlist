@@ -1,10 +1,11 @@
 /**
- * The drags in progress that undo and redo wait for (#848): a clip move, a
- * clip trim, a track-reorder drag. One per `WaveformPlaylistProvider`, which
+ * The drags in progress, during which undo and redo do nothing (#848): a clip
+ * move, a clip trim, a track-reorder drag. One per `WaveformPlaylistProvider`, which
  * owns it; the drag handlers begin and end it, `undo` / `redo` read it.
  *
- * Not React state: nothing re-renders when a drag starts or ends (`canUndo`
- * and `canRedo` are unchanged during a drag; only the actions are inert).
+ * Not React state: nothing re-renders when a drag starts or ends, and the
+ * drag does not change `canUndo` / `canRedo` (an Undo button stays enabled;
+ * pressing it does nothing).
  */
 export interface DragGuard {
   /** Marks a drag as in progress. The returned `end` is idempotent. */

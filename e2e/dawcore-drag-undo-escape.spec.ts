@@ -126,6 +126,35 @@ test.describe('dawcore: undo and Escape during a drag (#848)', () => {
     expect(warnings.filter((w) => w.includes('no active transaction'))).toEqual([]);
   });
 
+  test('undo during a press that has not moved: the drag that follows is one undo step', async ({
+    page,
+  }) => {
+    const warnings: string[] = [];
+    page.on('console', (m) => {
+      if (m.type() === 'warning') warnings.push(m.text());
+    });
+    const start = await startPx(page);
+
+    // One drop 40 px to the right: one undo step.
+    let p = await pressHeader(page);
+    await moveTo(page, p.x, p.y, 40);
+    await page.mouse.up();
+    await expect.poll(() => startPx(page)).toBe(start + 40);
+
+    // Press (no move), Cmd/Ctrl+Z: the drop is undone and the press stays live.
+    p = await pressHeader(page);
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect.poll(() => startPx(page)).toBe(start);
+    await moveTo(page, p.x, p.y, 60);
+    await page.mouse.up();
+    await expect.poll(() => startPx(page)).toBe(start + 60);
+
+    // One undo takes the whole drag back.
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect.poll(() => startPx(page)).toBe(start);
+    expect(warnings.filter((w) => w.includes('no active transaction'))).toEqual([]);
+  });
+
   test('Escape during a clip move puts the clip back and keeps playing', async ({ page }) => {
     const start = await startPx(page);
     const canUndoBefore = await page.evaluate(

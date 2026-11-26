@@ -971,7 +971,8 @@ interface EditorControlsContextValue {
   setLoopRegionFromSelection: () => void;
   clearLoopRegion: () => void;
 
-  // Undo/redo: the arrangement's history, engine or not.
+  // Undo/redo: the arrangement's history, engine or not. Both do nothing while
+  // a clip move, a clip trim or a track-reorder drag is in progress (#848).
   undo: () => void;
   redo: () => void;
 
@@ -998,7 +999,7 @@ interface EditorControlsContextValue {
 
 The four mixer setters take the track's **id** (they took its index before; see the [upgrade guide](../upgrading.md#track-controls-are-composed-from-pieces-bound-to-a-track-the-mixer-setters-take-a-track-id)). A first argument that is not a string is ignored, and in development each setter says so once in the console. A string that is no track's id is ignored without a message.
 
-The mixer setters, `reorderTrack`, `undo` and `redo` call the provider's arrangement, so they work before the first engine is built and while an engine is rebuilt; the next engine plays what they changed. A value set while a track's audio is still loading is kept.
+The mixer setters, `reorderTrack`, `undo` and `redo` call the provider's arrangement, so they work before the first engine is built and while an engine is rebuilt; the next engine plays what they changed. A value set while a track's audio is still loading is kept. `undo` and `redo` do nothing while a clip move, a clip trim or a track-reorder drag is in progress (an undo in the middle of a drag would land the clip away from the pointer); the drag does not change `canUndo` / `canRedo`, so an Undo button stays enabled and pressing it does nothing ([#848](https://github.com/naomiaro/waveform-playlist/issues/848)).
 
 Each mixer call is an undo step, and an undo, a redo or an aborted transaction brings back the mix of the state it returns to: Undo after a fader move moves the fader back. A slider that calls a setter on every move makes one step per move unless it passes one `gesture` id for the whole drag; the built-in `<TrackVolumeSlider />` and `<TrackPanSlider />` do, so a drag, or a held arrow key, is one step. For a slider of your own, make one `createMixerGesture()` (from `@waveform-playlist/core`) per slider, attach it to the input and pass `{ gesture: gesture.id }` (see the [upgrade guide](../upgrading.md#a-slider-of-your-own-makes-one-undo-step-per-move-until-it-passes-a-gesture)). A value that is not the user's edit, such as automation or a mix restored from a saved project, takes `{ undoable: false }`: no step, and no undo or redo brings back an older value. Keyboard Undo (`<KeyboardShortcuts undo />`) does not fire while a slider has focus, which it keeps after a mouse drag ([#730](https://github.com/naomiaro/waveform-playlist/issues/730)); an Undo button, or the key once focus has left the slider, works.
 
@@ -1533,7 +1534,7 @@ Edges to know: if the take's track is removed during a take as an undo step, the
 
 ### useClipDragHandlers
 
-Handles clip dragging (move) and boundary trimming on the provider's arrangement (`useArrangement()`): `WaveformPlaylistProvider` only; it throws outside one and under `MediaElementPlaylistProvider`. A move is one `arrangement.moveClip()` on drop. A trim is previewed in the view while the handle is dragged (only the dragged clip's view follows; the tracks do not change) and is one `arrangement.trimClip()` on release, so each is one undo step. Escape clears the preview and changes nothing. A move or a trim released while no engine is attached (before the first build, during a rebuild) is kept, and the next engine plays it. A move or a trim commits the clip and track picked up at drag start (by their ids), also if the row moves or other clips change position during the drag. A move whose clip is no longer in that track at the drop is dropped with a console warning. A clip still loading cannot be dragged (its placeholder has no handles). Collision detection for moves is `ClipCollisionModifier`, passed to the `modifiers` prop of `DragDropProvider`.
+Handles clip dragging (move) and boundary trimming on the provider's arrangement (`useArrangement()`): `WaveformPlaylistProvider` only; it throws outside one and under `MediaElementPlaylistProvider`. A move is one `arrangement.moveClip()` on drop. A trim is previewed in the view while the handle is dragged (only the dragged clip's view follows; the tracks do not change) and is one `arrangement.trimClip()` on release, so each is one undo step. Escape clears the preview and changes nothing. From `onDragStart` of a clip to its `onDragEnd` (or the unmount of the component that holds the handlers) `useEditorControls().undo()` / `redo()` do nothing (#848); a setup that calls `onDragStart` must also call `onDragEnd`, or undo stays off until that component unmounts. A move or a trim released while no engine is attached (before the first build, during a rebuild) is kept, and the next engine plays it. A move or a trim commits the clip and track picked up at drag start (by their ids), also if the row moves or other clips change position during the drag. A move whose clip is no longer in that track at the drop is dropped with a console warning. A clip still loading cannot be dragged (its placeholder has no handles). Collision detection for moves is `ClipCollisionModifier`, passed to the `modifiers` prop of `DragDropProvider`.
 
 ```typescript
 function useClipDragHandlers(options: UseClipDragHandlersOptions): {

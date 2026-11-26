@@ -107,7 +107,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     endReorderGuardRef.current?.();
     endReorderGuardRef.current = null;
   }, []);
-  // A drag cut short by unmount never gets its dragend.
+  // A drag cut short by unmount may not get its dragend.
   React.useEffect(() => endReorderGuard, [endReorderGuard]);
 
   // Wrap onDragStart to auto-select track

@@ -337,6 +337,7 @@ const clip = createClipFromSeconds({
   │   ├── followAnnotations.ts          # annotation step of the animation loop (pure)
   │   ├── useMergedTheme.ts             # the theme prop merged over defaultTheme
   │   ├── useTrimPreview.ts             # the clip trim preview source and the stable function that draws the previewed clip (internal contexts)
+  │   ├── dragGuard.ts                  # WaveformPlaylistProvider: the drags in progress (a counter), during which undo and redo do nothing (internal DragGuardContext)
   │   └── useRequiredContext.ts         # a throwing context read (the providers' hooks use useSlot in contexts/playlistContexts.ts)
   ├── hooks/                            # Custom hooks
   │   ├── useAnimationFrameLoop.ts      # Shared rAF loop for providers
