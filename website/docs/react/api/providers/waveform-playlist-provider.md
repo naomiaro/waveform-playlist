@@ -443,7 +443,7 @@ interface EditorControlsContextValue {
   setLoopRegion: (start: number, end: number) => void;
   setLoopRegionFromSelection: () => void;
   clearLoopRegion: () => void;
-  /** The arrangement's history, engine or not. */
+  /** The arrangement's history, engine or not. Does nothing during a clip or track drag (#848). */
   undo: () => void;
   redo: () => void;
   /** Mark a recording session active/inactive. While active: (1) the

@@ -50,6 +50,21 @@ describe('<daw-annotation-track> keyboard controls', () => {
     document.removeEventListener('keydown', bubbleSpy);
   });
 
+  it('an Escape a drag cancel already prevented keeps the selection (#848)', () => {
+    // <daw-editor>'s drag cancel: a window capture listener that prevents the default.
+    const dragCancel = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') e.preventDefault();
+    };
+    window.addEventListener('keydown', dragCancel, { capture: true });
+    try {
+      track.activeAnnotationId = 'a';
+      document.body.dispatchEvent(key('Escape'));
+      expect(track.activeAnnotationId).toBe('a');
+    } finally {
+      window.removeEventListener('keydown', dragCancel, { capture: true });
+    }
+  });
+
   it('Escape with NO selection falls through (two-press rule)', () => {
     const bubbleSpy = vi.fn();
     document.addEventListener('keydown', bubbleSpy);

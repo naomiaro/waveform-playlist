@@ -328,9 +328,9 @@ Render-less element that adds keyboard shortcuts to the editor. Must be a direct
 
 | Attribute   | Type    | Default | Description                                            |
 | ----------- | ------- | ------- | ------------------------------------------------------ |
-| `playback`  | boolean | `false` | Enable default playback shortcuts (Space = play/pause) |
+| `playback`  | boolean | `false` | Enable default playback shortcuts (Space = play/pause, Escape = stop, 0 = rewind to start) |
 | `splitting` | boolean | `false` | Enable split shortcut (S = split at playhead)          |
-| `undo`      | boolean | `false` | Enable undo/redo (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z)        |
+| `undo`      | boolean | `false` | Enable undo/redo (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z); they do nothing while a clip or track drag is in progress |
 
 **JS Properties (for custom key bindings):**
 
@@ -380,6 +380,12 @@ Render-less element that adds keyboard shortcuts to the editor. Must be a direct
 4. First track load creates `PlaylistEngine` + audio adapter (lazy)
 5. Waveforms render immediately from peaks (no play required)
 6. First play click resumes `AudioContext` (user gesture requirement)
+
+## Undo and Escape During a Drag
+
+**Undo and redo do nothing while a drag is in progress (#848).** From the moment a clip move or trim has moved past the 3 px drag threshold, or a track-reorder grip is grabbed, until the pointer is released or the drag is cancelled, `editor.undo()` and `editor.redo()` return without doing anything, and so do the `<daw-keyboard-shortcuts undo>` keys. The drag does not change `editor.canUndo` / `canRedo`: an Undo button stays enabled, and pressing it does nothing. A clip that is pressed but not yet moved is not a drag: undo works, and a drag that follows starts from the clip as the undo left it and is one undo step. An annotation edge drag does not block undo either: annotations are not in the undo history. `editor.engine.undo()` is not blocked.
+
+**Escape cancels a drag and does nothing else.** During a clip move, a clip trim, a track-reorder drag or an annotation edge drag, Escape puts everything back as it was when the drag began, as a `pointercancel` does, and the rest of the pointer's travel is ignored. The editor listens on `window` in the capture phase and calls `preventDefault()` on that Escape, so `<daw-keyboard-shortcuts playback>` does not also stop playback and `<daw-annotation-track keyboard-controls>` does not deselect. With no drag left, Escape works as it does without one: a selected annotation is deselected first, then Escape stops. A clip or annotation pressed but not yet moved is not a drag, so Escape goes to the shortcuts then. An Escape your own code calls `preventDefault()` on before the library's listeners run switches off Stop (`<daw-keyboard-shortcuts>`, a `document` listener) and the annotation deselect (`<daw-annotation-track keyboard-controls>`, a `document` capture listener) the same way. Disconnecting the editor in the middle of a drag, or of a press, cancels it.
 
 ## Undo and the Mix
 

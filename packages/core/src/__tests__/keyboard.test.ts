@@ -466,3 +466,46 @@ describe('matchesKeyBinding', () => {
     expect(matchesKeyBinding(ev({ key: 'z' }), { key: 'z', shiftKey: true })).toBe(false);
   });
 });
+
+describe('an Escape that was already handled', () => {
+  // A drag that took the key (dnd-kit's pointer sensor, <daw-editor>'s drag
+  // cancel) has prevented its default: the Escape cancelled the drag and does
+  // nothing else (#848).
+  const handled = (key: string) => {
+    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+    event.preventDefault();
+    return event;
+  };
+
+  it('does not run an Escape shortcut when the default was prevented', () => {
+    const action = vi.fn();
+    handleKeyboardEvent(handled('Escape'), [{ key: 'Escape', action }], true);
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it('still runs an Escape shortcut when the default was not prevented', () => {
+    const action = vi.fn();
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    handleKeyboardEvent(event, [{ key: 'Escape', action }], true);
+    expect(action).toHaveBeenCalledTimes(1);
+  });
+
+  it('an Escape one shortcut list handled still reaches a second list', () => {
+    // Two lists that both bind Escape (playback's Stop and an app's own, or
+    // the annotation deselect): before #848 both ran (review of #915).
+    const first = vi.fn();
+    const second = vi.fn();
+    const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    handleKeyboardEvent(event, [{ key: 'Escape', action: first }], true);
+    handleKeyboardEvent(event, [{ key: 'Escape', action: second }], true);
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('still runs a non-Escape shortcut whose default was prevented', () => {
+    const action = vi.fn();
+    handleKeyboardEvent(handled(' '), [{ key: ' ', action }], true);
+    expect(action).toHaveBeenCalledTimes(1);
+  });
+});

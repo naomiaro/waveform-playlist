@@ -47,6 +47,7 @@ import { useEngineLifetime } from './providerInternals/useEngineLifetime';
 import { useArrangementView } from './providerInternals/useArrangementView';
 import { useReadyOnce } from './providerInternals/useReadyOnce';
 import { useArrangementEditing } from './providerInternals/useArrangementEditing';
+import { createDragGuard } from './providerInternals/dragGuard';
 import { useArrangementKey } from './providerInternals/arrangementIdentity';
 
 // Types
@@ -113,6 +114,7 @@ import {
   SelectionContext,
   TrackReorderPreviewContext,
   TrimPreviewContext,
+  DragGuardContext,
   RecordingTrackContext,
   TrimPreviewPeaksContext,
   UndoRedoContext,
@@ -508,7 +510,8 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
 
   // The mixer setters, reorder, undo, redo and the recording session: all
   // through the arrangement, engine or not.
-  const editing = useArrangementEditing(arrangement);
+  const [dragGuard] = useState(createDragGuard);
+  const editing = useArrangementEditing(arrangement, dragGuard);
   const { recordingActiveRef } = editing;
 
   // Cross-hook concern: reads selection refs to set loop region
@@ -1490,55 +1493,59 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
           <ArrangementContext value={arrangement}>
             <PlaybackRefsContext value={refsValue}>
               <EngineRefsContext value={engineRefsValue}>
-                <TrimPreviewContext value={trimPreview}>
-                  <TrimPreviewPeaksContext value={trimPreviewPeaks}>
-                    <PlaybackControlsContext value={controlsValue}>
-                      <EditorControlsContext value={editorControlsValue}>
-                        <PlaylistViewContext value={viewValue}>
-                          <PlaylistSettingsContext value={settingsValue}>
-                            <PlaylistZoomContext value={zoomValue}>
-                              <UndoRedoContext value={undoRedoValue}>
-                                <SelectedTrackIdContext value={selectedTrackIdValue}>
-                                  <SelectedRowContext value={selectedTrackIdValue}>
-                                    <LoopContext value={loopValue}>
-                                      <AnnotationOptionsContext value={annotationOptionsValue}>
-                                        <AnnotationsContext value={annotationsValue}>
-                                          <IsPlayingContext value={isPlayingValue}>
-                                            <ActiveAnnotationContext value={activeAnnotationValue}>
-                                              <CurrentTimeContext value={currentTimeValue}>
-                                                <SelectionContext value={selectionValue}>
-                                                  <TrackReorderPreviewContext
-                                                    value={reorderPreviewValue}
-                                                  >
-                                                    <PlaylistMixerContext value={mixerValue}>
-                                                      <PlaylistTimelineContext
-                                                        value={timelineValue}
-                                                      >
-                                                        <RecordingTrackContext
-                                                          value={editing.recordingTrack}
+                <DragGuardContext value={dragGuard}>
+                  <TrimPreviewContext value={trimPreview}>
+                    <TrimPreviewPeaksContext value={trimPreviewPeaks}>
+                      <PlaybackControlsContext value={controlsValue}>
+                        <EditorControlsContext value={editorControlsValue}>
+                          <PlaylistViewContext value={viewValue}>
+                            <PlaylistSettingsContext value={settingsValue}>
+                              <PlaylistZoomContext value={zoomValue}>
+                                <UndoRedoContext value={undoRedoValue}>
+                                  <SelectedTrackIdContext value={selectedTrackIdValue}>
+                                    <SelectedRowContext value={selectedTrackIdValue}>
+                                      <LoopContext value={loopValue}>
+                                        <AnnotationOptionsContext value={annotationOptionsValue}>
+                                          <AnnotationsContext value={annotationsValue}>
+                                            <IsPlayingContext value={isPlayingValue}>
+                                              <ActiveAnnotationContext
+                                                value={activeAnnotationValue}
+                                              >
+                                                <CurrentTimeContext value={currentTimeValue}>
+                                                  <SelectionContext value={selectionValue}>
+                                                    <TrackReorderPreviewContext
+                                                      value={reorderPreviewValue}
+                                                    >
+                                                      <PlaylistMixerContext value={mixerValue}>
+                                                        <PlaylistTimelineContext
+                                                          value={timelineValue}
                                                         >
-                                                          {children}
-                                                        </RecordingTrackContext>
-                                                      </PlaylistTimelineContext>
-                                                    </PlaylistMixerContext>
-                                                  </TrackReorderPreviewContext>
-                                                </SelectionContext>
-                                              </CurrentTimeContext>
-                                            </ActiveAnnotationContext>
-                                          </IsPlayingContext>
-                                        </AnnotationsContext>
-                                      </AnnotationOptionsContext>
-                                    </LoopContext>
-                                  </SelectedRowContext>
-                                </SelectedTrackIdContext>
-                              </UndoRedoContext>
-                            </PlaylistZoomContext>
-                          </PlaylistSettingsContext>
-                        </PlaylistViewContext>
-                      </EditorControlsContext>
-                    </PlaybackControlsContext>
-                  </TrimPreviewPeaksContext>
-                </TrimPreviewContext>
+                                                          <RecordingTrackContext
+                                                            value={editing.recordingTrack}
+                                                          >
+                                                            {children}
+                                                          </RecordingTrackContext>
+                                                        </PlaylistTimelineContext>
+                                                      </PlaylistMixerContext>
+                                                    </TrackReorderPreviewContext>
+                                                  </SelectionContext>
+                                                </CurrentTimeContext>
+                                              </ActiveAnnotationContext>
+                                            </IsPlayingContext>
+                                          </AnnotationsContext>
+                                        </AnnotationOptionsContext>
+                                      </LoopContext>
+                                    </SelectedRowContext>
+                                  </SelectedTrackIdContext>
+                                </UndoRedoContext>
+                              </PlaylistZoomContext>
+                            </PlaylistSettingsContext>
+                          </PlaylistViewContext>
+                        </EditorControlsContext>
+                      </PlaybackControlsContext>
+                    </TrimPreviewPeaksContext>
+                  </TrimPreviewContext>
+                </DragGuardContext>
               </EngineRefsContext>
             </PlaybackRefsContext>
           </ArrangementContext>

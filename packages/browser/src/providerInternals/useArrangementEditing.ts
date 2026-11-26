@@ -14,6 +14,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import type { Arrangement, MixerChangeOptions } from '@waveform-playlist/engine';
+import type { DragGuard } from './dragGuard';
 import { warnOnce } from '../components/partWarnings';
 import type { RecordingTrackContextValue } from '../contexts/playlistContexts';
 
@@ -119,7 +120,10 @@ function useRecordingActive(arrangement: Arrangement) {
   return { setRecordingActive, recordingActiveRef, recordingTrack };
 }
 
-export function useArrangementEditing(arrangement: Arrangement): ArrangementEditing {
+export function useArrangementEditing(
+  arrangement: Arrangement,
+  dragGuard: DragGuard
+): ArrangementEditing {
   const setTrackMute = useCallback(
     (trackId: string, muted: boolean, options?: MixerChangeOptions) => {
       if (isTrackId('setTrackMute', trackId)) arrangement.setTrackMute(trackId, muted, options);
@@ -149,8 +153,13 @@ export function useArrangementEditing(arrangement: Arrangement): ArrangementEdit
     (trackId: string, toIndex: number) => arrangement.reorderTrack(trackId, toIndex),
     [arrangement]
   );
-  const undo = useCallback(() => arrangement.undo(), [arrangement]);
-  const redo = useCallback(() => arrangement.redo(), [arrangement]);
+  // Undo and redo do nothing while a clip or track drag is in progress (#848).
+  const undo = useCallback(() => {
+    if (!dragGuard.active) arrangement.undo();
+  }, [arrangement, dragGuard]);
+  const redo = useCallback(() => {
+    if (!dragGuard.active) arrangement.redo();
+  }, [arrangement, dragGuard]);
   const { setRecordingActive, recordingActiveRef, recordingTrack } =
     useRecordingActive(arrangement);
   return {

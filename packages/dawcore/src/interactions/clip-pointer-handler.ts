@@ -139,6 +139,12 @@ export class ClipPointerHandler {
     return this._mode !== null;
   }
 
+  /** True once the pointer of the current press has moved past the drag
+   *  threshold: a press that has not moved is not a drag (#848). */
+  get isDragging(): boolean {
+    return this._isDragging;
+  }
+
   /**
    * Attempts to handle a pointerdown event on the given target element.
    * Returns true if the target is a recognized clip interaction element.
@@ -189,27 +195,37 @@ export class ClipPointerHandler {
     this._isDragging = false;
 
     this._cumulativeDeltaSamples = 0;
+  }
 
-    // Snapshot clip start position for snap calculations
+  /**
+   * The press has become a drag (the pointer passed the threshold): take the
+   * clip's bounds and open the transaction now, not at the press. An undo
+   * made during the press (it is not a drag, so undo works) then has no
+   * transaction to abort, and the drag that follows starts from the clip as
+   * the undo left it, one undo step (#848, review of #915). Returns false
+   * when the clip is gone (the undo removed it): the press is dropped.
+   */
+  private _startDrag(): boolean {
     const engine = this._host.engine;
+    const trackId = this._trackId;
+    const clipId = this._clipId;
+    // Snapshot clip start position for snap calculations
     if (engine) {
       const bounds = engine.getClipBounds(trackId, clipId);
-      if (bounds) {
-        this._originalStartSample = bounds.startSample;
-      }
-    }
-
-    // Group all drag mutations into one undo step
-    if (engine) {
+      if (!bounds) return false;
+      this._originalStartSample = bounds.startSample;
+      this._originalOffsetSamples = bounds.offsetSamples;
+      this._originalDurationSamples = bounds.durationSamples;
+      // Group all drag mutations into one undo step
       engine.beginTransaction();
     } else {
       console.warn(
-        '[dawcore] beginDrag: engine unavailable, drag mutations will not be grouped for undo'
+        '[dawcore] drag start: engine unavailable, drag mutations will not be grouped for undo'
       );
     }
 
     // For trim: snapshot the clip container's current position/width
-    if (mode === 'trim-left' || mode === 'trim-right') {
+    if (this._mode === 'trim-left' || this._mode === 'trim-right') {
       const container = this._host.shadowRoot?.querySelector(
         `.clip-container[data-clip-id="${clipId}"]`
       ) as HTMLElement | null;
@@ -220,16 +236,8 @@ export class ClipPointerHandler {
       } else {
         console.warn('[dawcore] clip container not found for trim visual feedback: ' + clipId);
       }
-      // Snapshot clip audio bounds for peak re-extraction during drag
-      const engine = this._host.engine;
-      if (engine) {
-        const bounds = engine.getClipBounds(trackId, clipId);
-        if (bounds) {
-          this._originalOffsetSamples = bounds.offsetSamples;
-          this._originalDurationSamples = bounds.durationSamples;
-        }
-      }
     }
+    return true;
   }
 
   /** Processes pointermove events during an active drag. */
@@ -240,6 +248,10 @@ export class ClipPointerHandler {
 
     // Activate drag after threshold is exceeded
     if (!this._isDragging && Math.abs(totalDeltaPx) > DRAG_THRESHOLD) {
+      if (!this._startDrag()) {
+        this._reset();
+        return;
+      }
       this._isDragging = true;
       // Apply .dragging class to boundary element for active drag styling
       if (this._boundaryEl) {
@@ -400,12 +412,15 @@ export class ClipPointerHandler {
         }
       }
     } finally {
-      // Commit transaction if mutations occurred, abort if click/no-op.
-      // Abort does NOT push to undo stack or clear redo stack.
-      if (this._isDragging && this._cumulativeDeltaSamples !== 0) {
-        this._host.engine?.commitTransaction();
-      } else {
-        this._host.engine?.abortTransaction();
+      // A drag opened a transaction: commit it if mutations occurred, abort
+      // it if not (abort does NOT push to undo stack or clear redo stack). A
+      // click never opened one.
+      if (this._isDragging) {
+        if (this._cumulativeDeltaSamples !== 0) {
+          this._host.engine?.commitTransaction();
+        } else {
+          this._host.engine?.abortTransaction();
+        }
       }
       this._reset();
     }
@@ -427,7 +442,8 @@ export class ClipPointerHandler {
       // the adapter when mutations occurred).
       this._restoreTrimVisual();
     } finally {
-      this._host.engine?.abortTransaction();
+      // Only a drag opened a transaction; a press that never moved did not.
+      if (this._isDragging) this._host.engine?.abortTransaction();
       this._reset();
     }
   }

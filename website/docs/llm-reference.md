@@ -480,7 +480,8 @@ interface EditorControlsContextValue {
   setLoopRegionFromSelection: () => void;
   clearLoopRegion: () => void;
 
-  // Undo/redo: the arrangement's history, engine or not (#812).
+  // Undo/redo: the arrangement's history, engine or not (#812). Both do nothing
+  // while a clip move, a clip trim or a track-reorder drag is in progress (#848).
   undo: () => void;
   redo: () => void;
 
@@ -1479,7 +1480,7 @@ interface UseClipDragHandlersOptions {
 }
 ```
 
-Reads the provider's arrangement (`useArrangement()`): throws outside `WaveformPlaylistProvider` and under `MediaElementPlaylistProvider` (#812; options `tracks` and `engineRef` removed). A move is one `arrangement.moveClip()` on drop and a trim one `arrangement.trimClip()` on release: each is one undo step, and neither opens a transaction. A move, trim or split made while no engine is attached (before the first build, during a rebuild) is kept, and the next engine plays it. While a trim handle is dragged, each move is constrained by `arrangement.constrainTrimDelta` and drawn as a preview of the dragged clip only (the preview is internal: no exported hook or context reads it); the tracks do not change until the release. Escape (`event.canceled`) clears the preview and changes nothing. A move or a trim commits the clip and track picked up at drag start, by their ids (also if the row moves or other clips change position during the drag); a move whose clip is no longer among the track's loaded clips at the drop is dropped with a console warning; `clipIndex` of the drag data is not read. The draggable ids are `clip/<trackId>/<clipId>`, `clip-boundary-left/<trackId>/<clipId>` and `clip-boundary-right/<trackId>/<clipId>` (each part `encodeURIComponent`-encoded). A clip still loading has no handles. Collision detection is handled separately by `ClipCollisionModifier` (passed to DragDropProvider's `modifiers` prop; give it `usePlaylistTimeline().tracks`). Within one provider mount (the arrangement and the provider's trim preview do not change then) `onDragStart` keeps its identity, `onDragMove` changes with `samplesPerPixel` or the sample rate and `onDragEnd` with `samplesPerPixel`.
+Reads the provider's arrangement (`useArrangement()`): throws outside `WaveformPlaylistProvider` and under `MediaElementPlaylistProvider` (#812; options `tracks` and `engineRef` removed). A move is one `arrangement.moveClip()` on drop and a trim one `arrangement.trimClip()` on release: each is one undo step, and neither opens a transaction. A move, trim or split made while no engine is attached (before the first build, during a rebuild) is kept, and the next engine plays it. While a trim handle is dragged, each move is constrained by `arrangement.constrainTrimDelta` and drawn as a preview of the dragged clip only (the preview is internal: no exported hook or context reads it); the tracks do not change until the release. Escape (`event.canceled`) clears the preview and changes nothing. From `onDragStart` of a clip to its `onDragEnd` (or the unmount of the component that holds the handlers) `useEditorControls().undo()` / `redo()` do nothing (#848); a setup that calls `onDragStart` must also call `onDragEnd`, or undo stays off until that component unmounts. A move or a trim commits the clip and track picked up at drag start, by their ids (also if the row moves or other clips change position during the drag); a move whose clip is no longer among the track's loaded clips at the drop is dropped with a console warning; `clipIndex` of the drag data is not read. The draggable ids are `clip/<trackId>/<clipId>`, `clip-boundary-left/<trackId>/<clipId>` and `clip-boundary-right/<trackId>/<clipId>` (each part `encodeURIComponent`-encoded). A clip still loading has no handles. Collision detection is handled separately by `ClipCollisionModifier` (passed to DragDropProvider's `modifiers` prop; give it `usePlaylistTimeline().tracks`). Within one provider mount (the arrangement and the provider's trim preview do not change then) `onDragStart` keeps its identity, `onDragMove` changes with `samplesPerPixel` or the sample rate and `onDragEnd` with `samplesPerPixel`.
 
 ### useDragSensors
 
@@ -2296,6 +2297,11 @@ function usePlaybackShortcuts(options?: UsePlaybackShortcutsOptions): UsePlaybac
 //   - while an input/select/textarea has focus NO shortcut fires (incl. undo, split)
 //   - so after clicking Mute, Space toggles Mute again; Space is play/pause when focus is not on a control
 //   - elements with only an ARIA role (<div role="button">) are NOT covered
+// An Escape whose default something other than a shortcut list already prevented fires no shortcut (#848):
+//   dnd-kit prevents it when it cancels a drag, so Escape during a drag only cancels the drag; an app's own
+//   preventDefault() on Escape before the library's window listener also switches off Stop and the deselect.
+//   Two shortcut lists that both bind Escape both run.
+// Undo / redo (useEditorControls, <KeyboardShortcuts undo />) do nothing while a clip move, a clip trim or a track-reorder drag is in progress (#848).
 ```
 
 ---

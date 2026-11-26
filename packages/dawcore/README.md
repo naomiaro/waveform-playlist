@@ -436,9 +436,11 @@ Add `<daw-keyboard-shortcuts>` as a child of `<daw-editor>`:
 
 | Attribute | Shortcuts |
 |-----------|-----------|
-| `playback` | Space (play/pause), Enter (stop) |
+| `playback` | Space (play/pause), Escape (stop), 0 (rewind to start) |
 | `splitting` | S (split at playhead) |
 | `undo` | Cmd/Ctrl+Z (undo), Cmd/Ctrl+Shift+Z (redo) |
+
+During a clip move or trim, or a track-reorder drag, undo and redo do nothing (the keys and `editor.undo()` / `redo()`), and Escape only cancels the drag: it does not also stop playback.
 
 Custom shortcuts via JS properties: `playbackShortcuts`, `splittingShortcuts`, `undoShortcuts`, `customShortcuts`.
 

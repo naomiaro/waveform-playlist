@@ -136,7 +136,7 @@ export function StemTracksExample() {
         theme={theme}
       >
         <ClipInteractionProvider>
-          <KeyboardShortcuts playback />
+          <KeyboardShortcuts playback undo />
           <Controls>
             <ControlGroup>
               <PlayButton />

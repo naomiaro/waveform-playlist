@@ -446,8 +446,17 @@ Waveform Playlist supports common keyboard shortcuts:
 | Key | Action |
 |-----|--------|
 | Space | Play/Pause toggle. Starts playback exactly as the Play button does: the highlighted selection if there is one (and looping is off), otherwise from the cursor. If the cursor is inside the selection (playback was paused there, for example), both resume from the cursor and stop at the selection's end; Stop, or the selection finishing, returns the cursor to the selection's start |
-| Home | Go to start |
-| End | Go to end |
+| Escape | Stop. During a drag it only cancels the drag (see below). |
+| 0 | Rewind to start |
+| S | Split the clip at the playhead on the selected track (`clipSplitting`) |
+| Cmd/Ctrl+Z | Undo (`undo`). Does nothing while a clip or track drag is in progress. |
+| Cmd/Ctrl+Shift+Z | Redo (`undo`). Does nothing while a clip or track drag is in progress. |
+
+Space, Escape and 0 come with `playback`; S and the undo keys with the props named in the table. The `annotations` keys are listed in the [Annotations guide](./annotations.md).
+
+### Shortcuts during a drag
+
+While a clip is being moved or trimmed, or a track is being dragged to a new position, undo and redo do nothing: the keys, and `useEditorControls().undo()` / `redo()` called by the app. The drag does not change `useUndoRedo().canUndo` / `canRedo`: an Undo button stays enabled, and pressing it does nothing. Escape cancels the drag (a clip, a trim, a track or an annotation edge goes back to where it was) and does nothing else: playback goes on and the selected annotation stays selected. A second Escape stops playback as usual. A call to the arrangement's own `undo()` (`useArrangement().undo()`, or an `Arrangement` the app holds) is not stopped during a drag. An Escape that your own code calls `preventDefault()` on before the library's `window` listener runs fires no shortcut either (see the [upgrade guide](../upgrading.md#undo-and-escape-during-a-drag-848)).
 
 ### Shortcuts and focused controls
 

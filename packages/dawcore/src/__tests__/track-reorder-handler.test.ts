@@ -161,3 +161,21 @@ describe('lane preview parity', () => {
     expect(host.reorderTrack).toHaveBeenCalledWith('a', 1);
   });
 });
+
+describe('TrackReorderHandler.isActive (#848)', () => {
+  it('isActive is true from grab until cancel', () => {
+    const rows = [makeRow('a', 0, 80), makeRow('b', 80, 80)];
+    const host = makeHost(rows);
+    const handler = new TrackReorderHandler(host);
+    const grip = document.createElement('button');
+    rows[0].appendChild(grip);
+    expect(handler.isActive).toBe(false);
+    handler.onGrab('a', new PointerEvent('pointerdown', { pointerId: 1, clientY: 40 }), grip);
+    expect(handler.isActive).toBe(true);
+    grip.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientY: 130 }));
+    handler.cancel();
+    expect(handler.isActive).toBe(false);
+    expect(host.reorderTrack).not.toHaveBeenCalled();
+    expect(rows.map((r) => r.style.transform)).toEqual(['', '']);
+  });
+});
