@@ -459,7 +459,7 @@ editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<
 
 ### `<daw-track>` API
 
-**Attributes (reflected):**
+**Attributes** (the page's declaration: never written by the editor, #848):
 
 ```
 src              String    —        Audio source URL
@@ -479,7 +479,9 @@ render-mode      String    waveform 'waveform' | 'spectrogram' | 'split'. Audio 
 ```typescript
 track.recordArmed: boolean       // Reflects record-armed attribute
 track.inputDevice: string|null   // Reflects input-device attribute
-track.kind: 'audio' | 'midi'     // Reflects kind attribute; a change after the track is registered is undone with a warning
+track.kind: 'audio' | 'midi'     // Reflects kind attribute; a change after the track has entered is ignored with a warning
+track.name / volume / pan / muted / soloed  // Live (#848): the arrangement's values while it holds the track (muted: the stored mute); a set is one undo step and never writes the attribute; the declaration otherwise
+track.index: number              // Read-only: position in the arrangement the editor plays, -1 when not in it
 track.renderMode: string         // Reflects render-mode attribute
 track.isRecording: boolean       // Read-only: currently recording (armed + editor.isRecording)
 track.inputStream: MediaStream   // Read-only: active mic stream when recording
@@ -506,7 +508,7 @@ When `arm()` is called without a `deviceId`, it uses the default input device. T
 
 ### `<daw-clip>` API
 
-**Attributes (reflected):**
+**Attributes** (the page's declaration: never written by the editor, #848):
 
 ```
 src              String    —        Audio file URL
@@ -528,6 +530,7 @@ midi-program     Number    —        MIDI program number (0-127)
 
 ```typescript
 clip.midiNotes: MidiNoteData[] | null        // Parsed MIDI notes
+clip.start / duration / offset / gain / name / midiNotes / midiChannel / midiProgram  // Live (#848): the arrangement's values while it holds the clip (after a drag, clip.start is where the clip is); a set is one undo step and never writes the attribute
 ```
 
 Decoded audio is held by the editor's arrangement (#848), not exposed as properties on the element. There is no way to pass a decoded buffer or peak data through `<daw-clip>` or `addClip`; give pre-computed peaks by URL (`peaks-src`, or `peaksSrc` in `addClip`).
@@ -1569,7 +1572,7 @@ Removal works via `element.remove()` — the editor's MutationObserver detects d
 
 Changing `src` on an already-loaded `<daw-clip>` is **not** supported via `daw-clip-update` — remove and re-add the clip instead.
 
-The editor's `daw-track-connected` handler reads all `<daw-clip>` children synchronously via `_readTrackDescriptor` during initial track load; `daw-clip-connected` events fired during that initial pass are skipped (the track loader handles them). Late-append clips (after `_engineTracks` already has the parent track) trigger the incremental path.
+A track's `<daw-clip>` children are read when the track enters the arrangement (#848); their own deferred `daw-clip-connected` events after that are skipped. A `<daw-clip>` appended to a track that has entered goes in as a loading clip, one undo step. A live property set (or attribute change) on a clip is a request to the arrangement; the editor does not act on `daw-clip-update`.
 
 ### Imperative Editor API
 
@@ -1632,15 +1635,9 @@ await editor.addTrack({
 });
 ```
 
-### Why `editor.engine.setTracks(...)` is not a consumer API
+### Drive tracks through `editor.arrangement`, not `editor.engine`
 
-The engine owns the playback graph; the editor owns the descriptor map, the DOM elements, the peak cache, and the clip-buffer cache. Calling `engine.setTracks` directly partially works — the `statechange` listener mirrors engine tracks into `_engineTracks` and `syncPeaksForChangedClips` regenerates peaks from any `clip.audioBuffer` attached to the engine clip — so a waveform will render. What stays broken:
-
-- `_tracks` **descriptor map** is not populated. `<daw-track-controls>` falls back to `name='Untitled'`, `volume=1`, `pan=0`, `muted=false`, `soloed=false` — regardless of what the engine track was constructed with. The track's real name and volume are invisible in the controls column.
-- `_onTrackControl` (volume slider, mute, solo buttons) early-returns when no descriptor exists, so user interactions on the controls column become silent no-ops.
-- `_trackElements` is not populated. `editor.removeTrack(trackId)` falls back to `_onTrackRemoved` directly, but consumers that walk the DOM (`editor.querySelectorAll('daw-track')`) see nothing.
-
-Treat `editor.engine` as **read-only** from consumer code (analyzers, master taps, effect insertions on `engine.masterOutputNode` are fine); mutate tracks via the editor API.
+Since #848 the editor draws and lists what its arrangement holds and keeps no copy of it, so an app or an agent changes tracks through `editor.arrangement` (its `addTrack`, `updateTrack`, `moveClip`, mixer setters, `undo`, …) or the editor's methods, which are calls on it. `editor.arrangement.setTracks(...)` (or `editor.engine.setTracks`) replaces every track and clears the undo history; the tracks are drawn with the default render mode and have no element. Handing in a whole arrangement is `editor.arrangement = createArrangement({ tracks })`. Treat `editor.engine` as read-only from consumer code (analyzers, master taps, effect insertions on `engine.masterOutputNode` are fine).
 
 ### Backwards-compat surface
 

@@ -92,6 +92,26 @@ Read before writing or changing a test in `src/__tests__` (after the skill `unit
 - **Why:** `new AudioWorkletNode(stdCtx, ...)` fails with standardized-audio-context ("parameter 1 is not of type BaseAudioContext"). Tone.js wraps standardized-audio-context, so `TonePlayoutAdapter.audioContext` (which returns `rawContext`) is not a native `BaseAudioContext`. The bridge methods use `context.createAudioWorkletNode()` (Tone.js wrapper) which handles both context types.
 - **`NativePlayoutAdapter` needs no bridge methods** — Its `audioContext` is a real native `AudioContext`, so the fallback path in `RecordingController` works directly.
 
+## As close to the native DOM as possible (#848)
+
+**The rule (maintainer, 2026-11-25):** the elements behave like native form controls. The markup is the starting declaration; live state is read from properties. The editor never writes an attribute and never moves a child; the one exception is an explicit request to remove (`editor.removeTrack` / `removeClip` remove the element, as `select.remove(i)` does).
+
+**Precedents to copy, not to invent:**
+
+- `<input>`: the `value` attribute is `defaultValue`, the declaration; `input.value` is live and setting it never writes the attribute. `<daw-track volume>` / `trackEl.volume`, `<daw-clip start>` / `clipEl.start`.
+- `<option>`: `selected` (attribute) against `option.selected`, and `option.index`, the position in its select. `trackEl.index`, -1 when not in the arrangement.
+- `<details open>` is the counter-example: a native element that writes its own attribute back when the user toggles it. This library does not follow it; a state change shows in a property or a custom state, never in the page's attribute.
+- `<video>` with `<source>` children and `srcObject`: the children declare the content, `srcObject` replaces it while set and the children are inert, `null` goes back. `editor.arrangement`.
+- Custom states (`ElementInternals.states`, `:state(detached)`) for runtime flags, never a synthetic attribute (the modern-web-guidance guide `custom-elements`). happy-dom 21 has no `attachInternals`: elements call it guarded and unit tests stub it.
+
+**Checklist for a new attribute or property** (write the answers in the design, before the first review):
+
+1. What does the attribute hold? The page's declaration only.
+2. What does the property return pending (before the track enters, or outside an editor), live (the arrangement holds the id) and detached? Live values come from the arrangement (`interactions/element-links.ts`), the others from the declaration.
+3. Does the editor write it back? Never. If the arrangement has no field for it, it is a declaration-only property (fades, `color`, `render-mode`) or an editor extra (`_extras`).
+4. Which event fires? A set is a synchronous request (one undo step; the same value is none); `daw-track-update` / `daw-clip-update` still fire as outbound notifications, the editor does not act on them for live fields.
+5. What happens before the element connects? A property set then is the value it enters with (Lit replays pre-upgrade own properties through the setters).
+
 ## Key Patterns
 
 - **Reparenting `<daw-editor>` keeps its arrangement (#848)** — `disconnectedCallback` cancels drags, disposes effects and the engine (which disposes the consumer's adapter) and sets `editor.adapter` to `null`, terminates the peak worker and the spectrogram controller. It keeps `_arrangement`, `_extras`, `_pending`, `_trackElements` and the peak data (`_peaksData`, `_clipBuffers`, the preview caches; the `.dat` fetch cache `_peaksCache` is cleared), so the detached editor still draws its tracks, as a moved `<input>` keeps its value. The children's reconnect finds their track (`_onTrackConnected`: pending, extras or entered) and enters nothing again; a `<daw-track>` the page removed while the editor was detached (the observer was off) has its track removed in `connectedCallback`, as the observer would have done. A fresh `editor.adapter` builds a new engine on the kept arrangement (one `adapter.setTracks`; a loaded source is not fetched again, a load in flight at the disconnect was aborted and starts again) and re-registers spectrogram audio.
@@ -157,7 +177,7 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 
 - **`DawEventMap`** in `src/events.ts` — all custom events with typed details. Use `new CustomEvent<DetailType>(...)` at dispatch sites.
 - **`daw-track-removed`** (detail `{ trackId }`) — outbound removal notification, symmetric with `daw-track-ready`. Dispatched from `_onTrackRemoved` ONLY when `existed && this.isConnected`: capture `existed` (pending, extras or entered) at the TOP (the cleanup removes all three before the dispatch), and gate on `isConnected` per pattern #36 (reachable on a detached editor via `removeTrack`'s element-less branch). The MutationObserver calls `_onTrackRemoved` even for a `<daw-track>` removed before its deferred `daw-track-connected` ran (never registered) — exactly what the `existed` gate filters.
-- **`daw-track-update`** (detail `DawTrackUpdateDetail`: `{ trackId, changed }`) — dispatched by `<daw-track>` after a reflected property changes; `changed` names the properties of that Lit update. The editor sends only the mixer properties it names, as one undo step (#843).
+- **`daw-track-update`** (detail `DawTrackUpdateDetail`: `{ trackId, changed }`) — dispatched by `<daw-track>` after a reflected property changes; `changed` names the properties of that Lit update. An outbound notification since #848 PR 3: the live properties (mix, name) ask the editor directly from their setters; `_onTrackUpdate` reads only `kind`, `renderMode`, `spectrogramConfig` and `src`.
 - **`daw-track-control`** (detail `DawTrackControlDetail`: `{ trackId, prop, value, gesture? }`) — dispatched by `<daw-track-controls>`; `gesture` is the slider's `createMixerGesture()` id, which the editor passes to the engine setter so one drag is one undo step (#843). Mute and solo send none.
 - **`LoadFilesResult`** — named return type for `loadFiles()`, exported from index.
 - **`daw-track-reorder`** (detail `DawTrackReorderDetail`: `{ trackId, fromIndex, toIndex }`) — dispatched by `<daw-track-controls>` when a move up/down button is clicked; bubbles to `<daw-editor>`, whose listener calls `reorderTrack(e.detail.trackId, e.detail.toIndex)`.

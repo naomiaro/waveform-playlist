@@ -1627,7 +1627,7 @@ interface MidiLoadResult {
 }
 ```
 
-Created tracks are MIDI tracks (`kind="midi"`), drawn as piano rolls. **Cleanup-on-failure:** any per-track rejection removes every `<daw-track>` appended during the call — both succeeded ones AND elements `addTrack` left in the DOM before rejecting. Editor returns to its pre-call state via `Promise.allSettled` + diff cleanup. If `@dawcore/midi` is not installed, rejects with a friendly install hint and `console.warn`s the original module-resolution error.
+Created tracks are MIDI tracks (`kind="midi"`), drawn as piano rolls, with no `<daw-track>` element (`addTrack` creates none since #848). **Cleanup-on-failure:** any per-track rejection removes every track the call added (by id); a track whose `addTrack` rejected never entered. Editor returns to its pre-call state via `Promise.allSettled`. If `@dawcore/midi` is not installed, rejects with a friendly install hint and `console.warn`s the original module-resolution error.
 
 ---
 
@@ -1877,6 +1877,7 @@ interface EngineState {
 // State: setSelection(), setLoopRegion(), setLoopEnabled(), setMasterVolume(), setTempo()
 // Zoom: zoomIn(), zoomOut(), setZoomLevel()
 // Events: on(event, listener), off(event, listener)
+// isArrangement(value): boolean — exported; true for an arrangement made by createArrangement()
 // Lifecycle: dispose(options?: { keepAdapter?: boolean }) — keepAdapter: stop playback, let go of the
 //   arrangement and onPlaybackEnded, leave the adapter undisposed for a new engine on another arrangement
 

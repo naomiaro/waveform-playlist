@@ -98,9 +98,12 @@
     <code>editor.ready()</code> bootstraps the engine before any track exists.
     <code>addTrack</code> / <code>updateTrack</code> / <code>removeTrack</code>
     operate on whole tracks; <code>addClip</code> / <code>updateClip</code> /
-    <code>removeClip</code> operate on individual clips. The same flow works
-    declaratively — appending or mutating <code>&lt;daw-track&gt;</code> /
-    <code>&lt;daw-clip&gt;</code> in the DOM goes through the exact same pipeline.
+    <code>removeClip</code> operate on individual clips. They are calls on
+    <code>editor.arrangement</code> and create no elements. Appending
+    <code>&lt;daw-track&gt;</code> / <code>&lt;daw-clip&gt;</code> declares tracks
+    and clips instead; their attributes stay what the page wrote, and their
+    properties (<code>trackEl.volume</code>, <code>clipEl.start</code>) read
+    the arrangement live, also after a drag or an undo.
   </p>
 
   <script type="module">import '@dawcore/components';</script>
@@ -317,7 +320,10 @@
       const trackEl = editor.querySelector('daw-track');
       if (!trackEl) return addLog('no <daw-track> in DOM', 'err');
       trackEl.volume = 0.2;
-      addLog('mutated <daw-track>.volume = 0.2 (fires daw-track-update)');
+      addLog(
+        '<daw-track>.volume = 0.2 (a request, one undo step): volume is ' + trackEl.volume +
+          ', the volume attribute is ' + trackEl.getAttribute('volume')
+      );
     });
 
     // --- Clips (declarative DOM) ------------------------------------------
@@ -336,9 +342,14 @@
     document.getElementById('dom-mutate-clip-start').addEventListener('click', () => {
       const clipEl = editor.querySelector('daw-clip');
       if (!clipEl) return addLog('no <daw-clip> in DOM', 'err');
-      const newStart = (Number(clipEl.start || 0) + 1).toFixed(2);
+      // clipEl.start is live: where the clip is now, after any drag or undo.
+      const before = Number(clipEl.start || 0);
+      const newStart = (before + 1).toFixed(2);
       clipEl.setAttribute('start', newStart);
-      addLog('mutated <daw-clip>.start = ' + newStart + ' (fires daw-clip-update)');
+      addLog(
+        '<daw-clip> start attribute set to ' + newStart + ' (a request) — clipEl.start was ' +
+          before.toFixed(2) + ', is ' + Number(clipEl.start).toFixed(2)
+      );
     });
 
     // --- State helpers -----------------------------------------------------
