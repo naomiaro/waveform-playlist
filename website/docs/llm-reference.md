@@ -2296,6 +2296,8 @@ function usePlaybackShortcuts(options?: UsePlaybackShortcutsOptions): UsePlaybac
 //   - while an input/select/textarea has focus NO shortcut fires (incl. undo, split)
 //   - so after clicking Mute, Space toggles Mute again; Space is play/pause when focus is not on a control
 //   - elements with only an ARIA role (<div role="button">) are NOT covered
+//   - an Escape whose default was already prevented (a drag cancelled it, #848): Escape during a drag only cancels the drag
+// Undo / redo (useEditorControls, <KeyboardShortcuts undo />) do nothing while a clip move, a clip trim or a track-reorder drag is in progress (#848).
 ```
 
 ---

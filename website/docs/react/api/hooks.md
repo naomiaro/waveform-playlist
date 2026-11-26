@@ -2347,7 +2347,7 @@ Enable common playback keyboard shortcuts. `WaveformPlaylistProvider` only: the 
 | Key | Action |
 |-----|--------|
 | `Space` | Toggle play/pause |
-| `Escape` | Stop playback |
+| `Escape` | Stop playback (during a drag it only cancels the drag, #848) |
 | `0` | Rewind to start |
 
 #### Signature

@@ -48,8 +48,23 @@ function makeEngine() {
   };
 }
 
-async function setupEditor(withShortcuts = false): Promise<any> {
-  const editor = document.createElement('daw-editor') as any;
+/** The editor's members these tests reach (internal ones included). */
+type TestEditor = HTMLElement & {
+  adapter: unknown;
+  updateComplete: Promise<boolean>;
+  _engine: ReturnType<typeof makeEngine>;
+  _pointer: { onPointerDown(e: PointerEvent): void };
+  _clipPointer: { isActive: boolean };
+  _trackReorderDrag: unknown;
+  _annotationDrag: unknown;
+  _dragInProgress: boolean;
+  undo(): void;
+  redo(): void;
+  stop(): void;
+};
+
+async function setupEditor(withShortcuts = false): Promise<TestEditor> {
+  const editor = document.createElement('daw-editor') as unknown as TestEditor;
   editor.setAttribute('interactive-clips', '');
   editor.adapter = { audioContext: { state: 'running', sampleRate: 48000 } };
   if (withShortcuts) {
@@ -65,8 +80,8 @@ async function setupEditor(withShortcuts = false): Promise<any> {
 }
 
 /** Press a clip header inside the editor's timeline, as the pointer would. */
-function pressClipHeader(editor: any, clientX = 100): HTMLElement {
-  const timeline = editor.shadowRoot.querySelector('.timeline') as HTMLElement;
+function pressClipHeader(editor: TestEditor, clientX = 100): HTMLElement {
+  const timeline = editor.shadowRoot!.querySelector('.timeline') as HTMLElement;
   const header = document.createElement('div');
   header.className = 'clip-header';
   header.dataset.clipId = 'c1';
@@ -85,7 +100,7 @@ function movePointer(timeline: HTMLElement, clientX: number) {
 }
 
 /** A track-reorder handler on a column of its own (the editor has no tracks here). */
-function grabTrack(editor: any): { handler: TrackReorderHandler; host: TrackReorderHost } {
+function grabTrack(editor: TestEditor): { handler: TrackReorderHandler; host: TrackReorderHost } {
   const column = document.createElement('div');
   column.className = 'controls-column';
   const rows = ['a', 'b'].map((id, i) => {
