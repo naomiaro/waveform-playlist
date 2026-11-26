@@ -202,6 +202,20 @@ describe('createSpectrogramWorker', () => {
   });
 
   describe('audio data pre-registration', () => {
+    it('registeredAudioClipIds lists the clips registered and not unregistered (#821)', () => {
+      expect(api.registeredAudioClipIds()).toEqual([]);
+      api.registerAudioData('a', [new Float32Array(4)], 44100);
+      api.registerAudioData('b', [new Float32Array(4)], 44100);
+      api.unregisterAudioData('a');
+      expect(api.registeredAudioClipIds()).toEqual(['b']);
+    });
+
+    it('registeredAudioClipIds is empty after terminate: the worker holds nothing (#821)', () => {
+      api.registerAudioData('a', [new Float32Array(4)], 44100);
+      api.terminate();
+      expect(api.registeredAudioClipIds()).toEqual([]);
+    });
+
     it('skips transfer for pre-registered clip', () => {
       // Register audio data first
       api.registerAudioData('clip1', [new Float32Array(100)], 44100);

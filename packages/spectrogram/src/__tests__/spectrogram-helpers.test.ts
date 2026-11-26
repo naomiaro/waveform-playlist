@@ -7,9 +7,7 @@ import {
   classifyChunkTiers,
   computeChunkSampleRange,
   resolveRenderMode,
-  toComputeConfig,
   buildConfigKey,
-  buildFFTKey,
   mapsDiffer,
   type ChannelChunkInfo,
 } from '../spectrogram-helpers';
@@ -158,44 +156,7 @@ describe('resolveRenderMode', () => {
   });
 });
 
-describe('toComputeConfig', () => {
-  it('returns all-undefined fields for undefined config', () => {
-    expect(toComputeConfig(undefined)).toEqual({
-      fftSize: undefined,
-      hopSize: undefined,
-      windowFunction: undefined,
-      alpha: undefined,
-      zeroPaddingFactor: undefined,
-    });
-  });
-
-  it('picks only the FFT-affecting fields', () => {
-    const result = toComputeConfig({
-      fftSize: 4096,
-      hopSize: 1024,
-      windowFunction: 'hamming',
-      alpha: 0.5,
-      zeroPaddingFactor: 4,
-      // appearance-only fields must NOT leak into the compute config:
-      frequencyScale: 'mel',
-      minFrequency: 0,
-      maxFrequency: 20000,
-      gainDb: 20,
-      rangeDb: 80,
-    });
-    expect(result).toEqual({
-      fftSize: 4096,
-      hopSize: 1024,
-      windowFunction: 'hamming',
-      alpha: 0.5,
-      zeroPaddingFactor: 4,
-    });
-    expect(result).not.toHaveProperty('frequencyScale');
-    expect(result).not.toHaveProperty('gainDb');
-  });
-});
-
-describe('buildConfigKey / buildFFTKey', () => {
+describe('buildConfigKey', () => {
   it('produces a stable key for identical inputs', () => {
     const a = buildConfigKey({
       mode: 'spectrogram',
@@ -212,37 +173,15 @@ describe('buildConfigKey / buildFFTKey', () => {
     expect(a).toBe(b);
   });
 
-  it('config key changes with color map, but FFT key does not', () => {
+  it('changes with the colour map', () => {
     const base = {
       mode: 'spectrogram' as const,
       cfg: { fftSize: 2048 } as SpectrogramConfig,
       mono: false,
     };
-    const cfgKeyA = buildConfigKey({ ...base, cm: 'viridis' });
-    const cfgKeyB = buildConfigKey({ ...base, cm: 'magma' });
-    expect(cfgKeyA).not.toBe(cfgKeyB);
-
-    const computeConfig = toComputeConfig(base.cfg);
-    const fftKeyA = buildFFTKey({ mode: base.mode, mono: base.mono, computeConfig });
-    const fftKeyB = buildFFTKey({ mode: base.mode, mono: base.mono, computeConfig });
-    expect(fftKeyA).toBe(fftKeyB);
-    // colour map is not part of the FFT key at all
-    expect(fftKeyA).not.toContain('viridis');
-    expect(fftKeyA).not.toContain('magma');
-  });
-
-  it('FFT key changes when an FFT-affecting field changes', () => {
-    const keyA = buildFFTKey({
-      mode: 'spectrogram',
-      mono: false,
-      computeConfig: toComputeConfig({ fftSize: 2048 }),
-    });
-    const keyB = buildFFTKey({
-      mode: 'spectrogram',
-      mono: false,
-      computeConfig: toComputeConfig({ fftSize: 4096 }),
-    });
-    expect(keyA).not.toBe(keyB);
+    expect(buildConfigKey({ ...base, cm: 'viridis' })).not.toBe(
+      buildConfigKey({ ...base, cm: 'magma' })
+    );
   });
 });
 

@@ -2,7 +2,6 @@ import {
   MAX_CANVAS_WIDTH,
   parseSpectrogramCanvasId,
   type SpectrogramConfig,
-  type SpectrogramComputeConfig,
   type ColorMapValue,
   type RenderMode,
   type TrackSpectrogramOverrides,
@@ -196,17 +195,6 @@ export function resolveRenderMode(
   return override?.renderMode ?? trackRenderMode ?? 'waveform';
 }
 
-/** Project a `SpectrogramConfig` down to the fields that affect FFT computation. */
-export function toComputeConfig(cfg: SpectrogramConfig | undefined): SpectrogramComputeConfig {
-  return {
-    fftSize: cfg?.fftSize,
-    hopSize: cfg?.hopSize,
-    windowFunction: cfg?.windowFunction,
-    alpha: cfg?.alpha,
-    zeroPaddingFactor: cfg?.zeroPaddingFactor,
-  };
-}
-
 /**
  * Stable string key for a track's full spectrogram appearance (mode + config +
  * color map + mono). A change means the rendered output must be recomputed.
@@ -219,20 +207,6 @@ export function buildConfigKey(params: {
 }): string {
   const { mode, cfg, cm, mono } = params;
   return JSON.stringify({ mode, cfg, cm, mono });
-}
-
-/**
- * Stable string key for the inputs that affect the FFT only (mode + mono +
- * compute config). A change here means the cached FFT data is stale; a config
- * change that leaves this key untouched (e.g. color map) only needs re-display.
- */
-export function buildFFTKey(params: {
-  mode: RenderMode;
-  mono: boolean;
-  computeConfig: SpectrogramComputeConfig;
-}): string {
-  const { mode, mono, computeConfig } = params;
-  return JSON.stringify({ mode, mono, ...computeConfig });
 }
 
 /**

@@ -82,6 +82,13 @@ export interface SpectrogramWorkerApi {
   unregisterCanvas(canvasId: string): void;
   registerAudioData(clipId: string, channelDataArrays: Float32Array[], sampleRate: number): void;
   unregisterAudioData(clipId: string): void;
+  /**
+   * The clip ids whose audio is registered now: registered and not
+   * unregistered since, and empty once terminated. A new array on every call.
+   * A caller that pre-registers audio asks this instead of keeping its own
+   * list, which would outlive a terminated worker (#821).
+   */
+  registeredAudioClipIds(): string[];
   terminate(): void;
 }
 
@@ -245,8 +252,13 @@ export function createSpectrogramWorker(worker: Worker): SpectrogramWorkerApi {
       registeredClipIds.delete(clipId);
     },
 
+    registeredAudioClipIds(): string[] {
+      return [...registeredClipIds];
+    },
+
     terminate() {
       terminated = true;
+      registeredClipIds.clear();
       worker.terminate();
       for (const [, entry] of pending) {
         entry.reject(new Error('Worker terminated'));
