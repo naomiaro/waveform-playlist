@@ -192,11 +192,28 @@ Independent of PRs 2 and 3.
   the `LoadingClip`'s `waveformData` instead (core has the field) is for the
   plan: putting it there writes the arrangement after the clip entered, which
   must not be an undo step.
-- Undo history: a track entering at connect is an undo step like any added
-  track, except the tracks declared in the markup when the page loads, which
-  are not (the React MIDI guide does the same with `clearHistory()` after the
-  first load). The plan settles how "declared at page load" is told apart
-  (for example, tracks added before the editor's first render).
+- Undo history (call, 2026-11-25, told to the maintainer): a track entering
+  at connect is an undo step like any added track, except the tracks
+  declared in the markup when the page loads. If the editor's OWN
+  arrangement has no history when the page's tracks arrive, the editor
+  clears it again after adding them (the React MIDI guide does the same with
+  `clearHistory()` after the first load), so Undo right after load removes
+  nothing. If an app or agent changed `editor.arrangement` first, the history
+  is not empty, the page's tracks stay undo steps and nothing is wiped. Page
+  tracks never go into a handed-in arrangement (the `srcObject` model). The
+  plan settles how "the page's tracks" are batched (they connect one by one,
+  each after a `setTimeout(0)` in `<daw-track>`).
+- **Inserting at a position (decided, 2026-11-25: the index option).** The
+  engine gains `arrangement.addTrack(track, { index })` (and the engine's
+  `addTrack` passes it on): the track enters at that position, one undo
+  step. A `<daw-track>` inserted between two others later in the session
+  lands at its DOM position. Rejected: `addTrack` then `reorderTrack` in a
+  transaction (`beginTransaction` overwrites an open one, so an insert during
+  a clip drag would drop the drag's transaction); always appending (not
+  native). The engine calls the arrangement's methods by name through the
+  `Symbol.for` attach keys, so a new option is a change of that interface:
+  the keys go to `/v3` (`packages/engine/CLAUDE.md`, "Attaching goes through
+  shared keys"). An engine changeset and the engine guide's entry.
 - Gone in this PR: `_seedMix`, the peaks-first preview track in
   `_engineTracks`, every `engine.setTracks` in the load path (and its
   fallbacks), `_audioCache`, `_clipBuffers`, `_loadingTracks` if `sources`
@@ -265,7 +282,8 @@ DOM order is not synced.
   arrangement already holds changes nothing (same-value setters are silent
   since #843).
 - Moving a `<daw-track>` in the DOM is a reorder request: it is placed after
-  the arrangement track of its previous element sibling. An Undo of a reorder
+  the arrangement track of its previous element sibling (the same rule gives
+  the `index` of an inserted element). An Undo of a reorder
   does not move elements. `_syncDomToEngineOrder`, `_syncEngineOrderToDom`
   and `_inOrderSync` go.
 - Removing an element removes its track as an undo step (as today). Undo
