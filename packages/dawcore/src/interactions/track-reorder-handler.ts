@@ -7,6 +7,8 @@
  * touch, and pen uniformly.
  */
 
+import type { DraggedTrack } from './drag-watch';
+
 export interface TrackReorderHost {
   readonly isConnected: boolean;
   shadowRoot: ShadowRoot | null;
@@ -103,6 +105,12 @@ export class TrackReorderHandler {
     gripEl.addEventListener('pointerup', this._onPointerUp);
     gripEl.addEventListener('pointercancel', this._onPointerCancel);
   };
+
+  /** The dragged track and the order of the rows at the grab (#848), or null. */
+  get draggedTrack(): DraggedTrack | null {
+    if (this._trackId === null) return null;
+    return { trackId: this._trackId, order: this._rows.map((r) => r.trackId) };
+  }
 
   /** True from the grab until the drag ends or is cancelled. */
   get isActive(): boolean {

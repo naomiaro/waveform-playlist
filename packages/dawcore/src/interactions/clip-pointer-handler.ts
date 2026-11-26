@@ -1,6 +1,7 @@
 import { snapTickToGrid } from '@waveform-playlist/core';
 import type { AudioClip, SnapTo, MeterEntry } from '@waveform-playlist/core';
 import { constrainClipDrag } from '@waveform-playlist/engine';
+import type { DraggedClip } from './drag-watch';
 import { DRAG_THRESHOLD } from './constants';
 
 /** Snapshot of a clip's bounds for trim constraint computation. */
@@ -155,10 +156,22 @@ export class ClipPointerHandler {
     return this._isDragging;
   }
 
-  /** The clip being dragged (past the threshold), or null. */
-  get draggedClip(): { trackId: string; clipId: string } | null {
-    return this._isDragging ? { trackId: this._trackId, clipId: this._clipId } : null;
+  /**
+   * The clip being dragged (past the threshold) with its bounds at the drag's
+   * start, or null; null too while the release makes its one arrangement
+   * call, so that call is not taken for an outside change (#848).
+   */
+  get draggedClip(): DraggedClip | null {
+    if (!this._isDragging || this._committing) return null;
+    return {
+      trackId: this._trackId,
+      clipId: this._clipId,
+      startSample: this._originalStartSample,
+      durationSamples: this._originalDurationSamples,
+      offsetSamples: this._originalOffsetSamples,
+    };
   }
+  private _committing = false;
 
   /**
    * Attempts to handle a pointerdown event on the given target element.
@@ -372,6 +385,7 @@ export class ClipPointerHandler {
       }
 
       const engine = this._host.engine;
+      this._committing = true;
 
       if (this._mode === 'move') {
         // Back to where the clip was drawn; the re-render after the move puts it there.
@@ -428,6 +442,7 @@ export class ClipPointerHandler {
         }
       }
     } finally {
+      this._committing = false;
       this._reset();
     }
   }

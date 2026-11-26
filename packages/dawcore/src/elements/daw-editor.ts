@@ -113,6 +113,7 @@ import {
 import { LoadAnnouncer } from '../interactions/load-announcer';
 import { clipSeconds, loadedTrack, mixOf } from '../interactions/arrangement-view';
 import { normalizeHandedIn, swapArrangement } from '../interactions/arrangement-swap';
+import { clipDragChanged, trackDragChanged } from '../interactions/drag-watch';
 import {
   refreshLinkStates,
   type ClipLinkValues,
@@ -577,6 +578,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     });
     let tracksVersion = arrangement.tracksVersion;
     const stopTracks = arrangement.subscribe(() => {
+      this._watchDrags();
       if (arrangement.tracksVersion === tracksVersion) return;
       tracksVersion = arrangement.tracksVersion;
       this._refreshLinkStates();
@@ -585,6 +587,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       stopSources();
       stopTracks();
     };
+  }
+  /**
+   * A change to the arrangement while a drag is in progress came from
+   * elsewhere (a drag writes nothing until its release): cancel the drag
+   * when it changed what is dragged (#848 P2, interactions/drag-watch.ts).
+   */
+  private _watchDrags(): void {
+    const clip = this._clipPointer.draggedClip;
+    if (clip && clipDragChanged(this._arrangement, clip)) this._pointer.cancelClipDrag();
+    const track = this._trackReorderDrag.draggedTrack;
+    if (track && trackDragChanged(this._arrangement, track)) this._trackReorderDrag.cancel();
   }
   // --- The swap (interactions/arrangement-swap.ts) ---
   /** @internal */
