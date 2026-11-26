@@ -1270,7 +1270,7 @@ editor.loadMidi(source: string | File, options?: MidiLoadOptions): Promise<MidiL
 interface MidiLoadOptions {
   /** Timeline position in seconds applied to every created clip (default: 0) */
   startTime?: number;
-  /** AbortSignal forwarded to fetch() when source is a URL */
+  /** Cancels the fetch, the parse and the addTrack waits; the tracks added are taken out (no undo step) */
   signal?: AbortSignal;
 }
 
@@ -1298,7 +1298,7 @@ await editor.loadMidi('/midi/bridge.mid', { startTime: 30.0 });
 
 Created tracks are MIDI tracks (`kind="midi"`), drawn as piano rolls. Each track's clip carries `midiNotes` data for the piano-roll renderer. Track names are derived from the MIDI file (instrument name, channel, or GM program name).
 
-**Cleanup-on-failure:** if any of the N track creations fails, `loadMidi` removes all successfully-created tracks before rejecting — the editor returns to its pre-call state. Documented limitation: an `AbortSignal` only cancels the fetch phase; aborts during the track-creation phase are a no-op (the in-flight `addTrack` calls run to completion).
+**Cleanup-on-failure:** if any of the N track creations fails, `loadMidi` removes all successfully-created tracks, with no undo step, before rejecting — the editor returns to its pre-call state. An abort of `options.signal` (or a swap of `editor.arrangement`) in any phase does the same and rejects with the signal's reason (#848).
 
 **Deferred to future versions:**
 
@@ -1556,7 +1556,7 @@ An element is linked to the arrangement by id (`trackEl.trackId`, `clipEl.clipId
 |---|---|---|---|
 | **pending** | Outside an editor, or registered and not entered yet (waiting for `editor.adapter`) | The declaration | Changes the declaration: it is the value the track enters with |
 | **live** | The arrangement played holds the id | The arrangement (`name`, `volume`, `pan`, `muted`, `soloed`, `kind`; `start`, `duration`, `offset`, `gain`, `name`, the MIDI fields) | A request to the arrangement, synchronous, one undo step (mix changes in one synchronous run are one step); the attribute keeps what the page wrote |
-| **detached** | The editor took it and the arrangement no longer holds its id (an Undo of its arrival, a removal made through the arrangement, a refusal), or a handed-in arrangement is set | The declaration | Changes nothing in the arrangement and logs a warning; an attribute change still updates the declaration. The element carries `:state(detached)`; a Redo of its arrival makes it live again |
+| **detached** | The editor took it and the arrangement no longer holds its id (an Undo of its arrival, a removal made through the arrangement, a refusal), or a handed-in arrangement is set | The declaration | Changes nothing in the arrangement and logs a warning; an attribute change still updates the declaration. The element carries `:state(detached)`; a Redo of its arrival makes it live again (for a handed-in arrangement: `editor.arrangement = null`) |
 
 `src`, `render-mode`, `spectrogramConfig`, fades and `color` are declaration-only: the arrangement has no field for them (`editor.updateTrack()` changes what is drawn; read it from `editor.tracks`). `kind` is live and cannot change after entry: a later change warns, and the attribute keeps what the page wrote. A `<daw-clip>` is linked to its clip by id wherever it sits, so after an Undo of a move it can sit in another track's element and still be live.
 
@@ -1571,11 +1571,11 @@ An element is linked to the arrangement by id (`trackEl.trackId`, `clipEl.clipId
 | moves a `<daw-track>` (`insertBefore`, `moveBefore()`) | A reorder request: placed after the track of the `<daw-track>` before it | One step per observer batch; an Undo moves no element |
 | moves a `<daw-clip>` into another live track | Its clip moves there as it is (times, audio) | One step; an Undo moves no element: the element stays, linked by id |
 | moves a `<daw-clip>` into a track of the other kind | Refused: nothing changes, `daw-clip-error`, a warning; the element stays where the page put it | None |
-| moves a `<daw-clip>` into a pending track | The clip moves when the track enters, as it is (times, audio); one of the other kind stays where it is, with `daw-clip-error` | Part of the track's arrival step |
+| moves a `<daw-clip>` into a pending track | The clip moves when the track enters, as it is (times, audio); one of the other kind stays where it is, with `daw-clip-error` | Part of the track's arrival step (none at page load, when the arrival makes none) |
 | moves a `<daw-clip>` into a detached track | Refused: the clip stays in its track, `daw-clip-error`, a warning; the element shows `:state(detached)` and, once a Redo brings the track back, is live, linked to its clip by id | None |
 | removes a `<daw-clip>` | Its clip leaves the track that holds it | One step |
 | removes a `<daw-track>` | The track leaves, with every clip its children declared (also a clip another track holds, whose element sat inside it) | One step for the whole removal |
-| removes an element whose clip or track an Undo took out | Gone for good: taken out of the undo and redo states too, so no Redo brings it back (and no Redo is lost) | None |
+| removes an element whose clip or track the arrangement does not hold (an Undo, a removal made through the arrangement, a refusal) | Gone for good: taken out of the undo and redo states too, so no Redo brings it back (and no Redo is lost) | None |
 | removes an element while a handed-in arrangement is set | An ordinary undo step in the editor's own arrangement | One step there |
 | moves the elements with `moveBefore()` | As the moves above; `connectedMoveCallback` keeps the elements' state and announces their new place | As above |
 

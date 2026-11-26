@@ -271,7 +271,7 @@ editor.loadMidi(source: string | File, options?: MidiLoadOptions): Promise<MidiL
 
 interface MidiLoadOptions {
   startTime?: number;       // Timeline position in seconds (default 0)
-  signal?: AbortSignal;     // Forwarded to fetch only — see "AbortSignal scope" below
+  signal?: AbortSignal;     // Cancels the fetch, the parse and the tracks waiting to enter — see "AbortSignal Scope" below
 }
 
 interface MidiLoadResult {
@@ -303,7 +303,7 @@ If any per-track creation fails, every track the call added is removed (`addTrac
 
 ### AbortSignal Scope
 
-`options.signal` is forwarded to `fetch()` for URL sources only. Aborting after parsing has finished does NOT cancel the in-flight `addTrack` calls (a documented v1 limitation). Cancellation typically surfaces as a `DOMException` named `AbortError` — distinguish it from a real failure:
+`options.signal` cancels the whole call: the fetch of a URL source, the parse, and the tracks still waiting to enter (`<daw-editor>` combines it with the arrangement it plays, so a swap of `editor.arrangement` cancels it too). The call rejects with the signal's `reason` (a `DOMException` named `AbortError` when `abort()` is called without one), and the tracks it added are taken out with no undo step. Distinguish it from a real failure:
 
 ```javascript
 try {

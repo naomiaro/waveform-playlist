@@ -189,7 +189,7 @@ Removed: `usePlaylistControls()`, `usePlaylistAnnotations()`, `useMediaElementAn
 ### MIDI Loading (from `@dawcore/components`, requires optional `@dawcore/midi` peer dep)
 
 - `editor.loadMidi(source, options?)` — Imperatively load a `.mid` file (URL string or File) and add N MIDI tracks (no `<daw-track>` element; drawn as piano rolls) — one per note-bearing MIDI track. Returns `Promise<MidiLoadResult>` with `{ trackIds, bpm, timeSignature, duration, name }`. Cleanup-on-failure via `Promise.allSettled`: any per-track failure removes every track the call added, with no undo step; `options.signal` cancels it the same way. Dynamic-imports `@dawcore/midi` on first call; throws friendly install hint if missing.
-- `MidiLoadOptions` — `{ startTime?: number; signal?: AbortSignal }`. `signal` is forwarded to `fetch()` only; aborting after parse is a no-op.
+- `MidiLoadOptions` — `{ startTime?: number; signal?: AbortSignal }`. `signal` cancels the fetch, the parse and the tracks waiting to enter; the call rejects with its reason and takes out the tracks it added (no undo step). `addTrack(config, options?)`, `addClip(trackId, config, options?)` and `loadFiles(files, options?)` take the same `{ signal }` (`EditorCallOptions`).
 - `MidiLoadResult` — `{ readonly trackIds: readonly string[]; readonly bpm: number; readonly timeSignature: readonly [number, number]; readonly duration: number; readonly name: string }`.
 
 ### Beats & Bars (from `@waveform-playlist/ui-components`)

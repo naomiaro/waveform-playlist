@@ -703,6 +703,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   - `ClipPointerHandler` (`interactions/clip-pointer-handler.ts`) — Move (header drag) and trim (boundary drag) with engine delegation
   - `splitAtPlayhead` (`interactions/split-handler.ts`) — Split clip at current playhead position (S key)
   - `clip-peak-sync.ts` — Regenerates peaks after split/trim via `_syncPeaksForChangedClips`
+  - `abort.ts` — cancellation: `AbortError`s that name their cause, one `AbortController` per arrangement while it is played (`PlaySignals`; a swap aborts the waits of the one leaving), `untilAborted` (#848)
   - `clip-rehome.ts` — A `<daw-clip>` the page moved into another `<daw-track>`: its clip moves there in one undo step; a track of the other kind refuses it (#848)
   - Move and trim preview in the view and call the engine once on release (#848: no transaction, nothing written during the drag)
   - `drag-watch.ts` — During a clip or track drag, a change to the arrangement made elsewhere cancels the drag when it changed what is dragged (#848)
