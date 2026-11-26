@@ -228,7 +228,7 @@ All three methods:
 - Increment `tracksVersion` and emit `statechange`
 - Are undo steps
 
-With `skipAdapter` set to `true`, `moveClip()` and `trimClip()` change the state and emit `statechange` without calling the adapter. A drag uses this for each pointer move and sends the track once on drop with `engine.updateTrack(trackId)`.
+With `skipAdapter` set to `true`, `moveClip()` and `trimClip()` change the state and emit `statechange` without calling the adapter. It is for a custom drag that writes each pointer move: send the track once on drop with `engine.updateTrack(trackId)`. The library's own drags (`<daw-editor>`, the React editor) draw a preview and call `moveClip()` / `trimClip()` once on release.
 
 ### Playback
 
@@ -370,7 +370,7 @@ engine.dispose(options?: { keepAdapter?: boolean }): void;
 
 Disposes the adapter, clears all event listeners, stops following the arrangement and takes back the audio context it gave the arrangement to decode with (loads in flight are aborted and stay pending). Safe to call multiple times. An arrangement you passed in is not cleared: see [The Arrangement](#the-arrangement).
 
-With `{ keepAdapter: true }` the adapter is not disposed: playback is stopped first (as `stop()` does, with its `stop` event), and the engine lets go of the adapter's `onPlaybackEnded`. A new engine can then be built with the same adapter on another arrangement; its constructor sends that arrangement's tracks to the adapter. `<daw-editor>` does this when `editor.arrangement` is set.
+With `{ keepAdapter: true }` the adapter is not disposed: playback is stopped first (as `stop()` does, with its `stop` event), and the engine lets go of the adapter's `onPlaybackEnded`. The adapter is emptied (`setTracks([])`), so the tracks of this engine stop playing through it even when the next arrangement has none (an empty arrangement sends nothing). A new engine can then be built with the same adapter on another arrangement; its constructor sends that arrangement's tracks to the adapter. `<daw-editor>` does this when `editor.arrangement` is set.
 
 ## The Arrangement
 
@@ -420,11 +420,15 @@ Make track changes from an event handler (or a listener of `arrangement.sources`
 
 The arrangement has the engine's track, clip, mixer, recording and history methods: `setTracks`, `addTrack`, `removeTrack`, `updateTrack`, `reorderTrack`, `moveClip`, `trimClip`, `splitClip`, `getClipBounds`, `constrainTrimDelta`, `setTrackVolume`, `setTrackMute`, `setTrackSolo`, `setTrackPan` (each with the same `options`), `setTrackRecording`, `undo`, `redo`, `clearHistory`, `beginTransaction`, `commitTransaction` and `abortTransaction`. The engine's methods call them, so a change made through either reaches the adapter and emits `statechange`.
 
-Besides [loading audio](#loading-audio), two things are on the arrangement only:
+Besides [loading audio](#loading-audio), three things are on the arrangement only:
 
 ```typescript
 // Remove a track for good: no undo step, and no undo or redo brings it back
 arrangement.removeTrack(trackId, { undoable: false });
+
+// Remove a clip: an undo step; with { undoable: false }, for good, as above
+arrangement.removeClip(trackId, clipId);
+arrangement.removeClip(trackId, clipId, { undoable: false });
 
 // Replace a track with a function of the current one (not called for an unknown ID)
 arrangement.updateTrack(trackId, (track) => ({ ...track, name: 'Bass' }));
@@ -433,6 +437,8 @@ arrangement.updateTrack(trackId, (track) => ({ ...track, name: 'Bass' }));
 `updateTrack()`, given a track or a function, keeps each clip object the track already holds and copies every other clip. The clips you did not replace are therefore the same objects afterwards.
 
 `removeTrack(trackId, { undoable: false })` is for a track that should never have been there, such as a dropped file that could not be decoded. The track is taken out of the current tracks and out of every undo and redo state, and an undo step that no longer changes anything is dropped. Its mixer values go with it.
+
+`removeClip(trackId, clipId, { undoable: false })` does the same for one clip, in every state that holds its track. A track that, without the clip, is the track as an earlier state holds it becomes that object, so the step that only added the clip is dropped too and no undo or redo is left that changes nothing. `<daw-editor>` uses it for a `<daw-clip>` the page removes while the arrangement does not hold its clip (an Undo took the clip or its track away). Without the option, `removeClip` is an undo step; nothing happens for a clip no state holds.
 
 The arrangement's `moveClip()` and `trimClip()` have no `skipAdapter` argument; that one is the engine's.
 

@@ -380,7 +380,7 @@ editor.zoomOut(): void
 editor.setMasterVolume(volume: number): void
 // Programmatic track/clip mutation (see "Programmatic Track Mutation" section)
 editor.ready(): Promise<PlaylistEngine>                                  // Ensure engine is built; resolves with it
-editor.addTrack(config: TrackConfig): Promise<string>                    // Append a <daw-track>; resolves with its id once it has entered (before its audio loads)
+editor.addTrack(config: TrackConfig): Promise<string>                    // Add a track to the arrangement played (no element, #848); resolves with its id once it has entered (before its audio loads)
 editor.retryTrack(trackId: string): void                                 // Load the track's failed sources again
 editor.removeTrack(trackId: string): void                                // Remove track by ID
 editor.updateTrack(trackId: string, partial: Partial<TrackConfig>): void
@@ -915,7 +915,7 @@ The track doesn't care what fired the event — any element that dispatches `daw
 - `PointerHandler` — timeline interactions: click-to-seek, drag-to-select, track selection.
 - `ClipPointerHandler` — clip move and boundary trim via `setPointerCapture`, with a small `DRAG_THRESHOLD` to distinguish clicks from drags.
 
-Both handlers talk to the engine through narrow contracts (`moveClip`, `trimClip`, `constrainTrimDelta`, `getClipBounds`) so collision and bounds logic stays engine-side, and they wrap each gesture in `beginTransaction()` / `commitTransaction()` so a full drag is one undo step (`abortTransaction()` on cancel). Snapping uses `snapTickToGrid` / `snapToTicks` from `@waveform-playlist/core` driven by the editor's `snapTo` value.
+Both handlers talk to the engine through narrow contracts (`moveClip`, `trimClip`, `constrainTrimDelta`, `getClipBounds`) so collision and bounds logic stays engine-side, and a drag previews in the view and makes one `moveClip` / `trimClip` call on release, which is its one undo step; a cancel writes nothing (#848). Snapping uses `snapTickToGrid` / `snapToTicks` from `@waveform-playlist/core` driven by the editor's `snapTo` value.
 
 Note for E2E tests: synthetic `dispatchEvent(new PointerEvent(...))` cannot drive these handlers — `setPointerCapture` throws for fabricated pointerIds. Use real input (`page.mouse.*`).
 
@@ -1535,7 +1535,7 @@ annotationTrack.moveEndBoundary(deltaMs: number): void
 
 ## Programmatic Track Mutation
 
-Two consumer-facing ways to mutate tracks at runtime exist by design: **declarative DOM mutation** (append/remove/update `<daw-track>` and `<daw-clip>` elements) and **imperative editor methods** (`editor.addTrack`, `editor.removeTrack`, `editor.loadFiles`). The engine API (`editor.engine.setTracks`, `editor.engine.addTrack`, …) is **internal plumbing**, not a consumer surface — calling it directly bypasses the descriptor map that backs `<daw-track-controls>` and the peak/buffer caches that back the waveform.
+Two consumer-facing ways to mutate tracks at runtime exist by design: **declarative DOM mutation** (append/remove/update `<daw-track>` and `<daw-clip>` elements) and **imperative editor methods** (`editor.addTrack`, `editor.removeTrack`, `editor.loadFiles`). The engine API (`editor.engine.setTracks`, `editor.engine.addTrack`, …) is **internal plumbing**, not a consumer surface — the editor reads its arrangement, so a change made through `editor.arrangement` (or the engine) is drawn; see "Drive tracks through `editor.arrangement`, not `editor.engine`" below (#848).
 
 ### Engine Lifecycle
 
@@ -1612,12 +1612,12 @@ interface ClipConfig {
 
 Behavior contract — all methods go through the same path as a declared `<daw-track>` (#848): the track enters the editor's arrangement, which loads its audio, so that:
 
-1. `<daw-track-controls>` shows the correct name/volume/pan/mute/solo (the descriptor map `_tracks` is populated; the mix is the arrangement's).
+1. `<daw-track-controls>` shows the correct name/volume/pan/mute/solo (read from the arrangement, #848).
 2. The waveform renders (peaks generated and cached in `_peaksData` as each clip loads).
 3. Drag/trim/split work once a clip has loaded.
 4. `daw-track-ready` / `daw-track-error` fire as the audio loads or fails.
 
-`addTrack` appends a real `<daw-track>` element to the editor's light DOM so subsequent declarative mutations work uniformly, and resolves with its track id once the track has entered. The element's `src`/`name`/etc. attributes are reflected from the config.
+`addTrack` adds the track to the arrangement played and creates no element (#848); it resolves with its track id once the track has entered. Change it with the id-keyed editor methods or `editor.arrangement`.
 
 ```javascript
 // Plain audio

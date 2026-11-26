@@ -102,6 +102,7 @@ Read before writing or changing a test in `src/__tests__` (after the skill `unit
 - `<option>`: `selected` (attribute) against `option.selected`, and `option.index`, the position in its select. `trackEl.index`, -1 when not in the arrangement.
 - `<details open>` is the counter-example: a native element that writes its own attribute back when the user toggles it. This library does not follow it; a state change shows in a property or a custom state, never in the page's attribute.
 - `<video>` with `<source>` children and `srcObject`: the children declare the content, `srcObject` replaces it while set and the children are inert, `null` goes back. `editor.arrangement`.
+- `<track>` in `<video>`: removing the element removes its text track; the list follows the children. A `<daw-clip>` or `<daw-track>` the page removes is gone, also when detached: `removeClip` / `removeTrack` with `{ undoable: false }` take it out of the undo and redo states (maintainer's choice, #848, after the case was put to them with the `<source>` precedent, which would leave it playing). A child ADDED to a detached track is a change to a detached element: it never enters, warns and shows `:state(detached)`.
 - Custom states (`ElementInternals.states`, `:state(detached)`) for runtime flags, never a synthetic attribute (the modern-web-guidance guide `custom-elements`). happy-dom 21 has no `attachInternals`: elements call it guarded and unit tests stub it.
 
 **Checklist for a new attribute or property** (write the answers in the design, before the first review):

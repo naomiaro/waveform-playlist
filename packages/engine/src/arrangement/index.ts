@@ -6,6 +6,7 @@ export type {
   ClipBounds,
   CreateArrangementOptions,
   MixerChangeOptions,
+  RemoveClipOptions,
   RemoveTrackOptions,
   AddTrackOptions,
 } from './types';

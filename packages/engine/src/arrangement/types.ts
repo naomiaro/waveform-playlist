@@ -24,6 +24,16 @@ export interface RemoveTrackOptions {
   undoable?: boolean;
 }
 
+/** Options of `removeClip`. */
+export interface RemoveClipOptions {
+  /**
+   * `false`: the removal is not an undo step, and the clip is also taken out
+   * of every undo and redo state, so no undo or redo brings it back (a
+   * `<daw-clip>` the page removed while its track was detached, #848).
+   */
+  undoable?: boolean;
+}
+
 /** Options of `addTrack`. */
 export interface AddTrackOptions {
   /**
@@ -92,6 +102,11 @@ export interface Arrangement {
   /** Add a track: an undo step. Throws for an `index` that is not a finite number. */
   addTrack(track: ArrangementTrack, options?: AddTrackOptions): void;
   removeTrack(trackId: string, options?: RemoveTrackOptions): void;
+  /**
+   * Remove a clip from a track: an undo step. With `undoable: false` there is
+   * no step, and the clip is also taken out of every undo and redo state.
+   */
+  removeClip(trackId: string, clipId: string, options?: RemoveClipOptions): void;
   /**
    * Replace a track, with a track or with a function of the current one.
    * Changes nothing for an id no track has (a track object is still checked

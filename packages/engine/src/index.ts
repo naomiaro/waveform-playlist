@@ -16,6 +16,7 @@ export type {
   CreateArrangementOptions,
   LoadSource,
   MixerChangeOptions,
+  RemoveClipOptions,
   RemoveTrackOptions,
   AddTrackOptions,
   TrackMixerValues,

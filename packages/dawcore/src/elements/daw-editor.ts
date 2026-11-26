@@ -117,6 +117,7 @@ import { normalizeHandedIn, swapArrangement } from '../interactions/arrangement-
 import { clipDragChanged, trackDragChanged } from '../interactions/drag-watch';
 import {
   refreshLinkStates,
+  detachedWarning,
   type ClipLinkValues,
   type LinkState,
   type TrackLinkValues,
@@ -1619,7 +1620,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           .find((t) => t.id === trackId)
           ?.clips.some((c) => c.id === clipId);
         if (held) this._removeClipFromTrack(trackId, clipId);
-        else this._forgetClip(trackId, clipId);
+        else this._dropUnheldClip(trackId, clipId);
       }
     }
     if (this._externalAdapter && !this._engine) this._buildEngineReporting();
@@ -1842,6 +1843,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // fires for a track that was actually registered.
     const existed =
       this._pending.has(trackId) || this._extras.has(trackId) || this._isEntered(trackId);
+    // Detached (an Undo of its arrival): gone for good, also from the undo
+    // and redo states (maintainer's choice, #848).
+    const detached = !this._handedIn && this._trackLinkState(trackId) === 'detached';
+    const detachedClipIds = detached ? [...(this._extras.get(trackId)?.peaksSrc.keys() ?? [])] : [];
     // An addClip() waiting for a clip of this track would never settle (the
     // clip may not even have connected yet): reject it (#917).
     this._rejectAwaitedClips(
@@ -1882,6 +1887,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._extras = nextExtras;
     // An undo step; the engine follows (incremental removal, playback goes on).
     if (arrangementTrack) holder.removeTrack(trackId);
+    else if (detached) {
+      holder.removeTrack(trackId, { undoable: false });
+      for (const id of detachedClipIds) {
+        this._purgeClipCaches(id);
+        this._previewWaveforms.delete(id);
+      }
+    }
     this._recomputeDuration();
     // Recompute zoom floor from remaining cached WaveformData scales
     this._recomputeZoomFloor();
@@ -2053,6 +2065,25 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const entered = this._arrangementOf(trackId)
       .getTracks()
       .some((t) => t.id === trackId);
+    if (!entered && this._trackLinkState(trackId) === 'detached') {
+      // Added under a detached track (an Undo of its arrival): it never
+      // enters, also after a Redo. It is taken, so it shows detached
+      // (maintainer's choice, #848).
+      this._takeClip(trackId, clipEl.clipId, clipEl.peaksSrc || '');
+      console.warn(
+        detachedWarning(
+          '<daw-track> "' + (trackEl.name || 'Untitled') + '"',
+          'a <daw-clip> added to it',
+          this._detachedReason()
+        )
+      );
+      this._rejectAwaitedClips(
+        (id) => id === clipEl.clipId,
+        'addClip: track "' + trackId + '" is detached'
+      );
+      this._refreshLinkStates();
+      return;
+    }
     if (!entered) {
       // Neither entered nor waiting to enter: an Undo took the track out
       // between an addClip() and this deferred connect, or the arrangement
@@ -2088,7 +2119,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // A clip the arrangement refused (its kind): it goes from what the editor took.
     for (const [trackId, extras] of this._extras) {
       if (!extras.peaksSrc.has(clipId)) continue;
-      this._forgetClip(trackId, clipId);
+      this._dropUnheldClip(trackId, clipId);
       return;
     }
     // Removed before its deferred connect, or from a track that has not
@@ -2402,6 +2433,18 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     if (!extras || extras.peaksSrc.get(clipId) === peaksSrc) return;
     const next = new Map(extras.peaksSrc).set(clipId, peaksSrc);
     this._extras = new Map(this._extras).set(trackId, { ...extras, peaksSrc: next });
+  }
+  /**
+   * A `<daw-clip>` the editor took is removed while the arrangement does not
+   * hold its clip (its track or its own arrival undone, or refused): it is
+   * gone for good, also from the undo and redo states, so no Redo brings it
+   * back (maintainer's choice, #848).
+   */
+  private _dropUnheldClip(trackId: string, clipId: string): void {
+    this._arrangementOf(trackId).removeClip(trackId, clipId, { undoable: false });
+    this._purgeClipCaches(clipId);
+    this._previewWaveforms.delete(clipId);
+    this._forgetClip(trackId, clipId);
   }
   /** The editor no longer holds anything for a clip of a track. */
   private _forgetClip(trackId: string, clipId: string): void {

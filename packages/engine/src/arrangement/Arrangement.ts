@@ -48,6 +48,7 @@ import {
   dropRepeats,
   mapHistoryStates,
   mapHistoryTracks,
+  purgeClip,
   purgeTrack,
   pushStep,
   redoStep,
@@ -80,6 +81,7 @@ import type {
   Arrangement,
   ClipBounds,
   MixerChangeOptions,
+  RemoveClipOptions,
   RemoveTrackOptions,
 } from './types';
 
@@ -457,6 +459,22 @@ export class ArrangementImpl implements Arrangement {
   }
 
   /**
+   * Remove a clip from a track: an undo step. With `undoable: false` there is
+   * no step, and the clip is also taken out of every undo and redo state, so
+   * that no undo or redo brings it back (#848: a `<daw-clip>` the page removed
+   * while its track was detached).
+   */
+  removeClip(trackId: string, clipId: string, options?: RemoveClipOptions): void {
+    if (options?.undoable === false) {
+      this._removeClipEverywhere(trackId, clipId);
+      return;
+    }
+    const current = this._tracks.find((t) => t.id === trackId);
+    if (!current?.clips.some((c) => c.id === clipId)) return;
+    this.updateTrack(trackId, (t) => ({ ...t, clips: t.clips.filter((c) => c.id !== clipId) }));
+  }
+
+  /**
    * Move a track to a new position in the track order. Purely organizational —
    * track order is not audible.
    */
@@ -811,6 +829,31 @@ export class ArrangementImpl implements Arrangement {
     } else if (historyChanged) {
       this._emit({ type: 'history' });
     } else {
+      // Only an open transaction's base held it.
+      this._resyncSourcesQuietly();
+    }
+  }
+
+  /** `removeClip` with `undoable: false`: out of the current tracks and out of every stored state. */
+  private _removeClipEverywhere(trackId: string, clipId: string): void {
+    const previous = this._tracks.find((t) => t.id === trackId);
+    const base = this._transaction?.state ?? null;
+    const purged = purgeClip(this._history, this._currentState(), trackId, clipId, base);
+    const historyChanged = purged.history !== this._history;
+    const baseChanged = purged.base !== base;
+    this._history = purged.history;
+    if (this._transaction && purged.base) {
+      this._transaction = { ...this._transaction, state: purged.base };
+    }
+    if (purged.current.tracks !== this._tracks && previous) {
+      this._gesture = null;
+      this._tracks = purged.current.tracks;
+      this._tracksVersion++;
+      this._emit({ type: 'update', trackId, previous });
+    } else if (historyChanged) {
+      this._gesture = null;
+      this._emit({ type: 'history' });
+    } else if (baseChanged) {
       // Only an open transaction's base held it.
       this._resyncSourcesQuietly();
     }

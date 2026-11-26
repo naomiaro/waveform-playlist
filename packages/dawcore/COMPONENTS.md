@@ -117,6 +117,8 @@ When `src` is set without child `<daw-clip>` elements, a single clip spanning th
 
 **Detached.** An element is linked to its track by id. When the arrangement no longer holds that id (an Undo of its arrival, an `arrangement.removeTrack` made by the app, a refusal) or a handed-in arrangement is set, the element is detached: it is not drawn, not in `editor.tracks`, its properties read its declaration, and a change on it does nothing and logs a warning that names the element and the reason. It carries the custom state `detached`: `daw-track:state(detached) { … }` in CSS, `el.matches(':state(detached)')` in script (nothing is written to the DOM). The editor never adds it again; a Redo of its arrival makes it live again. Removing it and inserting it again declares a new track.
 
+**The children of a detached `<daw-track>`.** A `<daw-clip>` (or the `<daw-track>` itself) that the page removes while the arrangement does not hold it is gone for good: it is taken out of the undo and redo states too, so no Redo brings it back, and no Redo is lost. A `<daw-clip>` added to a detached `<daw-track>` never enters, also after a Redo: it logs a warning and carries `:state(detached)`. The same holds for a `<daw-clip>` whose own arrival an Undo took away. (The rule follows `<track>` in `<video>`: removing the element removes what it declared.)
+
 **Events:** `daw-track-update` `{ trackId, changed }` after a reflected property changes (not on the first render). `changed` names the properties of that update.
 
 ### `<daw-clip>`

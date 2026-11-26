@@ -1722,6 +1722,10 @@ interface RemoveTrackOptions {
   undoable?: boolean;             // false: no undo step, and the track is taken out of every undo and redo state
 }
 
+interface RemoveClipOptions {
+  undoable?: boolean;             // false: no undo step, and the clip is taken out of every undo and redo state
+}
+
 /** How a mixer setter's change goes into the undo history. */
 interface MixerChangeOptions {
   /** Changes with the same id, one after another, are one undo step. */
@@ -1766,6 +1770,7 @@ interface Arrangement {
   // tracks
   addTrack(track: ArrangementTrack, options?: AddTrackOptions): void; // An undo step
   removeTrack(trackId: string, options?: RemoveTrackOptions): void;
+  removeClip(trackId: string, clipId: string, options?: RemoveClipOptions): void; // An undo step; nothing for a clip no state holds
   updateTrack(                                          // Changes nothing for an id no track has (the track object is still checked and may throw; a function is not called). The mix stays; a track given a new id takes its mix with it.
                                                         // In both forms a clip object the track already holds is kept as it is; every other clip is copied
     trackId: string,
@@ -1879,7 +1884,8 @@ interface EngineState {
 // Events: on(event, listener), off(event, listener)
 // isArrangement(value): boolean — exported; true for an arrangement made by createArrangement()
 // Lifecycle: dispose(options?: { keepAdapter?: boolean }) — keepAdapter: stop playback, let go of the
-//   arrangement and onPlaybackEnded, leave the adapter undisposed for a new engine on another arrangement
+//   arrangement and onPlaybackEnded, empty the adapter (setTracks([])) and leave it undisposed for a
+//   new engine on another arrangement
 
 // Pure operations (also exported for use without PlaylistEngine):
 import { constrainClipDrag, constrainBoundaryTrim, canSplitAt, splitClip, calculateSplitPoint } from '@waveform-playlist/engine';
