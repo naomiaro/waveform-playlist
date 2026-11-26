@@ -91,7 +91,7 @@ describe('<daw-editor>: a <daw-clip> moved to another <daw-track>', () => {
     expect(ids(ed, b.trackId)).toEqual([clip.clipId]);
   });
 
-  it('a clip of the wrong kind is refused: its element goes back to the old track, no undo step', async () => {
+  it('a clip of the wrong kind is refused: nothing changes, no undo step, the element stays linked to its clip', async () => {
     const { ed, a, b, clip } = await twoTracks('<daw-track name="M" kind="midi"></daw-track>');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const errors: unknown[] = [];
@@ -100,12 +100,17 @@ describe('<daw-editor>: a <daw-clip> moved to another <daw-track>', () => {
     const before = ed.arrangement.getTracks();
     b.appendChild(clip);
     await tick(3);
-    expect(clip.parentElement).toBe(a);
+    expect(clip.parentElement).toBe(b); // the editor moves no element
     expect(ed.arrangement.getTracks()).toBe(before);
     expect(ed.canUndo).toBe(canUndo);
-    expect(ed._clipLinkState(a.trackId, clip.clipId)).toBe('live');
+    expect(ed._clipLinkState(b.trackId, clip.clipId)).toBe('live');
+    expect(clip.start).toBe(2); // the clip in A, read by id
     expect(errors).toHaveLength(1);
-    expect(warn.mock.calls.some(([m]) => /put back/.test(String(m)))).toBe(true);
+    expect(warn.mock.calls.some(([m]) => /stays in its track/.test(String(m)))).toBe(true);
+    clip.connectedMoveCallback(); // announced again: not refused a second time
+    await tick(3);
+    expect(errors).toHaveLength(1);
+    expect(ids(ed, a.trackId)).toContain(clip.clipId);
   });
 
   it('a <daw-clip> moved out of the editor leaves its track', async () => {
@@ -158,5 +163,64 @@ describe('<daw-editor>: a <daw-clip> moved to another <daw-track>', () => {
     expect(ids(ed, b.trackId)).toEqual([clip.clipId]);
     ed.undo();
     expect(ids(ed, a.trackId)).toContain(clip.clipId);
+  });
+
+  it('after an Undo of a move the element stays where the page put it, linked to its clip by id', async () => {
+    const { ed, a, b, clip } = await twoTracks();
+    b.appendChild(clip);
+    await tick(3);
+    ed.undo();
+    await tick(3);
+    expect(clip.parentElement).toBe(b);
+    expect(ids(ed, a.trackId)).toContain(clip.clipId);
+    expect(ed._clipLinkState(b.trackId, clip.clipId)).toBe('live');
+    expect(clip.start).toBe(2);
+    ed.redo(); // the move again: the element is where its clip is
+    expect(ids(ed, b.trackId)).toEqual([clip.clipId]);
+    ed.undo();
+    clip.start = 3; // a request to the clip, in track A (a new step: the redo goes)
+    const inA = clipsOf(ed, a.trackId).find((c: { id: string }) => c.id === clip.clipId);
+    expect(inA.startSample).toBe(3 * ed.effectiveSampleRate);
+    clip.remove(); // its removal takes the clip from A, the track that holds it
+    await tick(3);
+    expect(ids(ed, a.trackId)).not.toContain(clip.clipId);
+    expect(ids(ed, b.trackId)).not.toContain(clip.clipId);
+  });
+
+  it('after an Undo of a move the page can move the element back: it is linked again, nothing is added', async () => {
+    const { ed, a, b, clip } = await twoTracks();
+    b.appendChild(clip);
+    await tick(3);
+    ed.undo();
+    await tick(3);
+    const errors: unknown[] = [];
+    ed.addEventListener('daw-clip-error', (e: CustomEvent) => errors.push(e.detail));
+    const canUndo = ed.canUndo;
+    a.appendChild(clip);
+    await tick(3);
+    expect(errors).toEqual([]);
+    expect(ids(ed, a.trackId).filter((id: string) => id === clip.clipId)).toHaveLength(1);
+    expect(ed._clipLinkState(a.trackId, clip.clipId)).toBe('live');
+    expect(ed.canUndo).toBe(canUndo);
+  });
+
+  it('an element the page did not move is not moved: a clip the app moves through the arrangement', async () => {
+    const { ed, a, b, clip } = await twoTracks();
+    const held = clipsOf(ed, a.trackId).find((c: { id: string }) => c.id === clip.clipId);
+    ed.arrangement.beginTransaction();
+    ed.arrangement.updateTrack(a.trackId, (t: { clips: { id: string }[] }) => ({
+      ...t,
+      clips: t.clips.filter((c) => c.id !== clip.clipId),
+    }));
+    ed.arrangement.updateTrack(b.trackId, (t: { clips: unknown[] }) => ({
+      ...t,
+      clips: [...t.clips, held],
+    }));
+    ed.arrangement.commitTransaction();
+    await tick(3);
+    ed.undo();
+    ed.redo();
+    await tick(3);
+    expect(clip.parentElement).toBe(a);
   });
 });

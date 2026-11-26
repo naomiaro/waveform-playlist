@@ -69,8 +69,8 @@ export class TrackReorderHandler {
     this._gripEl = gripEl;
 
     // Waveform-lane parity (drag-preview spec): snapshot the shadow timeline's
-    // .track-row lanes by trackId. Transform-only mirroring — lane DOM order
-    // never changes, so the editor's MutationObserver order-sync never fires.
+    // .track-row lanes by trackId. Transform-only mirroring: the lanes' DOM
+    // order does not change during the drag; the release is one reorderTrack.
     const timeline = this._host.shadowRoot?.querySelector('.timeline');
     const laneEls = timeline ? ([...timeline.querySelectorAll('.track-row')] as HTMLElement[]) : [];
     this._lanes = this._rows.map((r) => {

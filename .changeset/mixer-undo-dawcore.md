@@ -4,7 +4,7 @@
 
 dawcore: mixer moves are undo steps (#843).
 
-- A volume, pan, mute or solo change is an undo step: one per `<daw-track-controls>` slider drag or key press, per Mute or Solo click, per `<daw-track>` property set or attribute change (mix changes made together in one task are one step) and per `editor.updateTrack()` call. Before, the mix was never an undo step. A track is in the arrangement while its audio loads (#848), so a change made then is a step too.
+- A volume, pan, mute or solo change is an undo step: one per `<daw-track-controls>` slider drag or key press, per Mute or Solo click, per `<daw-track>` property set or attribute change (mix changes made together in one synchronous run, before the next microtask, are one step) and per `editor.updateTrack()` call. Before, the mix was never an undo step. A track is in the arrangement while its audio loads (#848), so a change made then is a step too.
 - `<daw-track-controls>` and `editor.tracks` show the arrangement's mix, so they follow Undo and Redo. The editor never writes a `<daw-track>`'s attributes; its `volume`, `pan`, `muted` and `soloed` properties read the arrangement's mix (#848), so they follow Undo and Redo too, and setting one is a request to the arrangement.
 - `daw-track-update` detail gains `changed` (`DawTrackUpdateDetail`, exported: `{ trackId, changed }`), the properties of that update. It is an outbound notification: since #848 the editor acts on it only for `kind`, `render-mode`, `spectrogramConfig` and `src` (the mix and the name are asked for by the properties directly).
 - `daw-track-control` detail gains `gesture?: string` (`DawTrackControlDetail`), the slider's gesture id; mute and solo send none.

@@ -346,9 +346,10 @@ export class DawTrackElement extends LitElement {
       return;
     }
 
-    // The names go in the event (#843): the editor sends a mixer property
-    // only when it is one of them, so an unrelated change (a rename after an
-    // Undo) never writes the element's older volume back.
+    // The names go in the event (#843): the editor's _onTrackUpdate takes
+    // kind, renderMode, spectrogramConfig and src only when they are among
+    // them. The mix and the name do not go through this event: their setters
+    // ask the editor directly (#848).
     const trackChanged = TRACK_PROPS.filter((p) => changed.has(p as keyof this));
 
     if (trackChanged.length > 0) {

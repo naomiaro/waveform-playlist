@@ -354,10 +354,10 @@
     // --- State helpers -----------------------------------------------------
     document.getElementById('dump').addEventListener('click', () => {
       const desc = editor.tracks;
-      const eng = editor.engine?.getState().tracks ?? [];
+      const eng = editor.arrangement?.getTracks() ?? [];
       addLog(
         'descriptors=' + desc.length +
-        ' engineTracks=' + eng.length +
+        ' arrangementTracks=' + eng.length +
         ' clips=' + eng.reduce((sum, t) => sum + t.clips.length, 0) +
         (desc.length !== eng.length ? ' MISMATCH' : ''),
         desc.length !== eng.length ? 'err' : ''

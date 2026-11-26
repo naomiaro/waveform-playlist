@@ -1627,7 +1627,7 @@ interface MidiLoadResult {
 }
 ```
 
-Created tracks are MIDI tracks (`kind="midi"`), drawn as piano rolls, with no `<daw-track>` element (`addTrack` creates none since #848). **Cleanup-on-failure:** any per-track rejection removes every track the call added (by id); a track whose `addTrack` rejected never entered. Editor returns to its pre-call state via `Promise.allSettled`. If `@dawcore/midi` is not installed, rejects with a friendly install hint and `console.warn`s the original module-resolution error.
+Created tracks are MIDI tracks (`kind="midi"`), drawn as piano rolls, with no `<daw-track>` element (`addTrack` creates none since #848). **Cleanup-on-failure:** any per-track rejection removes every track the call added (by id); a track whose `addTrack` rejected never entered (the call waits for every `addTrack` with `Promise.allSettled`). Each removal is an undo step, so the history is not rewound to before the call. If `@dawcore/midi` is not installed, rejects with a friendly install hint and `console.warn`s the original module-resolution error.
 
 ---
 

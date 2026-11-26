@@ -299,7 +299,7 @@ interface MidiLoadResult {
 
 ### Cleanup-on-Failure
 
-If any per-track creation fails, every `<daw-track>` appended during the call is removed — including elements that `addTrack` left in the DOM before its promise rejected. The editor returns to its pre-call state. Don't worry about orphan tracks on partial failure.
+If any per-track creation fails, every track the call added is removed (`addTrack` creates no `<daw-track>` element since #848; a track whose `addTrack` rejected never entered). No orphan tracks are left on partial failure. Each removal is an undo step, so the undo history is not rewound to before the call.
 
 ### AbortSignal Scope
 

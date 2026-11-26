@@ -269,7 +269,7 @@ test.describe('dawcore: the arrangement and the elements (#848 PR 3)', () => {
     await expect.poll(state).toEqual({ inKick: false, inHiHat: true, shakers: 'live' });
   });
 
-  test('moveBefore() of an audio <daw-clip> into a MIDI track is refused: the element goes back, no undo step', async ({
+  test('moveBefore() of an audio <daw-clip> into a MIDI track is refused: nothing changes, the element stays linked to its clip', async ({
     page,
   }) => {
     await page.evaluate(() => {
@@ -293,7 +293,23 @@ test.describe('dawcore: the arrangement and the elements (#848 PR 3)', () => {
       const notes = editor.querySelector('daw-track[name="Notes"]') as unknown as {
         moveBefore(n: Node, c: Node | null): void;
       };
-      const clip = kick.querySelector('daw-clip')!;
+      const clip = kick.querySelector('daw-clip') as HTMLElement & {
+        clipId: string;
+        start: number;
+      };
+      // Move the clip in the arrangement first, so the live start differs
+      // from the start attribute (the declaration).
+      const arr = editor.arrangement as unknown as Arrangement & {
+        moveClip(t: string, c: string, d: number): number;
+      };
+      const kickId = (kick as unknown as { trackId: string }).trackId;
+      const rate = (editor as unknown as { effectiveSampleRate: number }).effectiveSampleRate;
+      arr.moveClip(kickId, clip.clipId, rate);
+      const liveStart =
+        (arr
+          .getTracks()
+          .find((t) => t.id === kickId)!
+          .clips.find((c) => c.id === clip.clipId)!.startSample ?? 0) / rate;
       const before = editor.arrangement!.getTracks();
       const canUndo = editor.canUndo;
       let errors = 0;
@@ -301,13 +317,22 @@ test.describe('dawcore: the arrangement and the elements (#848 PR 3)', () => {
       notes.moveBefore(clip, null);
       await new Promise((r) => setTimeout(r, 300));
       return {
-        backInKick: clip.parentElement === kick,
+        stays: clip.parentElement === (notes as unknown as Element),
+        linked: !clip.matches(':state(detached)'),
+        readsLive: clip.start === liveStart && clip.start !== Number(clip.getAttribute('start')),
         sameTracks: editor.arrangement!.getTracks() === before,
         sameUndo: editor.canUndo === canUndo,
         errors,
       };
     });
-    expect(result).toEqual({ backInKick: true, sameTracks: true, sameUndo: true, errors: 1 });
+    expect(result).toEqual({
+      stays: true,
+      linked: true,
+      readsLive: true,
+      sameTracks: true,
+      sameUndo: true,
+      errors: 1,
+    });
   });
 });
 

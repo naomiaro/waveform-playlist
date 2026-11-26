@@ -190,9 +190,10 @@ export class DawClipElement extends LitElement {
     // Defer dispatch so:
     //  1. The editor's connectedCallback (which registers the daw-clip-connected
     //     listener) has time to run when parsed all-at-once.
-    //  2. The parent's deferred daw-track-connected event fires first; the editor
-    //     reads <daw-clip> children synchronously via _readTrackDescriptor, so
-    //     this event is the canonical late-append signal.
+    //  2. The parent's deferred daw-track-connected event fires first; the
+    //     editor reads the <daw-clip> children when the track enters, so this
+    //     event is the late-append signal (and, from connectedMoveCallback,
+    //     the signal of a move into another track).
     // _onClipConnected adds the clip to the descriptor of a track that has not
     // entered the arrangement yet, and appends it to an entered track as a
     // loading clip (a loaded one for MIDI) (#848).

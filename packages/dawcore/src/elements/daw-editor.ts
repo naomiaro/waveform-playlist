@@ -1403,10 +1403,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   _clipLinkState(trackId: string, clipId: string): LinkState {
     const track = this._trackLinkState(trackId);
     if (track !== 'live') return track;
-    const held = this._arrangement
-      .getTracks()
-      .find((t) => t.id === trackId)
-      ?.clips.some((c) => c.id === clipId);
+    // Linked by id, wherever the element sits (#848: the editor moves no
+    // element, so after an Undo of a move it is in another track's element).
+    const held = this._arrangement.getTracks().some((t) => t.clips.some((c) => c.id === clipId));
     if (held) return 'live';
     return this._extras.get(trackId)?.peaksSrc.has(clipId) ? 'detached' : 'pending';
   }
@@ -1421,7 +1420,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   _clipValues(trackId: string, clipId: string): ClipLinkValues | null {
     const clip = this._arrangement
       .getTracks()
-      .find((t) => t.id === trackId)
+      .find((t) => t.id === this._clipHolderId(trackId, clipId))
       ?.clips.find((c) => c.id === clipId);
     if (!clip) return null;
     const midi = isLoadingClip(clip) ? null : clip;
@@ -1455,12 +1454,20 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   _requestClipChange(trackId: string, clipId: string, partial: Partial<ClipLinkValues>): void {
     const current = this._clipValues(trackId, clipId);
     if (!current) return;
+    const holderId = this._clipHolderId(trackId, clipId);
     const clip = this._arrangement
       .getTracks()
-      .find((t) => t.id === trackId)
+      .find((t) => t.id === holderId)
       ?.clips.find((c) => c.id === clipId);
     const src = clip && typeof clip.src === 'string' ? clip.src : '';
-    this._applyClipUpdate(trackId, clipId, { ...current, ...partial, src });
+    this._applyClipUpdate(holderId, clipId, { ...current, ...partial, src });
+  }
+  /** The track of the arrangement played that holds a clip: `trackId` when it does, or else the one that does. */
+  private _clipHolderId(trackId: string, clipId: string): string {
+    const tracks = this._arrangement.getTracks();
+    if (tracks.some((t) => t.id === trackId && t.clips.some((c) => c.id === clipId)))
+      return trackId;
+    return tracks.find((t) => t.clips.some((c) => c.id === clipId))?.id ?? trackId;
   }
   /** @internal */
   _trackKind(trackId: string): TrackKind | null {
@@ -1612,10 +1619,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       if (!this.contains(el)) this._onTrackRemoved(trackId);
     }
     // ... and a <daw-clip> the page removed meanwhile: its clip goes (#848).
-    for (const [trackId, el] of this._trackElements) {
-      const present = new Set(
-        [...el.querySelectorAll('daw-clip')].map((c) => (c as DawClipElement).clipId as string)
-      );
+    // Present anywhere in the editor: an element may sit in another track's
+    // element than the one holding its clip (an Undo of a move, #848).
+    const present = new Set(
+      [...this.querySelectorAll('daw-clip')].map((c) => (c as DawClipElement).clipId as string)
+    );
+    for (const [trackId] of this._trackElements) {
       for (const clipId of this._extras.get(trackId)?.peaksSrc.keys() ?? []) {
         if (present.has(clipId)) continue;
         const held = this._arrangementOf(trackId)
@@ -2117,7 +2126,24 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    */
   private _rehomeClip(trackId: string, clipEl: DawClipElement): boolean {
     const clipId = clipEl.clipId;
+    // Declared here already (its own deferred connect, a move inside the
+    // track, an Undo that left the element here): not a move.
+    if (this._extras.get(trackId)?.peaksSrc.has(clipId)) return true;
     const arrangement = this._arrangementOf(trackId);
+    // Back in the track that holds its clip (the page moved it back after an
+    // Undo of its move): what the other tracks took comes here.
+    if (
+      arrangement.getTracks().some((t) => t.id === trackId && t.clips.some((c) => c.id === clipId))
+    ) {
+      let peaksSrc = clipEl.peaksSrc || '';
+      for (const [id, extras] of this._extras) {
+        if (id === trackId || !extras.peaksSrc.has(clipId)) continue;
+        peaksSrc = extras.peaksSrc.get(clipId) ?? peaksSrc;
+        this._forgetClip(id, clipId);
+      }
+      this._takeClip(trackId, clipId, peaksSrc);
+      return true;
+    }
     const fromTrackId = trackHoldingClip(arrangement, clipId, trackId);
     if (!fromTrackId) {
       // Taken by another track of this editor and not held now: that one forgets it.
@@ -2134,22 +2160,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
     const error = moveClipToTrack(arrangement, fromTrackId, trackId, clipId, toExtras.kind);
     if (error) {
-      // Refused (a clip of the other kind): nothing changes and no undo step;
-      // the element goes back to the track that holds its clip (the
-      // maintainer's rule, #848: the page and the arrangement keep agreeing).
-      const home = this._trackElements.get(fromTrackId);
-      if (home && home !== clipEl.parentElement) {
-        const move = (home as unknown as { moveBefore?: (n: Node, c: Node | null) => void })
-          .moveBefore;
-        if (typeof move === 'function') move.call(home, clipEl, null);
-        else home.appendChild(clipEl);
-      }
+      // Refused (a clip of the other kind): nothing changes, no undo step,
+      // and the element stays where the page put it (the editor moves no
+      // element, #848). It is taken here too, so a later announcement does
+      // not try again, and it stays linked to its clip by id.
+      this._takeClip(trackId, clipId, this._extras.get(fromTrackId)?.peaksSrc.get(clipId) ?? '');
       console.warn(
         '[dawcore] <daw-clip> cannot move to track "' +
           (this._trackElements.get(trackId)?.name || 'Untitled') +
           '" (' +
           String(error) +
-          '): it was put back in its track.'
+          '): its clip stays in its track.'
       );
       this.dispatchEvent(
         new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
@@ -3159,10 +3180,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return loadFilesImpl(this, files);
   }
   /**
-   * Imperatively load a `.mid` file (URL or File) and create N `<daw-track>`
-   * elements — one per note-bearing MIDI track. On any per-track failure,
-   * every `<daw-track>` appended during the call is removed (both successful
-   * and failed) so the editor returns to its pre-call state.
+   * Imperatively load a `.mid` file (URL or File) and add N tracks (no
+   * element, #848), one per note-bearing MIDI track. On any per-track
+   * failure, every track the call added is removed; each removal is an undo
+   * step, so the history is not rewound.
    *
    * `options.signal` is forwarded to `fetch()` only for URL sources; aborting
    * after parsing does not cancel in-flight `addTrack` calls.
@@ -3240,9 +3261,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return entered;
   }
   /**
-   * Remove a track by id. Equivalent to `trackElement.remove()` —
-   * the editor's MutationObserver handles engine and cache cleanup.
-   * No-op if no matching track exists.
+   * Remove a track by id: its `<daw-track>` element is removed (the
+   * MutationObserver does the rest), or, for a track with no element
+   * (`addTrack`, a dropped file, an Undo), the track itself. One undo step.
+   * Warns when no track has the id.
    */
   removeTrack(trackId: string): void {
     const trackEl = this._trackElements.get(trackId);

@@ -32,7 +32,7 @@ const installHint = (): string =>
 /**
  * Loads a `.mid` file (URL or `File`) and adds N tracks, one per note-bearing
  * MIDI track. On any per-track failure, every track added during this call is
- * removed so the editor returns to its pre-call state (cleanup-on-failure).
+ * removed (cleanup-on-failure; each removal is an undo step).
  *
  * AbortSignal is forwarded to the fetch phase only. Aborting after parsing
  * does not cancel in-flight `addTrack` calls (documented limitation).
