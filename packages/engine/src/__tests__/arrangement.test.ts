@@ -124,6 +124,36 @@ describe('Arrangement: tracks', () => {
     expect(changes).toEqual([{ type: 'add', trackId: 'C' }]);
   });
 
+  // #848: a <daw-track> inserted between two others enters at its place.
+  it('addTrack with an index puts the track there, one undo step', () => {
+    const { arrangement, changes, ids } = setup();
+    arrangement.addTrack(track('C', [clip('c1', 0)]));
+    arrangement.addTrack(track('D', [clip('d1', 0)]), { index: 1 });
+    expect(ids()).toEqual(['A', 'D', 'B', 'C']);
+    expect(changes[changes.length - 1]).toEqual({ type: 'add', trackId: 'D' });
+    arrangement.undo();
+    expect(ids()).toEqual(['A', 'B', 'C']);
+  });
+
+  it('an index past the end appends, a negative one inserts first, a fraction is cut', () => {
+    const { arrangement, ids } = setup();
+    arrangement.addTrack(track('C', []), { index: 99 });
+    arrangement.addTrack(track('D', []), { index: -3 });
+    arrangement.addTrack(track('E', []), { index: 1.9 });
+    expect(ids()).toEqual(['D', 'E', 'A', 'B', 'C']);
+  });
+
+  it('an index that is not a finite number throws and changes nothing', () => {
+    const { arrangement, ids } = setup();
+    const version = arrangement.tracksVersion;
+    for (const index of [NaN, Infinity, '1' as unknown as number]) {
+      expect(() => arrangement.addTrack(track('C', []), { index })).toThrow(TypeError);
+    }
+    expect(ids()).toEqual(['A', 'B']);
+    expect(arrangement.tracksVersion).toBe(version);
+    expect(arrangement.canUndo).toBe(false);
+  });
+
   it('removeTrack removes, is an undo step, announces "remove"', () => {
     const { arrangement, changes, ids } = setup();
     arrangement.removeTrack('A');

@@ -75,7 +75,13 @@ import {
   assertUniqueTrackIds,
   duplicateTrackId,
 } from './validate';
-import type { Arrangement, ClipBounds, MixerChangeOptions, RemoveTrackOptions } from './types';
+import type {
+  AddTrackOptions,
+  Arrangement,
+  ClipBounds,
+  MixerChangeOptions,
+  RemoveTrackOptions,
+} from './types';
 
 const DEFAULT_MIN_DURATION_SECONDS = 0.1;
 const DEFAULT_UNDO_LIMIT = 100;
@@ -131,6 +137,21 @@ export interface ArrangementVersions {
 }
 
 type ChangeListener = (change: ArrangementChange, at: ArrangementVersions) => void;
+
+/**
+ * Where `addTrack` puts a track among `length` tracks: `index` cut to a whole
+ * number and held between 0 and `length`; the end when it is left out. Throws
+ * before anything changes for an index that is not a finite number (#848).
+ */
+function insertIndex(index: number | undefined, length: number): number {
+  if (index === undefined) return length;
+  if (typeof index !== 'number' || !Number.isFinite(index)) {
+    throw new TypeError(
+      `[waveform-playlist] addTrack: index must be a finite number, got ${String(index)}`
+    );
+  }
+  return Math.max(0, Math.min(Math.trunc(index), length));
+}
 
 export class ArrangementImpl implements Arrangement {
   private _tracks: readonly ArrangementTrack[] = [];
@@ -402,13 +423,14 @@ export class ArrangementImpl implements Arrangement {
     this._emit({ type: 'set' });
   }
 
-  addTrack(track: ArrangementTrack): void {
+  addTrack(track: ArrangementTrack, options?: AddTrackOptions): void {
+    const index = insertIndex(options?.index, this._tracks.length);
     assertClipsOfTrackKind(track);
     assertUniqueClipIds(track);
     if (this._tracks.some((t) => t.id === track.id)) throw duplicateTrackId(track.id);
     this._pushUndoSnapshot();
     const enriched = this._ingest(track);
-    this._tracks = [...this._tracks, enriched];
+    this._tracks = [...this._tracks.slice(0, index), enriched, ...this._tracks.slice(index)];
     this._mixer = seedMixer(this._mixer, [enriched]);
     this._tracksVersion++;
     this._emit({ type: 'add', trackId: track.id });

@@ -162,8 +162,10 @@ The returned `EngineState` contains:
 // Replace all tracks (clears the undo history and ends an open transaction)
 engine.setTracks(tracks: readonly ClipTrack[]): void;
 
-// Append a track
-engine.addTrack(track: ClipTrack): void;
+// Add a track: at the end, or at `index` in the order (cut to a whole number,
+// held between 0 and the number of tracks; an index that is not a finite
+// number throws a TypeError and changes nothing)
+engine.addTrack(track: ClipTrack, options?: AddTrackOptions): void;
 
 // Remove by ID (no-op if not found)
 engine.removeTrack(trackId: string): void;
@@ -627,7 +629,7 @@ A different tempo is not converted. A tick is the musical position, so an engine
 
 The new engine sends the tracks it finds to its adapter once, in its constructor, with their mix. If that call throws, the constructor throws and the engine is no longer attached to the arrangement. After `dispose()`, the engine's track, clip, mixer, recording and history methods still change the arrangement, but call no adapter and emit no `statechange`, and `setTempo()` does nothing. Selection, loop, zoom, the playback position and the master volume belong to the engine and start from their defaults in the new one.
 
-An arrangement plays through one engine at a time. Building a second engine on an arrangement whose first engine has not been disposed logs a console warning. Two engines alive on one arrangement is unsupported, in particular with different `ppqn`: the second engine's time base replaces the first's, so ticks the first engine gives later are computed with the second engine's. The `arrangement` option accepts only an object made by `createArrangement()`; anything else throws. The engine recognises an arrangement by a versioned `Symbol.for` key, not by `instanceof`, so one made by another installed copy of `@waveform-playlist/engine` (an app and a library that pin different versions) is accepted when both copies use the same key version. The keys are `@waveform-playlist/engine/arrangement/time-base/v2` and `@waveform-playlist/engine/arrangement/attach-decode/v2` (v1 until the mixer became undoable): an engine and an arrangement from copies on either side of that change refuse each other.
+An arrangement plays through one engine at a time. Building a second engine on an arrangement whose first engine has not been disposed logs a console warning. Two engines alive on one arrangement is unsupported, in particular with different `ppqn`: the second engine's time base replaces the first's, so ticks the first engine gives later are computed with the second engine's. The `arrangement` option accepts only an object made by `createArrangement()`; anything else throws. The engine recognises an arrangement by a versioned `Symbol.for` key, not by `instanceof`, so one made by another installed copy of `@waveform-playlist/engine` (an app and a library that pin different versions) is accepted when both copies use the same key version. The keys are `@waveform-playlist/engine/arrangement/time-base/v3` and `@waveform-playlist/engine/arrangement/attach-decode/v3` (v1 until the mixer became undoable, v2 until `addTrack` took an `index`): an engine and an arrangement from copies on either side of such a change refuse each other.
 
 ## Implementing a PlayoutAdapter
 
@@ -940,6 +942,7 @@ import type {
   PlayoutAdapter,
   Arrangement,
   CreateArrangementOptions,
+  AddTrackOptions,
   RemoveTrackOptions,
   MixerChangeOptions,
   ClipBounds,
@@ -1045,6 +1048,10 @@ interface ArrangementSourcesValue {
   isLoading: boolean;
 }
 
+interface AddTrackOptions {
+  index?: number;     // where the track enters (cut to a whole number, held between 0 and the number of tracks); left out: the end
+}
+
 interface RemoveTrackOptions {
   undoable?: boolean; // false: no undo step, and the track leaves every undo and redo state
 }
@@ -1089,7 +1096,7 @@ interface Arrangement {
   setTracks(tracks: readonly ArrangementTrack[]): void;
 
   // tracks
-  addTrack(track: ArrangementTrack): void;
+  addTrack(track: ArrangementTrack, options?: AddTrackOptions): void;
   removeTrack(trackId: string, options?: RemoveTrackOptions): void;
   updateTrack(
     trackId: string,

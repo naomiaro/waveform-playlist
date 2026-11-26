@@ -13,7 +13,7 @@ import { AdapterSync } from './adapterSync';
 import type { TracksChange } from './adapterSync';
 import { ArrangementImpl } from './arrangement/Arrangement';
 import type { ArrangementChange, ArrangementVersions } from './arrangement/Arrangement';
-import type { ClipBounds, MixerChangeOptions } from './arrangement';
+import type { AddTrackOptions, ClipBounds, MixerChangeOptions } from './arrangement';
 import { attachDecodeContext, attachTimeBase, isArrangement } from './arrangement/attach';
 import { calculateDuration, findClosestZoomIndex } from './operations/timelineOperations';
 import type { PlayoutAdapter, EngineState, EngineEvents, PlaylistEngineOptions } from './types';
@@ -210,8 +210,8 @@ export class PlaylistEngine {
     this._arrangement.setTracks(tracks);
   }
 
-  addTrack(track: ClipTrack): void {
-    this._arrangement.addTrack(track);
+  addTrack(track: ClipTrack, options?: AddTrackOptions): void {
+    this._arrangement.addTrack(track, options);
   }
 
   removeTrack(trackId: string): void {

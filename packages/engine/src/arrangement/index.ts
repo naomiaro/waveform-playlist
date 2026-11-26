@@ -7,6 +7,7 @@ export type {
   CreateArrangementOptions,
   MixerChangeOptions,
   RemoveTrackOptions,
+  AddTrackOptions,
 } from './types';
 export type { TrackMixerValues } from './mixer';
 export type { ArrangementSourceState, ArrangementSourcesValue } from './sources';

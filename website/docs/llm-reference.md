@@ -1652,6 +1652,7 @@ import type {
   CreateArrangementOptions,
   LoadSource,
   MixerChangeOptions,
+  AddTrackOptions,
   RemoveTrackOptions,
   TrackMixerValues,
 } from '@waveform-playlist/engine';
@@ -1713,6 +1714,10 @@ interface ArrangementSourcesValue {      // What arrangement.sources holds. A ne
   isLoading: boolean;                    // True while a source is pending
 }
 
+interface AddTrackOptions {
+  index?: number;                 // Where the track enters: cut to a whole number, held between 0 and the number of tracks. Left out: the end. Not a finite number: throws a TypeError, nothing changes
+}
+
 interface RemoveTrackOptions {
   undoable?: boolean;             // false: no undo step, and the track is taken out of every undo and redo state
 }
@@ -1759,7 +1764,7 @@ interface Arrangement {
   setTracks(tracks: readonly ArrangementTrack[]): void; // Replace every track. Clears the undo history. An id that is in the tracks being replaced keeps its mix; any other id is seeded from the new track's fields
 
   // tracks
-  addTrack(track: ArrangementTrack): void;
+  addTrack(track: ArrangementTrack, options?: AddTrackOptions): void; // An undo step
   removeTrack(trackId: string, options?: RemoveTrackOptions): void;
   updateTrack(                                          // Changes nothing for an id no track has (the track object is still checked and may throw; a function is not called). The mix stays; a track given a new id takes its mix with it.
                                                         // In both forms a clip object the track already holds is kept as it is; every other clip is copied
@@ -1833,9 +1838,9 @@ interface Arrangement {
 // plus the src of a loaded clip that carries BOTH src and audioBuffer (its buffer is used; nothing is fetched).
 // A loaded clip with src and no audioBuffer is not fetched and not in `sources` (it never gets audio from the arrangement). A source no state names any more is dropped
 // (its load aborted); named again, it is fetched again.
-// The engine recognises an arrangement by a versioned Symbol.for key ('@waveform-playlist/engine/arrangement/time-base/v2'),
+// The engine recognises an arrangement by a versioned Symbol.for key ('@waveform-playlist/engine/arrangement/time-base/v3'),
 // not by instanceof, so an arrangement made by another installed copy of the package is accepted when both use the same
-// key version (v1 until the mixer became undoable: a v1 engine and a v2 arrangement refuse each other).
+// key version (v1 until the mixer became undoable, v2 until addTrack took an index: copies of different key versions refuse each other).
 
 interface EngineState {
   tracks: readonly ClipTrack[]; // Each track with its current mixer values (muted while a take records onto it) and without clips that are still loading. Shared, not a copy: never write to it. Frozen outside production builds

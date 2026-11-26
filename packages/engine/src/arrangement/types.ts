@@ -25,6 +25,15 @@ export interface RemoveTrackOptions {
 }
 
 /** How a mixer setter's change goes into the undo history. */
+/** Options of `addTrack`. */
+export interface AddTrackOptions {
+  /**
+   * Where the track enters: its index in the new order (cut to a whole
+   * number, then held between 0 and the number of tracks). Left out: at the end.
+   */
+  index?: number;
+}
+
 export interface MixerChangeOptions {
   /** Changes with the same id, one after another, are one undo step. */
   gesture?: string;
@@ -80,7 +89,8 @@ export interface Arrangement {
   setTracks(tracks: readonly ArrangementTrack[]): void;
 
   // tracks
-  addTrack(track: ArrangementTrack): void;
+  /** Add a track: an undo step. Throws for an `index` that is not a finite number. */
+  addTrack(track: ArrangementTrack, options?: AddTrackOptions): void;
   removeTrack(trackId: string, options?: RemoveTrackOptions): void;
   /**
    * Replace a track, with a track or with a function of the current one.
