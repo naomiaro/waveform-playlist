@@ -1649,12 +1649,15 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     for (const [trackId] of this._trackElements) {
       for (const clipId of this._extras.get(trackId)?.peaksSrc.keys() ?? []) {
         if (present.has(clipId)) continue;
-        const held = this._arrangementOf(trackId)
+        // The track that holds the clip, which may be another one than the
+        // element's (an Undo of a move, #848): the removal takes it from there.
+        const holder = this._historyOf(trackId)
           .getTracks()
-          .find((t) => t.id === trackId)
-          ?.clips.some((c) => c.id === clipId);
-        if (held) this._removeClipFromTrack(trackId, clipId);
-        else this._dropUnheldClip(trackId, clipId);
+          .find((t) => t.clips.some((c) => c.id === clipId));
+        if (holder) {
+          this._removeClipFromTrack(holder.id, clipId);
+          this._forgetClip(trackId, clipId);
+        } else this._dropUnheldClip(trackId, clipId);
       }
     }
     if (this._externalAdapter && !this._engine) this._buildEngineReporting();

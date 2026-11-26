@@ -5,7 +5,14 @@
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest';
 import { createArrangement, type Arrangement } from '@waveform-playlist/engine';
 import { createTrack } from '@waveform-playlist/core';
-import { mountEditor, settle, stubFetch, stubPeakPipeline, tick } from './helpers/editor-harness';
+import {
+  makeFakeAdapter,
+  mountEditor,
+  settle,
+  stubFetch,
+  stubPeakPipeline,
+  tick,
+} from './helpers/editor-harness';
 
 const states = new WeakMap<HTMLElement, Set<string>>();
 const proto = HTMLElement.prototype as unknown as { attachInternals?: () => unknown };
@@ -164,5 +171,24 @@ describe('review round 2 of #848 PR 3', () => {
     B.appendChild(clip); // and back: a move from C to B
     await tick(3);
     expect(where(own, clip.clipId)).toEqual(['B']);
+  });
+
+  it('after an Undo of a move, the element removed while the editor is out of the page removes its clip', async () => {
+    const ed = await mount(
+      '<daw-track name="A"><daw-clip src="/a.wav"></daw-clip></daw-track><daw-track name="B"></daw-track>'
+    );
+    const own: Arrangement = ed.arrangement;
+    const [A, B] = ed.querySelectorAll('daw-track');
+    const clip: El = A.querySelector('daw-clip');
+    B.appendChild(clip);
+    await tick(3);
+    own.undo(); // the clip is in A again; its element stays in B
+    const parent = ed.parentElement;
+    ed.remove();
+    clip.remove();
+    parent.appendChild(ed);
+    ed.adapter = makeFakeAdapter().adapter; // a disconnect disposed the old one
+    await settle(ed);
+    expect(where(own, clip.clipId)).toEqual([]);
   });
 });
