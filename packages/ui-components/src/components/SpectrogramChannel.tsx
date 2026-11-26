@@ -79,6 +79,32 @@ export interface SpectrogramChannelProps {
   durationSamples?: number;
 }
 
+/**
+ * Unregisters each id whose canvas is no longer on the page, and returns the
+ * ids that stay registered.
+ */
+function releaseUnmounted(
+  ids: ReadonlySet<string>,
+  canvases: ReadonlyMap<number, HTMLCanvasElement>,
+  unregister: (canvasId: string) => void
+): Set<string> {
+  const remaining = new Set<string>();
+  for (const id of ids) {
+    const parsed = parseSpectrogramCanvasId(id);
+    const canvas = parsed ? canvases.get(parsed.chunkIndex) : undefined;
+    if (canvas?.isConnected) {
+      remaining.add(id);
+      continue;
+    }
+    try {
+      unregister(id);
+    } catch (err) {
+      console.warn(`[spectrogram] unregister failed for ${id}:`, err);
+    }
+  }
+  return remaining;
+}
+
 export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
   index,
   channelIndex: channelIndexProp,
@@ -94,7 +120,9 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
 }) => {
   const channelIndex = channelIndexProp ?? index;
   const { canvasRef, canvasMapRef } = useChunkedCanvasRefs();
-  const registeredIdsRef = useRef<string[]>([]);
+  // A set: a canvas whose key changes remounts and registers again under the
+  // same id, and the id must be unregistered once (#856).
+  const registeredIdsRef = useRef<ReadonlySet<string>>(new Set());
   const transferredCanvasesRef = useRef<WeakSet<HTMLCanvasElement>>(new WeakSet());
   const onCanvasRegisterRef = useRef(onCanvasRegister);
   const onCanvasUnregisterRef = useRef(onCanvasUnregister);
@@ -118,26 +146,7 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
     const register = onCanvasRegisterRef.current;
 
     // Step 1: Drop registrations for canvases that have unmounted.
-    const remaining: string[] = [];
-    for (const id of registeredIdsRef.current) {
-      const parsed = parseSpectrogramCanvasId(id);
-      if (!parsed) {
-        remaining.push(id);
-        continue;
-      }
-      const chunkIdx = parsed.chunkIndex;
-      const canvas = canvasMapRef.current.get(chunkIdx);
-      if (canvas && canvas.isConnected) {
-        remaining.push(id);
-      } else {
-        try {
-          unregister(id);
-        } catch (err) {
-          console.warn(`[spectrogram] unregister failed for ${id}:`, err);
-        }
-      }
-    }
-    registeredIdsRef.current = remaining;
+    const remaining = releaseUnmounted(registeredIdsRef.current, canvasMapRef.current, unregister);
 
     // Step 2: Transfer newly mounted canvases.
     for (const [canvasIdx, canvas] of canvasMapRef.current.entries()) {
@@ -169,11 +178,12 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
           ...(offsetSamples !== undefined ? { offsetSamples } : {}),
           ...(durationSamples !== undefined ? { durationSamples } : {}),
         });
-        registeredIdsRef.current.push(canvasId);
+        remaining.add(canvasId);
       } catch (err) {
         console.warn(`[spectrogram] register failed for ${canvasId}:`, err);
       }
     }
+    registeredIdsRef.current = remaining;
   }, [
     canvasMapRef,
     clipId,
@@ -185,20 +195,20 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
     visibleChunkIndices,
   ]);
 
-  // Unregister all canvases on component unmount.
+  // On unmount, unregister the canvases that left the page with the component.
+  // A cleanup that leaves them on the page (StrictMode's simulated unmount, a
+  // hidden <Activity>, Fast Refresh) keeps them registered: a transferred canvas
+  // cannot be registered again when the effects run once more (#856).
   useEffect(() => {
+    const canvasMap = canvasMapRef.current;
     return () => {
-      const unregister = onCanvasUnregisterRef.current;
-      for (const id of registeredIdsRef.current) {
-        try {
-          unregister(id);
-        } catch (err) {
-          console.warn(`[spectrogram] unregister failed for ${id}:`, err);
-        }
-      }
-      registeredIdsRef.current = [];
+      registeredIdsRef.current = releaseUnmounted(
+        registeredIdsRef.current,
+        canvasMap,
+        onCanvasUnregisterRef.current
+      );
     };
-  }, []);
+  }, [canvasMapRef]);
 
   // Build visible canvas chunk elements
   const canvases = visibleChunkIndices.map((i) => {
