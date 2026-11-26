@@ -98,6 +98,7 @@
     "shortcuts-respect-focused-controls",
     "small-render-cleanups",
     "spectrogram-settings-modal-draft",
+    "spectrogram-unregister-once",
     "split-contexts-by-change-rate",
     "stable-controls-value",
     "stable-drag-handlers-keydown",
