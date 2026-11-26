@@ -530,7 +530,7 @@ midi-program     Number    —        MIDI program number (0-127)
 clip.midiNotes: MidiNoteData[] | null        // Parsed MIDI notes
 ```
 
-Decoded `AudioBuffer`s and parsed peaks are managed by the editor's URL-keyed caches, not exposed as properties on the element. To supply a pre-decoded buffer or pre-computed peaks programmatically, use the imperative path instead: `editor.addClip(trackId, { audioBuffer, waveformData, ... })`.
+Decoded audio is held by the editor's arrangement (#848), not exposed as properties on the element. There is no way to pass a pre-decoded buffer or peaks through `<daw-clip>` or `addClip`; use `peaks-src` for pre-computed peaks.
 
 Attributes use seconds for human readability. The element converts to the internal sample-based model (`startSample`, `offsetSamples`, `durationSamples`) automatically.
 

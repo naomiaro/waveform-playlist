@@ -775,3 +775,65 @@ describe('review fixes, round 2 (#917)', () => {
     expect(types(removed).sort()).toEqual(types(added).sort());
   });
 });
+
+describe('review fixes, round 3 (#917)', () => {
+  const pending = (p: Promise<unknown>) =>
+    Promise.race([
+      p.then(
+        () => 'resolved',
+        (err: Error) => err.message
+      ),
+      tick(10).then(() => 'still pending'),
+    ]);
+
+  it('L-a: addClip on a queued track rejects when its clip is removed before the track enters', async () => {
+    stubFetch({ '/a.wav': 'ok' });
+    const editor = (await mountEditor({
+      adapter: null,
+      html: '<daw-track name="T"></daw-track>',
+    })) as any;
+    const trackId = editor.tracks[0].trackId;
+    const outcome = pending(editor.addClip(trackId, { src: '/a.wav', duration: 1 }));
+    await tick(2);
+    editor.querySelector('daw-clip').remove();
+    expect(await outcome).toMatch(/removed before/);
+  });
+
+  it('L-b: addClip then its entered track removed in the same task rejects', async () => {
+    stubFetch({ '/a.wav': 'ok', '/b.wav': 'ok' });
+    const editor = await mount(makeFakeAdapter(), audioTrack('A', '/a.wav'));
+    await settle(editor);
+    const trackId = editor._arrangement.getTracks()[0].id;
+    const outcome = pending(editor.addClip(trackId, { src: '/b.wav', duration: 1 }));
+    editor.removeTrack(trackId);
+    expect(await outcome).toMatch(/removed before/);
+  });
+
+  it('L-b: addClip then its queued track removed in the same task rejects', async () => {
+    stubFetch({ '/a.wav': 'ok' });
+    const editor = (await mountEditor({
+      adapter: null,
+      html: '<daw-track name="T"></daw-track>',
+    })) as any;
+    const trackId = editor.tracks[0].trackId;
+    const outcome = pending(editor.addClip(trackId, { src: '/a.wav', duration: 1 }));
+    editor.removeTrack(trackId);
+    expect(await outcome).toMatch(/removed before/);
+  });
+
+  it('L-c: removing a queued track an addClip waits on sends no daw-clip-error', async () => {
+    stubFetch({ '/a.wav': 'ok' });
+    const editor = (await mountEditor({
+      adapter: null,
+      html: '<daw-track name="T"></daw-track>',
+    })) as any;
+    const errors: unknown[] = [];
+    editor.addEventListener('daw-clip-error', (e: Event) => errors.push(e));
+    const trackId = editor.tracks[0].trackId;
+    const outcome = pending(editor.addClip(trackId, { src: '/a.wav', duration: 1 }));
+    await tick(2);
+    editor.removeTrack(trackId);
+    expect(await outcome).toMatch(/removed before/);
+    expect(errors).toEqual([]);
+  });
+});

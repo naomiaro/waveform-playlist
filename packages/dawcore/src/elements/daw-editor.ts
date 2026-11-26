@@ -492,8 +492,21 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    */
   private _entryQueue: string[] = [];
   private _entryFlushScheduled = false;
-  /** Clips an `addClip()` is waiting for (settled with daw-clip-error if their track goes first). */
-  private _awaitedClips = new Set<string>();
+  /**
+   * Clips an `addClip()` is waiting for, with their track and the way to
+   * reject the call: a removal of the clip or of its track before the clip
+   * loads settles it here, without a public event (#917).
+   */
+  private _awaitedClips = new Map<string, { trackId: string; reject: (error: Error) => void }>();
+  /** Reject the `addClip()` calls waiting for clips that match `which`. */
+  private _rejectAwaitedClips(
+    which: (clipId: string, trackId: string) => boolean,
+    message: string
+  ): void {
+    for (const [clipId, awaited] of [...this._awaitedClips]) {
+      if (which(clipId, awaited.trackId)) awaited.reject(new Error(message));
+    }
+  }
   /** `<daw-track>` elements `addTrack()` made: every other one is the page's (the history rule). */
   private _editorMadeTracks = new WeakSet<DawTrackElement>();
   /** `.dat` peaks drawn for a clip still loading, by clip id (an editor-only render cache). */
@@ -1457,24 +1470,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // Captured before the cleanup below mutates _tracks — gates the outbound
     // event so it only fires for a track that was actually registered.
     const existed = this._tracks.has(trackId);
-    // A track removed before it entered: an addClip() waiting for one of its
-    // clips would never settle (#917).
-    if (this._entryQueue.includes(trackId)) {
-      for (const clip of this._tracks.get(trackId)?.clips ?? []) {
-        if (!clip.clipId || !this._awaitedClips.has(clip.clipId)) continue;
-        this.dispatchEvent(
-          new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
-            bubbles: true,
-            composed: true,
-            detail: {
-              trackId,
-              clipId: clip.clipId,
-              error: new Error('track "' + trackId + '" was removed before it entered'),
-            },
-          })
-        );
-      }
-    }
+    // An addClip() waiting for a clip of this track would never settle (the
+    // clip may not even have connected yet): reject it (#917).
+    this._rejectAwaitedClips(
+      (_, awaitedTrackId) => awaitedTrackId === trackId,
+      'the track of the clip was removed before the clip loaded'
+    );
     this._entryQueue = this._entryQueue.filter((id) => id !== trackId);
     this._settleEntry(trackId, new Error('track "' + trackId + '" was removed before it entered'));
     const arrangementTrack = this._arrangement.getTracks().find((t) => t.id === trackId);
@@ -1853,6 +1854,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         ...desc,
         clips: desc.clips.filter((c) => c.clipId !== clipId),
       });
+      this._rejectAwaitedClips((id) => id === clipId, 'the clip was removed before it loaded');
       return;
     }
     // No matching engine clip. May be benign (clip was removed before its load
@@ -2956,7 +2958,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // arrangement nor waiting to enter) would never take the clip (#917).
     if (!this._isEntered(trackId) && !this._entryQueue.includes(trackId)) {
       return Promise.reject(
-        new Error('addClip: track "' + trackId + '" is not in the editor (an Undo took it out)')
+        new Error(
+          'addClip: track "' +
+            trackId +
+            '" is not in the editor (an Undo took it out, or the arrangement refused it)'
+        )
       );
     }
     const clipEl = this._buildClipElement(config);
@@ -2998,7 +3004,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       };
       this.addEventListener('daw-clip-ready', onReady);
       this.addEventListener('daw-clip-error', onError);
-      this._awaitedClips.add(clipId);
+      this._awaitedClips.set(clipId, {
+        trackId,
+        reject: (error) => {
+          cleanup();
+          reject(error);
+        },
+      });
       trackEl.appendChild(clipEl);
     });
   }
