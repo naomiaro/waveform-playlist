@@ -139,6 +139,12 @@ export class ClipPointerHandler {
     return this._mode !== null;
   }
 
+  /** True once the pointer of the current press has moved past the drag
+   *  threshold: a press that has not moved is not a drag (#848). */
+  get isDragging(): boolean {
+    return this._isDragging;
+  }
+
   /**
    * Attempts to handle a pointerdown event on the given target element.
    * Returns true if the target is a recognized clip interaction element.

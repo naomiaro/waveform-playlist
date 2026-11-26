@@ -862,3 +862,18 @@ describe('ClipPointerHandler', () => {
     });
   });
 });
+
+describe('ClipPointerHandler.isDragging (#848)', () => {
+  it('isDragging is false after pointerdown and true once the pointer moves past the threshold', () => {
+    const handler = new ClipPointerHandler(createMockHost(createMockEngine()));
+    handler.tryHandle(makeClipEl('c1', 't1'), pointerEvent('pointerdown', { clientX: 100 }));
+    expect(handler.isActive).toBe(true);
+    expect(handler.isDragging).toBe(false);
+    handler.onPointerMove(pointerEvent('pointermove', { clientX: 102 }));
+    expect(handler.isDragging).toBe(false);
+    handler.onPointerMove(pointerEvent('pointermove', { clientX: 104 }));
+    expect(handler.isDragging).toBe(true);
+    handler.onPointerUp(pointerEvent('pointerup', { clientX: 104 }));
+    expect(handler.isDragging).toBe(false);
+  });
+});

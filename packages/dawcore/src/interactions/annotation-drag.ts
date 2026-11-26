@@ -192,7 +192,22 @@ export class AnnotationDragHandler {
   _onPointerCancel = (e: PointerEvent): void => {
     const drag = this._drag;
     if (!drag || e.pointerId !== drag.pointerId) return;
-    // Restore the drag-start snapshot — a cancelled drag must not commit.
+    this._restoreAndTeardown(drag);
+  };
+
+  /** True from pointerdown on an annotation until the drag ends or is cancelled. */
+  get isActive(): boolean {
+    return this._drag !== null;
+  }
+
+  /** Cancel the drag in progress (Escape, editor disconnect): the boundaries
+   *  go back to where they were when it began (#848). */
+  cancel(): void {
+    if (this._drag) this._restoreAndTeardown(this._drag);
+  }
+
+  /** Restore the drag-start snapshot — a cancelled drag must not commit. */
+  private _restoreAndTeardown(drag: DragState): void {
     const elements = drag.track.annotationElements;
     if (drag.mode === 'ticks') {
       applyTickBoundaryResults(elements, drag.snapshot, (t) => this._host._ticksToSeconds(t));
@@ -200,7 +215,7 @@ export class AnnotationDragHandler {
       applyBoundaryResults(elements, drag.snapshot);
     }
     this._teardown();
-  };
+  }
 
   private _teardown(): void {
     const drag = this._drag;

@@ -98,6 +98,20 @@ describe('AnnotationDragHandler', () => {
     expect(track.annotations[0].end).toBeCloseTo(3); // restored
   });
 
+  it('cancel restores the boundaries from the start of the drag (#848)', () => {
+    const boundary = lane.querySelector('.annotation-boundary') as HTMLElement;
+    const removeListener = vi.spyOn(boundary, 'removeEventListener');
+    expect(handler.isActive).toBe(false);
+    handler.onPointerDown(fakePointer(boundary, 300), track);
+    expect(handler.isActive).toBe(true);
+    handler._onPointerMove(fakePointer(boundary, 380));
+    expect(track.annotations[0].end).toBeCloseTo(3.8);
+    handler.cancel();
+    expect(track.annotations[0].end).toBeCloseTo(3);
+    expect(handler.isActive).toBe(false);
+    expect(removeListener).toHaveBeenCalledWith('pointermove', handler._onPointerMove);
+  });
+
   it('box click (under drag threshold) selects and seeks', () => {
     const box = lane.querySelector('.annotation-box') as HTMLElement;
     handler.onPointerDown(fakePointer(box, 150), track);

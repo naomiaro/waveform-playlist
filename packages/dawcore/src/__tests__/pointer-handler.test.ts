@@ -544,3 +544,37 @@ describe('PointerHandler', () => {
     });
   });
 });
+
+describe('PointerHandler.cancelClipDrag (#848)', () => {
+  it('cancelClipDrag reverts an armed clip drag and detaches its listeners', () => {
+    const mockClipHandler = {
+      tryHandle: vi.fn().mockReturnValue(true),
+      onPointerMove: vi.fn(),
+      onPointerUp: vi.fn(),
+      onPointerCancel: vi.fn(),
+      isActive: true,
+    };
+    const host = createMockHost({ _clipHandler: mockClipHandler });
+    const handler = new PointerHandler(host);
+    const timeline = host.shadowRoot!.querySelector('.timeline')!;
+    const clipHeader = document.createElement('div');
+    clipHeader.classList.add('clip-header');
+    timeline.appendChild(clipHeader);
+    timeline.addEventListener('pointerdown', handler.onPointerDown as EventListener);
+    clipHeader.dispatchEvent(pointerEvent('pointerdown', { clientX: 150, pointerId: 7 }));
+
+    expect(handler.cancelClipDrag()).toBe(true);
+    expect(mockClipHandler.onPointerCancel).toHaveBeenCalledTimes(1);
+    expect((timeline as HTMLElement).releasePointerCapture).toHaveBeenCalledWith(7);
+
+    timeline.dispatchEvent(pointerEvent('pointermove', { clientX: 190, pointerId: 7 }));
+    expect(mockClipHandler.onPointerMove).not.toHaveBeenCalled();
+    expect(handler.cancelClipDrag()).toBe(false);
+    expect(mockClipHandler.onPointerCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancelClipDrag returns false when no clip drag is armed', () => {
+    const handler = new PointerHandler(createMockHost());
+    expect(handler.cancelClipDrag()).toBe(false);
+  });
+});

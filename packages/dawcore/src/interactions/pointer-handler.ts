@@ -97,6 +97,21 @@ export class PointerHandler {
     return (time * h.effectiveSampleRate) / h.samplesPerPixel;
   }
 
+  /** Cancels the armed clip drag; set while one is armed (#848). */
+  private _cancelArmedClipDrag: (() => void) | null = null;
+
+  /**
+   * Cancel an armed clip move or trim as a `pointercancel` would: the clip
+   * handler reverts it and the timeline's listeners and pointer capture are
+   * released. Returns whether a clip drag was armed.
+   */
+  cancelClipDrag(): boolean {
+    const cancel = this._cancelArmedClipDrag;
+    if (!cancel) return false;
+    cancel();
+    return true;
+  }
+
   onPointerDown = (e: PointerEvent) => {
     // Check if click landed on an interactive clip element
     const clipHandler = this._host._clipHandler;
@@ -114,12 +129,13 @@ export class PointerHandler {
             console.warn('[dawcore] setPointerCapture failed: ' + String(err));
           }
           const onMove = (me: Event) => clipHandler.onPointerMove(me as PointerEvent);
-          const detach = (pe: PointerEvent) => {
+          const detach = (pointerId: number) => {
+            this._cancelArmedClipDrag = null;
             this._timeline?.removeEventListener('pointermove', onMove);
             this._timeline?.removeEventListener('pointerup', onUp);
             this._timeline?.removeEventListener('pointercancel', onCancel);
             try {
-              this._timeline?.releasePointerCapture(pe.pointerId);
+              this._timeline?.releasePointerCapture(pointerId);
             } catch (err) {
               console.warn(
                 '[dawcore] releasePointerCapture failed (may already be released): ' + String(err)
@@ -129,7 +145,7 @@ export class PointerHandler {
           };
           const onUp = (ue: Event) => {
             clipHandler.onPointerUp(ue as PointerEvent);
-            detach(ue as PointerEvent);
+            detach((ue as PointerEvent).pointerId);
           };
           // pointercancel fires INSTEAD of pointerup on touch interruption /
           // pen leaving range / OS gestures — the clip drag must be reverted
@@ -140,7 +156,14 @@ export class PointerHandler {
           const onCancel = (ce: Event) => {
             if ((ce as PointerEvent).pointerId !== downPointerId) return;
             clipHandler.onPointerCancel(ce as PointerEvent);
-            detach(ce as PointerEvent);
+            detach((ce as PointerEvent).pointerId);
+          };
+          // Escape and the editor's disconnect cancel the drag the same way (#848).
+          this._cancelArmedClipDrag = () => {
+            clipHandler.onPointerCancel(
+              new PointerEvent('pointercancel', { pointerId: downPointerId })
+            );
+            detach(downPointerId);
           };
           this._timeline.addEventListener('pointermove', onMove);
           this._timeline.addEventListener('pointerup', onUp);
