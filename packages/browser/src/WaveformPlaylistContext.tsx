@@ -351,9 +351,10 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   // don't restart afterward don't need suppression — see the mirror's own
   // comment for why.
   const suppressEngineStopMirrorRef = useRef(false);
-  // Provider-level ref for scroll-position math and animation loop pixel
-  // calculation. Distinct from useZoomControls's internal ref (statechange guard).
+  // Viewport zoom for scroll-position math and animation loop pixels.
   const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
+  // The latest engine zoom, available to a rebuild before React commits it.
+  const engineSamplesPerPixelRef = useRef(initialSamplesPerPixel);
   // True while the bounded play in progress is the highlighted selection itself
   // (its start and end are the selection's). Set by play(). Selection playback
   // ignores continuous play; anything else, including an annotation clicked
@@ -390,10 +391,10 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     (engine: PlaylistEngine) => followersRef.current?.follow(engine),
     []
   );
-  const onEngineState = useCallback(
-    (state: EngineState) => followersRef.current?.mirror(state),
-    []
-  );
+  const onEngineState = useCallback((state: EngineState) => {
+    engineSamplesPerPixelRef.current = state.samplesPerPixel;
+    followersRef.current?.mirror(state);
+  }, []);
 
   // The engine around the arrangement: built on mount and when `effects` or
   // the zoom levels change, disposed in every cleanup (#812). A track edit
@@ -417,7 +418,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     soundFontCacheRef,
     sampleRateProp,
     zoomLevels,
-    samplesPerPixelRef,
+    samplesPerPixelRef: engineSamplesPerPixelRef,
     playbackEndTimeRef,
     seedEngine,
     onEngine,
@@ -677,7 +678,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
         if (selectedTrackIdRef.current) engine.selectTrack(selectedTrackIdRef.current);
       },
       follow: (engine) => {
-        engine.on('statechange', mirror);
+        engine.on('statechange', onEngineState);
         engine.on('stop', () => mirrorEngineStop(engine));
       },
       mirror,

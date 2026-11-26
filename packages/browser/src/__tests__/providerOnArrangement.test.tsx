@@ -647,6 +647,38 @@ describe('WaveformPlaylistProvider on an arrangement (#812)', () => {
     expect(noData.some((m) => m.includes('"LB"'))).toBe(false);
   });
 
+  it.each([false, true])(
+    'preserves zoom on an empty timeline across rebuilds (batched: %s)',
+    async (batched) => {
+      const view = renderWithArrangement([], {
+        children: CHILDREN,
+        effects: effectsA,
+        samplesPerPixel: 1024,
+        zoomLevels: [256, 512, 1024, 2048],
+      });
+      await ready();
+      expect(probe.timeline.duration).toBe(0);
+      expect(probe.zoom.samplesPerPixel).toBe(1024);
+
+      if (batched) {
+        act(() => {
+          probe.editor.zoomIn();
+          view.update({ effects: effectsB });
+        });
+      } else {
+        act(() => probe.editor.zoomIn());
+        await waitFor(() => expect(probe.zoom.samplesPerPixel).toBe(512));
+        act(() => view.update({ effects: effectsB }));
+      }
+
+      await waitFor(() => {
+        expect(view.adapters).toHaveLength(2);
+        expect(probe.engineRefs.playoutRef.current?.getState().samplesPerPixel).toBe(512);
+        expect(probe.zoom.samplesPerPixel).toBe(512);
+      });
+    }
+  );
+
   it('a rebuild gives the new engine what the old one held: selection, loop, master volume, selected track', async () => {
     const view = renderWithArrangement(
       [track('A', [clip('a1', 0, 4)]), track('B', [clip('b1', 0, 4)])],
