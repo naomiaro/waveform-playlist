@@ -724,8 +724,8 @@ export class ArrangementImpl implements Arrangement {
    * `undoable: false`: the value in the current mix and in every saved state
    * that has an entry for the track, so that no undo, redo or abort brings
    * the old one back. A step that no longer differs from the state next to
-   * it goes; when that was the step a gesture joins, the gesture's next
-   * change pushes a new one.
+   * it goes; when that was the step a gesture joins and no equal step is
+   * left on top, the gesture's next change pushes a new one.
    */
   private _writeMixerThrough(
     trackId: string,
@@ -740,8 +740,13 @@ export class ArrangementImpl implements Arrangement {
     this._history = written.history;
     this._transaction = written.base;
     if (this._gesture) {
+      // The top may be another object that equals the gesture's step: a step
+      // below it that the write made equal to it (`dropRepeats` keeps the
+      // older of two equal steps). It holds where the gesture began, so the
+      // gesture goes on joining it.
+      const newTop = this._history.undo[this._history.undo.length - 1];
       this._gesture =
-        this._history.undo[this._history.undo.length - 1] === top
+        newTop !== undefined && top !== undefined && sameState(newTop, top)
           ? { ...this._gesture, before: mapHistoryStates(this._gesture.before, write) }
           : null;
     }
