@@ -5,6 +5,12 @@ import type { RenderMode, SpectrogramConfig, TrackKind } from '@waveform-playlis
 import type { EffectState as TrackEffectState, SerializedEffectEntry } from '../effects/types';
 import { normalizeRenderMode } from '../types';
 import type { DawTrackUpdateDetail } from '../events';
+import {
+  detachedWarning,
+  linkHostOf,
+  setCustomState,
+  type TrackLinkValues,
+} from '../interactions/element-links';
 
 /** The properties whose change the editor hears about (`daw-track-update`). */
 const TRACK_PROPS: readonly string[] = [
@@ -50,11 +56,95 @@ interface TrackEffectsDelegate {
 @customElement('daw-track')
 export class DawTrackElement extends LitElement {
   @property() src = '';
-  @property() name = '';
-  @property({ type: Number }) volume = 1;
-  @property({ type: Number }) pan = 0;
-  @property({ type: Boolean }) muted = false;
-  @property({ type: Boolean }) soloed = false;
+
+  // --- Live properties (#848): the arrangement's values while the track is
+  // in it; the declaration (attributes, a set before entry) otherwise. ---
+
+  /** The track's name: the arrangement's, or as declared. Setting it renames the track (an undo step). */
+  @property({ noAccessor: true })
+  get name(): string {
+    return this._linked('name');
+  }
+  set name(value: string) {
+    this._request('name', value ?? '');
+  }
+  @property({ type: Number, noAccessor: true })
+  get volume(): number {
+    return this._linked('volume');
+  }
+  set volume(value: number) {
+    this._request('volume', value);
+  }
+  @property({ type: Number, noAccessor: true })
+  get pan(): number {
+    return this._linked('pan');
+  }
+  set pan(value: number) {
+    this._request('pan', value);
+  }
+  /** The stored mute (a take's mute is not shown here). */
+  @property({ type: Boolean, noAccessor: true })
+  get muted(): boolean {
+    return this._linked('muted');
+  }
+  set muted(value: boolean) {
+    this._request('muted', Boolean(value));
+  }
+  @property({ type: Boolean, noAccessor: true })
+  get soloed(): boolean {
+    return this._linked('soloed');
+  }
+  set soloed(value: boolean) {
+    this._request('soloed', Boolean(value));
+  }
+
+  /** The track's position in the arrangement the editor plays; -1 when it is not there. */
+  get index(): number {
+    return linkHostOf(this)?._trackIndex(this.trackId) ?? -1;
+  }
+
+  /** What the page declared: the attributes, and a property set before the track entered. */
+  private _declared: TrackLinkValues = { name: '', volume: 1, pan: 0, muted: false, soloed: false };
+  private _fromAttribute = false;
+  private _internals: ElementInternals | null = this.attachInternals?.() ?? null;
+
+  attributeChangedCallback(name: string, old: string | null, value: string | null): void {
+    // An attribute is the declaration, whatever the link state.
+    this._fromAttribute = true;
+    try {
+      super.attributeChangedCallback(name, old, value);
+    } finally {
+      this._fromAttribute = false;
+    }
+  }
+
+  private _linked<K extends keyof TrackLinkValues>(key: K): TrackLinkValues[K] {
+    const host = linkHostOf(this);
+    const live =
+      host?._trackLinkState(this.trackId) === 'live' ? host._trackValues(this.trackId) : null;
+    return live ? live[key] : this._declared[key];
+  }
+
+  private _request<K extends keyof TrackLinkValues>(key: K, value: TrackLinkValues[K]): void {
+    const old = this._linked(key);
+    const host = linkHostOf(this);
+    const state = host?._trackLinkState(this.trackId) ?? 'pending';
+    if (this._fromAttribute || state === 'pending') {
+      this._declared = { ...this._declared, [key]: value };
+    }
+    if (state === 'live') {
+      host!._requestTrackChange(this.trackId, { [key]: value } as Partial<TrackLinkValues>);
+    } else if (state === 'detached') {
+      const label = '<daw-track name="' + this._declared.name + '">';
+      console.warn(detachedWarning(label, key + ' = ' + String(value), host!._detachedReason()));
+    }
+    this.requestUpdate(key, old);
+  }
+
+  /** @internal Shown as `:state(detached)` (#848). */
+  _setDetached(detached: boolean): void {
+    setCustomState(this._internals, 'detached', detached);
+  }
 
   /**
    * What the track holds: `'audio'` (default) or `'midi'`. Every `<daw-clip>`

@@ -54,13 +54,7 @@ import type {
   PlayoutAdapter,
   TrackMixerValues,
 } from '@waveform-playlist/engine';
-import {
-  DEFAULT_TRACK_MIX,
-  clampNumber,
-  mixOfElement,
-  mixOfTrack,
-  pickMix,
-} from '../utils/track-mix';
+import { DEFAULT_TRACK_MIX, clampNumber, mixOfElement, mixOfTrack } from '../utils/track-mix';
 import '../elements/daw-track-controls';
 import '../elements/daw-grid';
 import { hostStyles, clipStyles } from '../styles/theme';
@@ -117,6 +111,12 @@ import {
 } from '../interactions/track-entry';
 import { LoadAnnouncer } from '../interactions/load-announcer';
 import { clipSeconds, loadedTrack, mixOf } from '../interactions/arrangement-view';
+import {
+  refreshLinkStates,
+  type ClipLinkValues,
+  type LinkState,
+  type TrackLinkValues,
+} from '../interactions/element-links';
 import { EffectsManager } from '../effects/effects-manager';
 import { exportAudioImpl } from '../interactions/export-audio';
 import type { ExportOptions } from '../interactions/export-audio';
@@ -129,6 +129,9 @@ import { installCommand } from '../utils/install-command';
 
 /** Height of the ruler band — single source for the ruler element and the header row. */
 const RULER_HEIGHT = 30;
+
+/** The values a clip change is computed from: the live values with the request applied (#848). */
+type ClipUpdateValues = ClipLinkValues & { src: string };
 
 /** What a row of the template reads about its track (#848: from the arrangement and the extras). */
 interface RowInfo {
@@ -507,6 +510,14 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._arrangement.sources.subscribe(() => {
       this._announceLoading();
       this.requestUpdate();
+    });
+    // The elements' link states follow the tracks (#848): a structural change
+    // only, not every mixer frame.
+    let tracksVersion = this._arrangement.tracksVersion;
+    this._arrangement.subscribe(() => {
+      if (this._arrangement.tracksVersion === tracksVersion) return;
+      tracksVersion = this._arrangement.tracksVersion;
+      this._refreshLinkStates();
     });
   }
   /**
@@ -1249,6 +1260,87 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const el = this._trackElements.get(trackId);
     return el ? mixOfElement(el) : DEFAULT_TRACK_MIX;
   }
+  // --- Element links (#848, interactions/element-links.ts) ---
+  /** @internal */
+  _trackLinkState(trackId: string): LinkState {
+    if (this._isEntered(trackId)) return 'live';
+    return this._extras.has(trackId) && !this._pending.has(trackId) ? 'detached' : 'pending';
+  }
+  /** @internal */
+  _clipLinkState(trackId: string, clipId: string): LinkState {
+    const track = this._trackLinkState(trackId);
+    if (track !== 'live') return track;
+    const held = this._arrangement
+      .getTracks()
+      .find((t) => t.id === trackId)
+      ?.clips.some((c) => c.id === clipId);
+    if (held) return 'live';
+    return this._extras.get(trackId)?.peaksSrc.has(clipId) ? 'detached' : 'pending';
+  }
+  /** @internal The stored mix (not a take's mute) and the name. */
+  _trackValues(trackId: string): TrackLinkValues | null {
+    const track = this._arrangement.getTracks().find((t) => t.id === trackId);
+    const mix = this._arrangement.getMixer().get(trackId);
+    if (!track || !mix) return null;
+    return { ...mix, name: track.name ?? '' };
+  }
+  /** @internal */
+  _clipValues(trackId: string, clipId: string): ClipLinkValues | null {
+    const clip = this._arrangement
+      .getTracks()
+      .find((t) => t.id === trackId)
+      ?.clips.find((c) => c.id === clipId);
+    if (!clip) return null;
+    const midi = isLoadingClip(clip) ? null : clip;
+    return {
+      ...clipSeconds(clip, this.effectiveSampleRate),
+      gain: clip.gain ?? 1,
+      name: clip.name ?? '',
+      midiNotes: midi?.midiNotes ?? null,
+      midiChannel: midi?.midiChannel ?? null,
+      midiProgram: midi?.midiProgram ?? null,
+    };
+  }
+  /** @internal A property or attribute set on a live `<daw-track>`: one undo step per field kind. */
+  _requestTrackChange(trackId: string, partial: Partial<TrackLinkValues>): void {
+    const { name, ...mix } = partial;
+    if (Object.keys(mix).length > 0) this._writeMixFields(trackId, mix, this._taskGesture(trackId));
+    if (name !== undefined) this._renameTrack(trackId, name || 'Untitled');
+  }
+  /** One gesture id per track for the rest of this task: mix sets made together are one step (#843). */
+  private _taskGestures = new Map<string, string>();
+  private _taskGesture(trackId: string): string {
+    let id = this._taskGestures.get(trackId);
+    if (!id) {
+      id = createMixerGesture().id;
+      this._taskGestures.set(trackId, id);
+      if (this._taskGestures.size === 1) queueMicrotask(() => this._taskGestures.clear());
+    }
+    return id;
+  }
+  /** @internal A property or attribute set on a live `<daw-clip>`: one undo step. */
+  _requestClipChange(trackId: string, clipId: string, partial: Partial<ClipLinkValues>): void {
+    const current = this._clipValues(trackId, clipId);
+    if (!current) return;
+    const clip = this._arrangement
+      .getTracks()
+      .find((t) => t.id === trackId)
+      ?.clips.find((c) => c.id === clipId);
+    const src = clip && typeof clip.src === 'string' ? clip.src : '';
+    this._applyClipUpdate(trackId, clipId, { ...current, ...partial, src });
+  }
+  /** @internal */
+  _trackIndex(trackId: string): number {
+    return this._arrangement.getTracks().findIndex((t) => t.id === trackId);
+  }
+  /** @internal */
+  _detachedReason(): string {
+    return 'its track or clip is not in the arrangement the editor plays';
+  }
+  /** Set or clear `:state(detached)` on every registered element (#848). */
+  private _refreshLinkStates(): void {
+    refreshLinkStates(this, this._trackElements);
+  }
   /**
    * Change one mixer field of a track: the arrangement's setter with
    * `options` (an undo step; changes with one `gesture` id are one step). A
@@ -1270,8 +1362,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * Change the given mixer fields of a track as ONE undo step (#843): all
    * of them carry one fresh gesture id. A field left out is not sent.
    */
-  private _writeMixFields(trackId: string, mix: Partial<TrackMixerValues>): void {
-    const options: MixerChangeOptions = { gesture: createMixerGesture().id };
+  private _writeMixFields(
+    trackId: string,
+    mix: Partial<TrackMixerValues>,
+    gesture: string = createMixerGesture().id
+  ): void {
+    const options: MixerChangeOptions = { gesture };
     if (mix.volume !== undefined) this._writeMix(trackId, 'volume', mix.volume, options);
     if (mix.pan !== undefined) this._writeMix(trackId, 'pan', mix.pan, options);
     if (mix.muted !== undefined) this._writeMix(trackId, 'muted', mix.muted, options);
@@ -1309,7 +1405,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this.addEventListener('daw-track-control', this._onTrackControl as EventListener);
     this.addEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener);
     this.addEventListener('daw-clip-connected', this._onClipConnected as EventListener);
-    this.addEventListener('daw-clip-update', this._onClipUpdate as EventListener);
     this.addEventListener(
       'daw-annotation-track-connected',
       this._onAnnotationTrackConnected as EventListener
@@ -1384,7 +1479,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this.removeEventListener('daw-track-control', this._onTrackControl as EventListener);
     this.removeEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener);
     this.removeEventListener('daw-clip-connected', this._onClipConnected as EventListener);
-    this.removeEventListener('daw-clip-update', this._onClipUpdate as EventListener);
     this.removeEventListener(
       'daw-annotation-track-connected',
       this._onAnnotationTrackConnected as EventListener
@@ -1701,12 +1795,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       src: trackEl.src,
     };
     this._extras = new Map(this._extras).set(trackId, next);
-    // Only the mixer properties this update changed (#843), as one undo step:
-    // a rename after an Undo must not send the element's older volume back.
-    const changed = Array.isArray(e.detail.changed) ? e.detail.changed : [];
-    this._writeMixFields(trackId, pickMix(mixOfElement(trackEl), changed));
-    // A rename is a request to the arrangement, one undo step (#848).
-    if (changed.includes('name')) this._renameTrack(trackId, trackEl.name || 'Untitled');
+    // The mix and the name are not handled here: the element's setters ask
+    // the arrangement directly (#848, element-links.ts).
     if (old.src !== next.src) this._replaceShorthandClips(trackId, trackEl);
     const loaded = this._loadedTracks().find((t) => t.id === trackId)?.clips ?? [];
     // Track switched into spectrogram mode — push existing clip audio into the controller.
@@ -1816,21 +1906,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // elements fire disconnectedCallback+connectedCallback on insertBefore).
     if (this._extras.get(trackId)?.peaksSrc.has(clipEl.clipId)) return;
     this._loadAndAppendClip(trackId, this._readClipDescriptor(clipEl));
-  };
-  private _onClipUpdate = (e: CustomEvent) => {
-    const clipEl = e.target as DawClipElement;
-    if (!(clipEl instanceof HTMLElement) || clipEl.tagName !== 'DAW-CLIP') return;
-    const detail = e.detail as { trackId: string; clipId: string };
-    if (!detail.trackId) {
-      // <daw-clip> mounted outside a <daw-track> — developer error.
-      console.warn(
-        '[dawcore] daw-clip-update fired from a <daw-clip> not nested in a <daw-track> — ignored'
-      );
-      return;
-    }
-    // A track that has not entered yet reads its clips when it enters.
-    if (!this._isEntered(detail.trackId)) return;
-    this._applyClipUpdate(detail.trackId, detail.clipId, clipEl);
   };
   private _onClipRemovedFromDom(clipEl: DawClipElement) {
     const clipId = clipEl.clipId;
@@ -1962,7 +2037,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       clips: current.clips.map((c) => (c.id === clipId ? clip : c)),
     }));
   }
-  private _applyClipUpdate(trackId: string, clipId: string, clipEl: DawClipElement) {
+  private _applyClipUpdate(trackId: string, clipId: string, clipEl: ClipUpdateValues) {
     const t = this._arrangement.getTracks().find((track) => track.id === trackId);
     if (!t) {
       console.warn('[dawcore] _applyClipUpdate: no track for id "' + trackId + '"');
@@ -1970,17 +2045,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
     const loadedClip = this._loadedClip(trackId, clipId);
     if (!loadedClip) {
-      const loading = this._arrangement
-        .getTracks()
-        .find((track) => track.id === trackId)
-        ?.clips.some((c) => c.id === clipId);
+      const loading = t.clips.find((c) => c.id === clipId);
+      if (loading && isLoadingClip(loading)) {
+        this._updateLoadingClip(trackId, loading, clipEl);
+        return;
+      }
       console.warn(
         '[dawcore] _applyClipUpdate: clip "' +
           clipId +
-          '" ' +
-          (loading
-            ? 'is still loading; the change is dropped'
-            : 'not found in track "' + trackId + '" (DOM/engine clip-id misalignment?)')
+          '" not found in track "' +
+          trackId +
+          '" (DOM/engine clip-id misalignment?)'
       );
       return;
     }
@@ -2012,6 +2087,19 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       return;
     }
     if (isMidiNow || wasMidi) {
+      // The value the arrangement holds already changes nothing (#848).
+      if (
+        clipEl.midiNotes === oldClip.midiNotes &&
+        (clipEl.midiChannel ?? undefined) === oldClip.midiChannel &&
+        (clipEl.midiProgram ?? undefined) === oldClip.midiProgram &&
+        Math.round(clipEl.start * sr) === oldClip.startSample &&
+        Math.round(clipEl.offset * sr) === oldClip.offsetSamples &&
+        (clipEl.duration <= 0 || Math.round(clipEl.duration * sr) === oldClip.durationSamples) &&
+        clipEl.gain === (oldClip.gain ?? 1) &&
+        (clipEl.name || oldClip.name) === oldClip.name
+      ) {
+        return;
+      }
       const notes = validMidiNotes(clipEl.midiNotes ?? []);
       const noteSpanSeconds = notes.length
         ? notes.reduce((max, n) => Math.max(max, n.time + n.duration), 0)
@@ -2051,6 +2139,16 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       gain: clipEl.gain,
       name: clipEl.name || oldClip.name,
     };
+    // The value the arrangement holds already changes nothing (#848).
+    if (
+      newStartSample === oldClip.startSample &&
+      newDurationSamples === oldClip.durationSamples &&
+      newOffsetSamples === oldClip.offsetSamples &&
+      updatedClip.gain === (oldClip.gain ?? 1) &&
+      updatedClip.name === oldClip.name
+    ) {
+      return;
+    }
     const boundsChanged =
       oldClip.offsetSamples !== newOffsetSamples || oldClip.durationSamples !== newDurationSamples;
     if (boundsChanged) {
@@ -2065,6 +2163,33 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
 
     this._replaceClip(trackId, clipId, updatedClip);
+  }
+  /**
+   * A change to a clip still loading (#848 P10): its times, gain and name in
+   * seconds on the `LoadingClip`, one undo step; the audio loads into it.
+   */
+  private _updateLoadingClip(trackId: string, clip: LoadingClip, values: ClipUpdateValues): void {
+    const next: LoadingClip = {
+      ...clip,
+      start: values.start,
+      ...(values.duration > 0 ? { duration: values.duration } : {}),
+      offset: values.offset,
+      gain: values.gain,
+      ...(values.name ? { name: values.name } : {}),
+    };
+    if (
+      (next.start ?? 0) === (clip.start ?? 0) &&
+      next.duration === clip.duration &&
+      (next.offset ?? 0) === (clip.offset ?? 0) &&
+      (next.gain ?? 1) === (clip.gain ?? 1) &&
+      next.name === clip.name
+    ) {
+      return;
+    }
+    this._arrangement.updateTrack(trackId, (current) => ({
+      ...current,
+      clips: current.clips.map((c) => (c.id === clip.id ? next : c)),
+    }));
   }
   /** Remove a clip (loaded or still loading) from a track of the arrangement: an undo step. */
   private _removeClipFromTrack(trackId: string, clipId: string) {
@@ -2271,6 +2396,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         nextExtras.delete(trackId);
         this._extras = nextExtras;
       }
+      this._refreshLinkStates();
       this._settleEntry(trackId, err instanceof Error ? err : new Error(String(err)));
       this.dispatchEvent(
         new CustomEvent<DawTrackErrorDetail>('daw-track-error', {
