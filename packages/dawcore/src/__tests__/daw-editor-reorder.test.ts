@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, vi, beforeEach, afterEach } from 'vitest';
 import type { DawTrackElement } from '../elements/daw-track';
+import { makeFakeAdapter, restoreFetch, settle, stubFetch } from './helpers/editor-harness';
 
 beforeAll(async () => {
   // Register all elements before template cloning (happy-dom 20 upgrades
@@ -16,9 +17,21 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  restoreFetch();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
+
+/** An editor whose arrangement loads through the harness's fetch and decoder (#848). */
+function loadingEditor() {
+  const fake = makeFakeAdapter();
+  stubFetch({ '/a.wav': 'ok', '/b.wav': 'ok', '/c.wav': 'ok' });
+  const editor = document.createElement('daw-editor') as any;
+  editor.adapter = fake.adapter;
+  document.body.appendChild(editor);
+  editor._peakPipeline = makeMockPeakPipeline();
+  return { editor, fake };
+}
 
 function makeMockAdapter() {
   const ctx = {
@@ -58,17 +71,6 @@ async function makeEditor(trackCount: number) {
   return editor;
 }
 
-function makeAudioBuffer(durationSec = 1, sampleRate = 48000): AudioBuffer {
-  const length = Math.round(durationSec * sampleRate);
-  return {
-    length,
-    duration: durationSec,
-    sampleRate,
-    numberOfChannels: 1,
-    getChannelData: () => new Float32Array(length),
-  } as unknown as AudioBuffer;
-}
-
 function makePeakData() {
   return { data: [new Int16Array(0)], length: 0, bits: 16 };
 }
@@ -103,25 +105,13 @@ describe('<daw-editor> track reordering (#612)', () => {
   });
 
   it('registers engine tracks in DOM order even when audio decode finishes out of order', async () => {
-    const editor = document.createElement('daw-editor') as any;
-    editor.adapter = makeMockAdapter();
-    document.body.appendChild(editor);
-    editor._peakPipeline = makeMockPeakPipeline();
+    const { editor, fake } = loadingEditor();
 
     // Hold the FIRST track's decode mid-flight so the SECOND track's decode
     // (mocked to resolve immediately) completes first — Map-insertion
     // (completion) order would then be [second, first], diverging from DOM
     // (append) order [first, second].
-    let releaseFirst!: (b: AudioBuffer) => void;
-    editor._fetchAndDecode = vi
-      .fn()
-      .mockImplementationOnce(
-        () =>
-          new Promise<AudioBuffer>((resolve) => {
-            releaseFirst = resolve;
-          })
-      )
-      .mockResolvedValue(makeAudioBuffer());
+    const first = fake.holdDecode('/a.wav');
 
     const firstPromise = editor.addTrack({
       name: 'First',
@@ -132,9 +122,10 @@ describe('<daw-editor> track reordering (#612)', () => {
       clips: [{ src: '/b.wav', start: 0, duration: 1 }],
     });
 
-    await secondPromise; // second track's decode wins the race
-    releaseFirst(makeAudioBuffer());
+    await secondPromise; // the second track's decode wins the race
+    first.resolve();
     await firstPromise;
+    await settle(editor);
 
     const domOrder = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
     const engineOrder = editor.engine!.getState().tracks.map((t: { id: string }) => t.id);
@@ -143,33 +134,15 @@ describe('<daw-editor> track reordering (#612)', () => {
   });
 
   it('preserves the declared <daw-track> DOM order when decodes finish out of order (#625)', async () => {
-    const editor = document.createElement('daw-editor') as any;
-    editor.adapter = makeMockAdapter();
-    document.body.appendChild(editor);
-    editor._peakPipeline = makeMockPeakPipeline();
+    const { editor, fake } = loadingEditor();
 
     // Decode completion order is C, B, A — the reverse of the declared DOM
     // order [A, B, C]. Each completion calls engine.setTracks with only the
     // loaded subset; the statechange handler's _syncDomToEngineOrder must NOT
     // move that subset ahead of still-loading tracks (#625: tracks ended up
     // in load-completion order, breaking consumer grouping).
-    let releaseA!: (b: AudioBuffer) => void;
-    let releaseB!: (b: AudioBuffer) => void;
-    editor._fetchAndDecode = vi
-      .fn()
-      .mockImplementationOnce(
-        () =>
-          new Promise<AudioBuffer>((resolve) => {
-            releaseA = resolve;
-          })
-      )
-      .mockImplementationOnce(
-        () =>
-          new Promise<AudioBuffer>((resolve) => {
-            releaseB = resolve;
-          })
-      )
-      .mockResolvedValue(makeAudioBuffer());
+    const releaseA = fake.holdDecode('/a.wav');
+    const releaseB = fake.holdDecode('/b.wav');
 
     const aPromise = editor.addTrack({ name: 'A', clips: [{ src: '/a.wav' }] });
     const bPromise = editor.addTrack({ name: 'B', clips: [{ src: '/b.wav' }] });
@@ -178,11 +151,12 @@ describe('<daw-editor> track reordering (#612)', () => {
     const declaredOrder = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
     expect(declaredOrder.length).toBe(3);
 
-    await cPromise; // C's decode resolves immediately and wins the race
-    releaseB(makeAudioBuffer());
+    await cPromise; // C's decode resolves at once and wins the race
+    releaseB.resolve();
     await bPromise;
-    releaseA(makeAudioBuffer());
+    releaseA.resolve();
     await aPromise;
+    await settle(editor);
     await editor.updateComplete;
 
     const domOrder = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
@@ -215,26 +189,21 @@ describe('<daw-editor> track reordering (#612)', () => {
 
 describe('<daw-editor> track reordering — redundant reconnect guard (#612)', () => {
   it('does not re-fetch/re-decode audio or replace the clip buffer when a loaded audio track is moved', async () => {
-    const editor = document.createElement('daw-editor') as any;
-    editor.adapter = makeMockAdapter();
-    document.body.appendChild(editor);
-    editor._peakPipeline = makeMockPeakPipeline();
-
-    const fetchAndDecodeSpy = vi.fn().mockResolvedValue(makeAudioBuffer());
-    editor._fetchAndDecode = fetchAndDecodeSpy;
+    const { editor, fake } = loadingEditor();
 
     const errorSpy = vi.fn();
     editor.addEventListener('daw-track-error', errorSpy);
 
     await editor.addTrack({ name: 'A', clips: [{ src: '/a.wav', start: 0, duration: 1 }] });
     await editor.addTrack({ name: 'B', clips: [{ src: '/b.wav', start: 0, duration: 1 }] });
+    await settle(editor);
 
     const [elA, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
     const clipElB = elB.querySelector('daw-clip') as unknown as { clipId: string };
     const clipIdB = clipElB.clipId;
     const bufferBefore = editor._clipBuffers.get(clipIdB);
     expect(bufferBefore).toBeDefined();
-    const callsBefore = fetchAndDecodeSpy.mock.calls.length;
+    const decodesBefore = fake.decodeCount('/b.wav');
 
     editor.insertBefore(elB, elA); // consumer-initiated DOM reorder — fires
     // disconnectedCallback+connectedCallback on elB per custom-element spec.
@@ -247,7 +216,7 @@ describe('<daw-editor> track reordering — redundant reconnect guard (#612)', (
     // re-dispatches fired by the moved element's connectedCallback.
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(fetchAndDecodeSpy.mock.calls.length).toBe(callsBefore);
+    expect(fake.decodeCount('/b.wav')).toBe(decodesBefore);
     expect(errorSpy).not.toHaveBeenCalled();
     // Same AudioBuffer reference for moved track B — nothing re-fetched/re-decoded/re-finalized.
     expect(editor._clipBuffers.get(clipIdB)).toBe(bufferBefore);
@@ -256,14 +225,10 @@ describe('<daw-editor> track reordering — redundant reconnect guard (#612)', (
   });
 
   it('keeps engine track clip ids unique and unchanged after a move settles', async () => {
-    const editor = document.createElement('daw-editor') as any;
-    editor.adapter = makeMockAdapter();
-    document.body.appendChild(editor);
-    editor._peakPipeline = makeMockPeakPipeline();
-    editor._fetchAndDecode = vi.fn().mockResolvedValue(makeAudioBuffer());
-
+    const { editor } = loadingEditor();
     await editor.addTrack({ name: 'A', clips: [{ src: '/a.wav', start: 0, duration: 1 }] });
     await editor.addTrack({ name: 'B', clips: [{ src: '/b.wav', start: 0, duration: 1 }] });
+    await settle(editor);
 
     const [elA, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
     type EngineTrack = { id: string; clips: { id: string }[] };

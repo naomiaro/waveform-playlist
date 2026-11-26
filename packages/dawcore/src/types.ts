@@ -117,6 +117,8 @@ export interface DomClipDescriptor extends BaseClipDescriptor {
 export interface DropClipDescriptor extends BaseClipDescriptor {
   kind: 'drop';
   clipId?: string;
+  /** A dropped file the clip loads (`src` is then ''): a File cannot be an attribute (#848). */
+  file?: File;
 }
 
 export type ClipDescriptor = DomClipDescriptor | DropClipDescriptor;

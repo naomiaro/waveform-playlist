@@ -11,7 +11,6 @@ import type { TrackConfig } from '../types';
 
 export interface FileLoaderHost {
   readonly isConnected: boolean;
-  _audioCache: Map<string, Promise<AudioBuffer>>;
   addTrack(config: TrackConfig): Promise<DawTrackElement>;
   dispatchEvent(event: Event): boolean;
 }
@@ -63,10 +62,8 @@ export async function loadFiles(
       console.warn('[dawcore] Failed to load file: ' + file.name + ' — ' + String(err));
       dispatchLoadError(file, err);
     } finally {
-      // The decode is complete either way; the blob URL and its cache entry
-      // (keyed by a URL that will never be fetched again) are dead weight.
+      // The decode is complete either way; the blob URL is dead weight.
       URL.revokeObjectURL(blobUrl);
-      host._audioCache.delete(blobUrl);
     }
   }
 

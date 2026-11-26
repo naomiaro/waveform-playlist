@@ -189,9 +189,16 @@ interface EditorInternals {
  * deferred connects and the entry flush.
  */
 export async function mountEditor(
-  options: { adapter?: FakeAdapter['adapter'] | null; html?: string; parent?: HTMLElement } = {}
+  options: {
+    adapter?: FakeAdapter['adapter'] | null;
+    html?: string;
+    parent?: HTMLElement;
+    /** Called with the editor before it connects (stub internals here). */
+    before?: (editor: DawEditorElement) => void;
+  } = {}
 ): Promise<DawEditorElement> {
   const editor = document.createElement('daw-editor') as DawEditorElement;
+  options.before?.(editor);
   const adapter = options.adapter === undefined ? makeFakeAdapter().adapter : options.adapter;
   if (adapter) (editor as unknown as { adapter: unknown }).adapter = adapter;
   if (options.html) editor.innerHTML = options.html;
@@ -211,4 +218,27 @@ export async function settle(editor: DawEditorElement, maxTicks = 50): Promise<v
     }
   }
   throw new Error('settle: sources still loading after ' + maxTicks + ' ticks');
+}
+
+/** Peak data with no samples: enough for the editor to draw a clip. */
+export function makePeakData() {
+  return { data: [new Int16Array(0)], length: 0, bits: 16 as const };
+}
+
+/**
+ * Replace the editor's peak pipeline (its Web Worker does not run under
+ * happy-dom) with stubs that resolve empty peaks at once.
+ */
+export function stubPeakPipeline(editor: DawEditorElement): Record<string, Mock> {
+  const pipeline = {
+    generatePeaks: vi.fn().mockResolvedValue(makePeakData()),
+    cacheWaveformData: vi.fn(),
+    getMaxCachedScale: vi.fn().mockReturnValue(0),
+    getCachedScale: vi.fn().mockReturnValue(0),
+    reextractPeaks: vi.fn().mockReturnValue(new Map()),
+    getBaseScalePeaks: vi.fn().mockReturnValue(null),
+    terminate: vi.fn(),
+  };
+  (editor as unknown as { _peakPipeline: unknown })._peakPipeline = pipeline;
+  return pipeline;
 }
