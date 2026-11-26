@@ -781,9 +781,12 @@ describe('review fixes, round 3 (#917)', () => {
       html: '<daw-track name="T"></daw-track>',
     })) as any;
     const trackId = editor.tracks[0].trackId;
-    const outcome = pending(editor.addClip(trackId, { src: '/a.wav', duration: 1 }));
+    const added = editor.addClip(trackId, { src: '/a.wav', duration: 1 });
+    const outcome = pending(added);
     await tick(2);
-    editor.querySelector('daw-clip').remove();
+    // addClip makes no <daw-clip> (#848): removeClip takes it off the queued track.
+    const clipId = editor.tracks[0].clips[0].clipId;
+    editor.removeClip(trackId, clipId);
     expect(await outcome).toMatch(/removed before/);
   });
 
@@ -846,13 +849,14 @@ describe('review fixes, round 4 (#917)', () => {
     expect(await outcome).toMatch(/not in the editor|removed before/);
   });
 
-  it('addClip then its <daw-clip> removed from the DOM in the same task rejects', async () => {
+  it('addClip then removeClip of that clip in the same task rejects (#848: no <daw-clip>)', async () => {
     stubFetch({ '/a.wav': 'ok', '/b.wav': 'ok' });
     const editor = await mount(makeFakeAdapter(), audioTrack('A', '/a.wav'));
     await settle(editor);
     const trackId = editor._arrangement.getTracks()[0].id;
     const outcome = pending(editor.addClip(trackId, { src: '/b.wav', duration: 1 }));
-    editor.querySelector('daw-track').lastElementChild.remove();
+    const added = editor._arrangement.getTracks()[0].clips.at(-1);
+    editor.removeClip(trackId, added.id);
     expect(await outcome).toMatch(/removed before/);
   });
 });

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, vi, beforeEach, afterEach } from 'vitest';
+import { appendTrackElement } from './helpers/editor-harness';
 
 /** A track as it is played (loaded clips, current mix), read from the arrangement (#848). */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -29,9 +30,9 @@ afterEach(() => {
 });
 
 /** The `<daw-track>` element `editor.addTrack()` appended, from the id it resolved with. */
-async function addTrackElement(editor: any, config: unknown): Promise<any> {
-  const trackId: string = await editor.addTrack(config);
-  return [...editor.querySelectorAll('daw-track')].find((t: any) => t.trackId === trackId);
+/** A <daw-track> the page declares (addTrack makes no element since #848). */
+async function addTrackElement(editor: any, config: object): Promise<any> {
+  return appendTrackElement(editor, config);
 }
 
 function makeMockAdapter() {
@@ -311,7 +312,7 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.removeChild(editor);
   });
 
-  it('updateTrack({ renderMode }) sets render-mode attribute on DOM track', async () => {
+  it('updateTrack({ renderMode }) changes how the track is drawn, not its attribute (#848)', async () => {
     const editor = document.createElement('daw-editor') as any;
     editor.adapter = makeMockAdapter();
     document.body.appendChild(editor);
@@ -321,7 +322,8 @@ describe('<daw-editor> MIDI loading', () => {
 
     editor.updateTrack(track.trackId, { renderMode: 'spectrogram' });
     await track.updateComplete;
-    expect(track.getAttribute('render-mode')).toBe('spectrogram');
+    expect(track.getAttribute('render-mode')).toBeNull();
+    expect(editor.tracks[0].renderMode).toBe('spectrogram');
     document.body.removeChild(editor);
   });
 

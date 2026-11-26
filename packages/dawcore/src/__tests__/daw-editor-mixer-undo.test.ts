@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { appendTrackElement } from './helpers/editor-harness';
 
 // #843: the arrangement owns a track's mix in <daw-editor> too. The controls
 // and editor.tracks read it from the arrangement, so an engine undo moves
@@ -77,10 +78,11 @@ async function makeEditor() {
  * steps, so each starts from the track with an empty history. Resolves with
  * the `<daw-track>` element addTrack appended (addTrack resolves with its id).
  */
+/** A `<daw-track>` the page declares (addTrack makes no element since #848). */
 async function addBaseTrack(editor: any, config: ReturnType<typeof midiTrackConfig>) {
-  const trackId: string = await editor.addTrack(config);
+  const trackEl = await appendTrackElement(editor, config);
   editor.engine.clearHistory();
-  return [...editor.querySelectorAll('daw-track')].find((t: any) => t.trackId === trackId);
+  return trackEl;
 }
 
 function controlsFor(editor: any, trackId: string): any {

@@ -1,6 +1,7 @@
 // #756: a track holds one kind of clip. <daw-track kind="audio|midi"> declares
 // it; a clip of the other kind is not added and is reported.
 import { describe, it, expect, beforeAll, vi, beforeEach, afterEach } from 'vitest';
+import { appendTrackElement } from './helpers/editor-harness';
 import {
   makeAudioBuffer,
   makeFakeAdapter,
@@ -224,10 +225,7 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
 
   it('changing kind after the track has loaded is ignored with a warning', async () => {
     const { editor } = makeEditor();
-    const trackId = await editor.addTrack({ name: 'Keys', midi: { notes: NOTES } });
-    const track = [...editor.querySelectorAll('daw-track')].find(
-      (t: any) => t.trackId === trackId
-    ) as any;
+    const track = await appendTrackElement(editor, { name: 'Keys', midi: { notes: NOTES } });
 
     track.kind = 'audio';
     await track.updateComplete;
@@ -238,10 +236,9 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
         .mocked(console.warn)
         .mock.calls.filter(([message]) => String(message).includes('kind cannot change')).length;
     expect(kindWarnings()).toBe(1);
-    // The element is put back (in a microtask), so it says what the editor holds...
-    await vi.waitFor(() => expect(track.kind).toBe('midi'));
+    // The element keeps what the page set: the editor writes no attribute (#848)...
     await track.updateComplete;
-    expect(track.getAttribute('kind')).toBe('midi');
+    expect(track.getAttribute('kind')).toBe('audio');
 
     // ...and an unrelated later change does not warn again.
     track.volume = 0.5;

@@ -1,6 +1,6 @@
 /**
  * MIDI loading logic extracted from daw-editor. Operates on the editor via a
- * narrow host interface (`addTrack` + `querySelectorAll`) — `<daw-editor>`
+ * narrow host interface (`addTrack` + `removeTrack`) — `<daw-editor>`
  * satisfies it without any new public surface.
  *
  * Numbered steps below match the Data Flow diagram in
@@ -15,16 +15,14 @@ export type { MidiLoadOptions, MidiLoadResult };
 
 /**
  * Minimal host surface needed by `loadMidiImpl`. `<daw-editor>` satisfies this
- * structurally. `querySelectorAll` is needed for cleanup-on-failure so the
- * loader can identify `<daw-track>` elements appended during this call (both
- * those whose `addTrack` resolved and those whose entry was refused — the
- * latter aren't in the `addTrack` resolution value, so we need DOM
- * observation to find them).
+ * structurally. A track `addTrack` added is removed by its id on a failure; a
+ * track whose entry was refused never entered, so there is nothing to remove
+ * (#848: `addTrack` makes no element).
  */
 export interface MidiLoaderHost {
   /** Resolves with the track id once the track has entered (#848). */
   addTrack(config: TrackConfig): Promise<string>;
-  querySelectorAll(selector: string): NodeListOf<Element>;
+  removeTrack(trackId: string): void;
 }
 
 // Built when thrown, so a bundler can drop it with the code that throws it.
@@ -32,12 +30,9 @@ const installHint = (): string =>
   '@dawcore/midi is required for loadMidi(). Install with: ' + installCommand('@dawcore/midi');
 
 /**
- * Loads a `.mid` file (URL or `File`) and creates N `<daw-track>` elements,
- * one per note-bearing MIDI track. On any per-track failure, every
- * `<daw-track>` appended during this call is removed so the editor returns
- * to its pre-call state (cleanup-on-failure — covers both `addTrack`
- * successes and the elements that `addTrack` left in the DOM before its
- * promise rejected).
+ * Loads a `.mid` file (URL or `File`) and adds N tracks, one per note-bearing
+ * MIDI track. On any per-track failure, every track added during this call is
+ * removed so the editor returns to its pre-call state (cleanup-on-failure).
  *
  * AbortSignal is forwarded to the fetch phase only. Aborting after parsing
  * does not cancel in-flight `addTrack` calls (documented limitation).
@@ -94,9 +89,6 @@ export async function loadMidiImpl(
     parsed = parseMidiFile(buffer);
   }
 
-  // (3) Snapshot existing tracks so cleanup can identify the ones we appended.
-  const childrenBefore = new Set<Element>(host.querySelectorAll('daw-track'));
-
   // (4) Concurrent addTrack with allSettled so we can wait for every settlement
   // before deciding. Promise.all would early-reject while other addTrack calls
   // keep running, leaving orphan tracks after cleanup.
@@ -129,24 +121,17 @@ export async function loadMidiImpl(
     }
   }
 
-  // (6) On any rejection: remove ALL tracks appended during this call (both
-  // succeeded and the ones addTrack left in the DOM before rejecting), then
+  // (6) On any rejection: remove every track added during this call, then
   // throw a summary Error and console.warn each additional rejection so
   // multi-track failure modes stay diagnosable.
   if (rejections.length > 0) {
-    const appendedTracks = Array.from(host.querySelectorAll('daw-track')).filter(
-      (el) => !childrenBefore.has(el)
-    );
-    for (const el of appendedTracks) {
+    for (const trackId of succeeded) {
       try {
-        el.remove();
+        host.removeTrack(trackId);
       } catch (cleanupErr) {
         console.warn('[dawcore] loadMidi cleanup failed for a track: ' + String(cleanupErr));
       }
     }
-    // Let MutationObserver microtasks flush so engine state is consistent
-    // before rethrow.
-    await Promise.resolve();
 
     // Log every rejection beyond the first so multi-track failure modes are
     // diagnosable (the thrown Error only carries the first). AggregateError

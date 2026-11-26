@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeAll, vi, beforeEach, afterEach } from 'vitest';
 import type { DawTrackElement } from '../elements/daw-track';
-import { makeFakeAdapter, restoreFetch, settle, stubFetch } from './helpers/editor-harness';
+import {
+  appendTrackElement,
+  makeFakeAdapter,
+  restoreFetch,
+  settle,
+  stubFetch,
+} from './helpers/editor-harness';
 
 beforeAll(async () => {
   // Register all elements before template cloning (happy-dom 20 upgrades
@@ -64,8 +70,9 @@ async function makeEditor(trackCount: number) {
   const editor = document.createElement('daw-editor') as any;
   editor.adapter = makeMockAdapter();
   document.body.appendChild(editor);
+  // Page tracks (addTrack makes no element since #848).
   for (let i = 0; i < trackCount; i++) {
-    await editor.addTrack({ name: `T${i}`, midi: { notes: NOTES } });
+    await appendTrackElement(editor, { name: `T${i}`, midi: { notes: NOTES } });
   }
   await editor.updateComplete;
   return editor;
@@ -113,11 +120,11 @@ describe('<daw-editor> track reordering (#612)', () => {
     // (append) order [first, second].
     const first = fake.holdDecode('/a.wav');
 
-    const firstPromise = editor.addTrack({
+    const firstPromise = appendTrackElement(editor, {
       name: 'First',
       clips: [{ src: '/a.wav', start: 0, duration: 1 }],
     });
-    const secondPromise = editor.addTrack({
+    const secondPromise = appendTrackElement(editor, {
       name: 'Second',
       clips: [{ src: '/b.wav', start: 0, duration: 1 }],
     });
@@ -144,9 +151,9 @@ describe('<daw-editor> track reordering (#612)', () => {
     const releaseA = fake.holdDecode('/a.wav');
     const releaseB = fake.holdDecode('/b.wav');
 
-    const aPromise = editor.addTrack({ name: 'A', clips: [{ src: '/a.wav' }] });
-    const bPromise = editor.addTrack({ name: 'B', clips: [{ src: '/b.wav' }] });
-    const cPromise = editor.addTrack({ name: 'C', clips: [{ src: '/c.wav' }] });
+    const aPromise = appendTrackElement(editor, { name: 'A', clips: [{ src: '/a.wav' }] });
+    const bPromise = appendTrackElement(editor, { name: 'B', clips: [{ src: '/b.wav' }] });
+    const cPromise = appendTrackElement(editor, { name: 'C', clips: [{ src: '/c.wav' }] });
     // Elements are appended synchronously — this IS the declared order.
     const declaredOrder = [...editor.querySelectorAll('daw-track')].map((el: any) => el.trackId);
     expect(declaredOrder.length).toBe(3);
@@ -174,8 +181,14 @@ describe('<daw-editor> track reordering — redundant reconnect guard (#612)', (
     const errorSpy = vi.fn();
     editor.addEventListener('daw-track-error', errorSpy);
 
-    await editor.addTrack({ name: 'A', clips: [{ src: '/a.wav', start: 0, duration: 1 }] });
-    await editor.addTrack({ name: 'B', clips: [{ src: '/b.wav', start: 0, duration: 1 }] });
+    await appendTrackElement(editor, {
+      name: 'A',
+      clips: [{ src: '/a.wav', start: 0, duration: 1 }],
+    });
+    await appendTrackElement(editor, {
+      name: 'B',
+      clips: [{ src: '/b.wav', start: 0, duration: 1 }],
+    });
     await settle(editor);
 
     const [elA, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
@@ -206,8 +219,14 @@ describe('<daw-editor> track reordering — redundant reconnect guard (#612)', (
 
   it('keeps engine track clip ids unique and unchanged after a move settles', async () => {
     const { editor } = loadingEditor();
-    await editor.addTrack({ name: 'A', clips: [{ src: '/a.wav', start: 0, duration: 1 }] });
-    await editor.addTrack({ name: 'B', clips: [{ src: '/b.wav', start: 0, duration: 1 }] });
+    await appendTrackElement(editor, {
+      name: 'A',
+      clips: [{ src: '/a.wav', start: 0, duration: 1 }],
+    });
+    await appendTrackElement(editor, {
+      name: 'B',
+      clips: [{ src: '/b.wav', start: 0, duration: 1 }],
+    });
     await settle(editor);
 
     const [elA, elB] = [...editor.querySelectorAll('daw-track')] as DawTrackElement[];
