@@ -186,7 +186,22 @@ Independent of PRs 2 and 3.
 - The arrangement loads each source once with its `loadSource`; the editor
   reads `sources` for pending and failed, and dispatches its existing
   `daw-clip-error` / `daw-track-error` / `daw-track-ready` events from it.
-  A track whose clips all failed is still an error, as today.
+- **A track whose sources all failed stays, like a broken `<img>` (decided,
+  2026-11-25).** It is drawn with a failed placeholder (React dims a
+  placeholder clip through `placeholderClipOpacity`; the plan picks dawcore's
+  look and its CSS custom property), `daw-clip-error` and `daw-track-error`
+  fire, `arrangement.retry(src)` (and an editor method for it, the plan's
+  name) loads it, and `daw-track-ready` fires then. The app decides whether
+  to remove it. Was: the track never entered and `addTrack()` rejected
+  (`daw-editor.ts:2573`); an upgrade entry. A dropped file that fails is
+  still removed with `{ undoable: false }` (below): it was never a
+  declaration.
+- `editor.addTrack()` resolves with the track id once the track has entered
+  the arrangement, not once it has loaded; loading is followed through the
+  events and `sources`. Called before `editor.adapter` is set, it waits until
+  the adapter arrives and the track enters (call, 2026-11-25: tracks enter
+  only with an adapter), with one `console.warn` per editor that tracks are
+  waiting for `editor.adapter`. Was: it rejected with the no-adapter error.
 - The `.dat` preview stays in the editor: it fetches `peaks-src` and draws the
   peaks for the loading clip's id until the clip loads. Whether it goes onto
   the `LoadingClip`'s `waveformData` instead (core has the field) is for the
