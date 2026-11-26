@@ -112,6 +112,7 @@ import {
 } from '../interactions/track-entry';
 import { LoadAnnouncer } from '../interactions/load-announcer';
 import { clipSeconds, loadedTrack, mixOf } from '../interactions/arrangement-view';
+import { normalizeHandedIn, swapArrangement } from '../interactions/arrangement-swap';
 import {
   refreshLinkStates,
   type ClipLinkValues,
@@ -526,30 +527,96 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return null;
   }
   /**
-   * The one owner of the tracks, the clips, the mix, the undo history and
-   * loading (#848). Made with the editor, kept across a disconnect; the
-   * engine plays it once there is an adapter.
+   * The editor's own arrangement (#848): the one owner of the tracks, the
+   * clips, the mix, the undo history and loading of what the `<daw-track>`
+   * children declare. Made with the editor, kept across a disconnect.
    */
-  _arrangement: Arrangement = createArrangement();
-  /** Sends the load events, read from the arrangement (#848). */
+  readonly _ownArrangement: Arrangement = createArrangement();
+  /** An arrangement the app handed in (`editor.arrangement`), played alone; null: the own one. */
+  _handedIn: Arrangement | null = null;
+  /** The arrangement played now: a handed-in one, else the editor's own. */
+  get _arrangement(): Arrangement {
+    return this._handedIn ?? this._ownArrangement;
+  }
+  /**
+   * The arrangement the editor plays (#848 PR 3): one handed in by the app,
+   * or else the editor's own, whose content the `<daw-track>` children
+   * declare. Setting one plays it alone, like `video.srcObject`: the
+   * children are not added to it and show `:state(detached)` while it is
+   * set; `null` (or the editor's own) goes back to the own arrangement with
+   * what it held. A swap keeps the adapter: playback stops, a new engine is
+   * built on the new arrangement. Refused (with a warning) during a take.
+   * The editor never disposes or clears an arrangement it was handed.
+   * Throws a `TypeError` for a value that is not an arrangement.
+   */
+  get arrangement(): Arrangement {
+    return this._arrangement;
+  }
+  set arrangement(value: Arrangement | null) {
+    swapArrangement(this, normalizeHandedIn(value, this._ownArrangement));
+  }
+  /** Sends the load events, read from the arrangement played (#848; a new one per swap). */
   private _announcer = new LoadAnnouncer((event) => this.dispatchEvent(event));
+  /** Stops following the arrangement played (its sources and its tracks). */
+  private _unfollow: () => void = () => {};
   constructor() {
     super();
-    // A source that fails changes no track: only `sources` tells of it (the
-    // events, and the failed look). Never unsubscribed: the arrangement lives
-    // exactly as long as the editor.
-    this._arrangement.sources.subscribe(() => {
+    this._follow(this._ownArrangement);
+  }
+  /**
+   * Follow the arrangement played: a source that fails changes no track,
+   * only `sources` tells of it (the events, the failed look); the elements'
+   * link states follow its tracks (a structural change only, not every
+   * mixer frame).
+   */
+  private _follow(arrangement: Arrangement): void {
+    this._unfollow();
+    const stopSources = arrangement.sources.subscribe(() => {
       this._announceLoading();
       this.requestUpdate();
     });
-    // The elements' link states follow the tracks (#848): a structural change
-    // only, not every mixer frame.
-    let tracksVersion = this._arrangement.tracksVersion;
-    this._arrangement.subscribe(() => {
-      if (this._arrangement.tracksVersion === tracksVersion) return;
-      tracksVersion = this._arrangement.tracksVersion;
+    let tracksVersion = arrangement.tracksVersion;
+    const stopTracks = arrangement.subscribe(() => {
+      if (arrangement.tracksVersion === tracksVersion) return;
+      tracksVersion = arrangement.tracksVersion;
       this._refreshLinkStates();
     });
+    this._unfollow = () => {
+      stopSources();
+      stopTracks();
+    };
+  }
+  // --- The swap (interactions/arrangement-swap.ts) ---
+  /** @internal */
+  _releaseEngine(): void {
+    if (!this._engine) return;
+    try {
+      this._engine.dispose({ keepAdapter: true });
+    } catch (err) {
+      console.warn('[dawcore] Error releasing the engine: ' + String(err));
+    }
+    this._engine = null;
+  }
+  /** @internal */
+  _disposeTrackChain(trackId: string): void {
+    this._effectsManager?.disposeTrackChain(trackId);
+  }
+  /** @internal */
+  _playArrangement(next: Arrangement | null): void {
+    this._handedIn = next;
+    // A new load cycle: every track of the arrangement now played is announced.
+    this._announcer = new LoadAnnouncer((event) => this.dispatchEvent(event));
+    this._follow(this._arrangement);
+    this._currentTime = 0;
+    this._stopPlayhead();
+    this._recomputeDuration();
+    this._refreshLinkStates();
+    this._announceLoading();
+    this.requestUpdate();
+  }
+  /** @internal */
+  _buildEngineIfReady(): void {
+    if (this._externalAdapter && this.isConnected && !this._engine) this._buildEngineReporting();
   }
   /**
    * Ids of tracks registered (a `<daw-track>` connected, a file dropped) and
@@ -1297,6 +1364,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   // --- Element links (#848, interactions/element-links.ts) ---
   /** @internal */
   _trackLinkState(trackId: string): LinkState {
+    // While a handed-in arrangement is set, the children are not played (P7).
+    if (this._handedIn && this._trackElements.has(trackId)) return 'detached';
     if (this._isEntered(trackId)) return 'live';
     return this._extras.has(trackId) && !this._pending.has(trackId) ? 'detached' : 'pending';
   }
@@ -1369,7 +1438,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   }
   /** @internal */
   _detachedReason(): string {
-    return 'its track or clip is not in the arrangement the editor plays';
+    return this._handedIn
+      ? 'a handed-in arrangement is set (editor.arrangement)'
+      : 'its track or clip is not in the arrangement the editor plays';
   }
   /** Set or clear `:state(detached)` on every registered element (#848). */
   private _refreshLinkStates(): void {
@@ -1737,7 +1808,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     );
     this._entryQueue = this._entryQueue.filter((id) => id !== trackId);
     this._settleEntry(trackId, new Error('track "' + trackId + '" was removed before it entered'));
-    const arrangementTrack = this._arrangement.getTracks().find((t) => t.id === trackId);
+    // A page track removed while a handed-in arrangement is played is the own one's (P7).
+    const holder = this._arrangementOf(trackId);
+    const arrangementTrack = holder.getTracks().find((t) => t.id === trackId);
     const clipIds = arrangementTrack?.clips.map((c) => c.id) ?? [];
     this._announcer.forget(trackId, clipIds);
     if (clipIds.some((id) => this._previewPeaks.has(id))) {
@@ -1766,7 +1839,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     nextExtras.delete(trackId);
     this._extras = nextExtras;
     // An undo step; the engine follows (incremental removal, playback goes on).
-    if (arrangementTrack) this._arrangement.removeTrack(trackId);
+    if (arrangementTrack) holder.removeTrack(trackId);
     this._recomputeDuration();
     // Recompute zoom floor from remaining cached WaveformData scales
     this._recomputeZoomFloor();
@@ -1856,6 +1929,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       this._spectrogramController?.setTrackConfig(trackId, next.spectrogramConfig ?? null);
     }
   };
+  /** The arrangement that holds a track: the one played, else the own one (a page track while handed in). */
+  private _arrangementOf(trackId: string): Arrangement {
+    const has = (a: Arrangement) => a.getTracks().some((t) => t.id === trackId);
+    return has(this._arrangement) || !has(this._ownArrangement)
+      ? this._arrangement
+      : this._ownArrangement;
+  }
   /** Rename a track in the arrangement (an undo step); the same name changes nothing. */
   private _renameTrack(trackId: string, name: string): void {
     const track = this._arrangement.getTracks().find((t) => t.id === trackId);
@@ -2365,8 +2445,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     if (!this._engine) return;
     // No drag holds a transaction (#848 PR 3): a track enters during a drag
     // as at any other time, an undo step of its own.
-    const queued = this._entryQueue;
-    this._entryQueue = [];
+    const isPageTrack = (id: string) => this._trackElements.has(id);
+    // The children declare the editor's OWN arrangement: while a handed-in
+    // one is played they wait (P7); addTrack() and drops go to the one played.
+    const queued = this._handedIn
+      ? this._entryQueue.filter((id) => !isPageTrack(id))
+      : this._entryQueue;
+    this._entryQueue = this._handedIn ? this._entryQueue.filter(isPageTrack) : [];
     const domOrder: string[] = [...this.querySelectorAll('daw-track')].map(
       (el) => (el as DawTrackElement).trackId
     );
@@ -2375,10 +2460,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       return at === -1 ? domOrder.length : at;
     };
     const ordered = [...queued].sort((a, b) => position(a) - position(b));
-    const isPageTrack = (id: string) => {
-      const el = this._trackElements.get(id);
-      return el !== undefined;
-    };
     const arrangement = this._arrangement;
     const historyWasEmpty = !arrangement.canUndo && !arrangement.canRedo;
     let pageEntered = false;
