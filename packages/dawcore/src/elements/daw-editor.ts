@@ -115,6 +115,7 @@ import { LoadAnnouncer } from '../interactions/load-announcer';
 import { clipSeconds, loadedTrack, mixOf } from '../interactions/arrangement-view';
 import { normalizeHandedIn, swapArrangement } from '../interactions/arrangement-swap';
 import { clipDragChanged, trackDragChanged } from '../interactions/drag-watch';
+import { moveClipToTrack, trackHoldingClip } from '../interactions/clip-rehome';
 import {
   refreshLinkStates,
   detachedWarning,
@@ -1595,8 +1596,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         this._onTrackRemoved(trackId);
       }
       for (const clip of removedClips) {
-        // A clip that moved with its track (or was re-slotted) is still connected.
-        if (clip.isConnected) continue;
+        // A clip that moved with its track, or into another track of this
+        // editor (its connected event moves it, #848), is still here. One
+        // moved out of the editor goes.
+        if (clip.isConnected && this.contains(clip)) continue;
         this._onClipRemovedFromDom(clip);
       }
       if (movedTrackIds.size > 0) this._placeMovedTracks(movedTrackIds);
@@ -1814,11 +1817,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       console.warn('[dawcore] Invalid daw-track-connected event detail: ' + String(e.detail));
       return;
     }
-    // Custom elements fire disconnectedCallback+connectedCallback on a pure
-    // DOM MOVE (e.g. insertBefore during a consumer reorder), not just on a
-    // genuine removal — no moveBefore() is used anywhere in this codebase.
-    // daw-track.ts's connectedCallback re-dispatches a deferred
-    // daw-track-connected for the SAME trackId in that case. If the track is
+    // A DOM MOVE sends daw-track-connected again for the SAME trackId: an
+    // insertBefore runs disconnectedCallback+connectedCallback, a
+    // moveBefore() runs connectedMoveCallback, and both announce (#848). If the track is
     // already registered (loading or fully loaded), this is a reconnect from
     // a move, not a first-time registration: refresh the element mapping and
     // bail out WITHOUT re-reading the descriptor or entering it again. The
@@ -2060,6 +2061,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const trackEl = clipEl.closest('daw-track') as DawTrackElement | null;
     if (!trackEl) return;
     const trackId = trackEl.trackId;
+    // Moved here from another track of this editor (#848, choice a): the
+    // clip moves with it, one undo step.
+    if (this._rehomeClip(trackId, clipEl)) return;
     // The arrangement that holds the track: the own one for a page track
     // while a handed-in arrangement is played (the children declare it, P7).
     const entered = this._arrangementOf(trackId)
@@ -2104,6 +2108,64 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     if (this._extras.get(trackId)?.peaksSrc.has(clipEl.clipId)) return;
     this._loadAndAppendClip(trackId, this._readClipDescriptor(clipEl));
   };
+  /**
+   * A `<daw-clip>` now under `trackId` whose clip another track holds: the
+   * clip moves to this track (one undo step) when both have entered the same
+   * arrangement; a clip of the other kind stays with `daw-clip-error`.
+   * Otherwise the old track lets it go and the element goes on as a new
+   * arrival. Returns true when nothing more is to be done.
+   */
+  private _rehomeClip(trackId: string, clipEl: DawClipElement): boolean {
+    const clipId = clipEl.clipId;
+    const arrangement = this._arrangementOf(trackId);
+    const fromTrackId = trackHoldingClip(arrangement, clipId, trackId);
+    if (!fromTrackId) {
+      // Taken by another track of this editor and not held now: that one forgets it.
+      for (const [id, extras] of this._extras) {
+        if (id !== trackId && extras.peaksSrc.has(clipId)) this._forgetClip(id, clipId);
+      }
+      return false;
+    }
+    const entered = arrangement.getTracks().some((t) => t.id === trackId);
+    const toExtras = this._extras.get(trackId) ?? this._defaultExtras(trackId);
+    if (!entered || !toExtras) {
+      this._removeClipFromTrack(fromTrackId, clipId);
+      return false;
+    }
+    const error = moveClipToTrack(arrangement, fromTrackId, trackId, clipId, toExtras.kind);
+    if (error) {
+      // Refused (a clip of the other kind): nothing changes and no undo step;
+      // the element goes back to the track that holds its clip (the
+      // maintainer's rule, #848: the page and the arrangement keep agreeing).
+      const home = this._trackElements.get(fromTrackId);
+      if (home && home !== clipEl.parentElement) {
+        const move = (home as unknown as { moveBefore?: (n: Node, c: Node | null) => void })
+          .moveBefore;
+        if (typeof move === 'function') move.call(home, clipEl, null);
+        else home.appendChild(clipEl);
+      }
+      console.warn(
+        '[dawcore] <daw-clip> cannot move to track "' +
+          (this._trackElements.get(trackId)?.name || 'Untitled') +
+          '" (' +
+          String(error) +
+          '): it was put back in its track.'
+      );
+      this.dispatchEvent(
+        new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
+          bubbles: true,
+          composed: true,
+          detail: { trackId, clipId, error },
+        })
+      );
+      return true;
+    }
+    const peaksSrc = this._extras.get(fromTrackId)?.peaksSrc.get(clipId) ?? clipEl.peaksSrc ?? '';
+    this._forgetClip(fromTrackId, clipId);
+    if (!this._extras.has(trackId)) this._extras = new Map(this._extras).set(trackId, toExtras);
+    this._takeClip(trackId, clipId, peaksSrc);
+    return true;
+  }
   private _onClipRemovedFromDom(clipEl: DawClipElement) {
     const clipId = clipEl.clipId;
     // The arrangement played, and the own one (a page track's clip while a

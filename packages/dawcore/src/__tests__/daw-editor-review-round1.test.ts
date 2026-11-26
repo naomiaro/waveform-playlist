@@ -237,11 +237,16 @@ describe('review round 1 of #848 PR 3', () => {
     expect(typeof (clip as { connectedMoveCallback?: unknown }).connectedMoveCallback).toBe(
       'function'
     );
+    // It announces the element again (a real moveBefore() into another place
+    // must reach the editor), and the editor keeps the registration: nothing
+    // enters twice (daw-editor-clip-rehome.test.ts has the clip's case).
     const events: string[] = [];
     ed.addEventListener('daw-track-connected', (e: Event) => events.push(e.type));
+    const count = ed.arrangement.getTracks().length;
     (b as { connectedMoveCallback(): void }).connectedMoveCallback();
     await tick(2);
-    expect(events).toEqual([]);
+    expect(events).toEqual(['daw-track-connected']);
+    expect(ed.arrangement.getTracks()).toHaveLength(count);
   });
 
   it(':host([hidden]) hides the elements whose host sets display', () => {

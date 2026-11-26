@@ -208,6 +208,107 @@ test.describe('dawcore: the arrangement and the elements (#848 PR 3)', () => {
     await page.mouse.up();
     expect(await startPx(page)).toBe(start);
   });
+
+  test('moveBefore() of a <daw-clip> into another track moves its clip; a <daw-track> out and back in is live again', async ({
+    page,
+  }) => {
+    // Real Element.moveBefore() (Chromium): the elements' connectedMoveCallback
+    // must reach the editor (an empty hook missed both cases).
+    const where = await page.evaluate(() => {
+      const editor = document.querySelector('daw-editor') as unknown as Editor & {
+        _trackLinkState(id: string): string;
+      };
+      const kick = editor.querySelector('daw-track[name="Kick"]') as HTMLElement & {
+        trackId: string;
+      };
+      const hihat = editor.querySelector('daw-track[name="HiHat"]') as HTMLElement & {
+        trackId: string;
+      };
+      const clip = kick.querySelector('daw-clip') as HTMLElement & { clipId: string };
+      (hihat as unknown as { moveBefore(n: Node, c: Node | null): void }).moveBefore(clip, null);
+      const shakers = editor.querySelector('daw-track[name="Shakers"]') as HTMLElement & {
+        trackId: string;
+      };
+      const outside = document.createElement('div');
+      document.body.appendChild(outside);
+      (outside as unknown as { moveBefore(n: Node, c: Node | null): void }).moveBefore(
+        shakers,
+        null
+      );
+      return {
+        kick: kick.trackId,
+        hihat: hihat.trackId,
+        clip: clip.clipId,
+        shakers: shakers.trackId,
+      };
+    });
+    const state = () =>
+      page.evaluate((w) => {
+        const editor = document.querySelector('daw-editor') as unknown as Editor & {
+          _trackLinkState(id: string): string;
+        };
+        const tracks = editor.arrangement!.getTracks();
+        const holds = (id: string) =>
+          tracks.find((t) => t.id === id)?.clips.some((c) => c.id === w.clip);
+        return {
+          inKick: holds(w.kick),
+          inHiHat: holds(w.hihat),
+          shakers: editor._trackLinkState(w.shakers),
+        };
+      }, where);
+    await expect.poll(state).toEqual({ inKick: false, inHiHat: true, shakers: 'pending' });
+    await page.evaluate((w) => {
+      const editor = document.querySelector('daw-editor') as unknown as HTMLElement & {
+        moveBefore(n: Node, c: Node | null): void;
+      };
+      const shakers = [...document.querySelectorAll('daw-track')].find(
+        (t) => (t as unknown as { trackId: string }).trackId === w.shakers
+      )!;
+      editor.moveBefore(shakers, null);
+    }, where);
+    await expect.poll(state).toEqual({ inKick: false, inHiHat: true, shakers: 'live' });
+  });
+
+  test('moveBefore() of an audio <daw-clip> into a MIDI track is refused: the element goes back, no undo step', async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      const editor = document.querySelector('daw-editor')!;
+      const midi = document.createElement('daw-track');
+      midi.setAttribute('name', 'Notes');
+      midi.setAttribute('kind', 'midi');
+      editor.appendChild(midi);
+    });
+    await page.waitForFunction(
+      (count) =>
+        (document.querySelector('daw-editor') as unknown as Editor).arrangement!.getTracks()
+          .length === count,
+      TRACK_COUNT + 1
+    );
+    const result = await page.evaluate(async () => {
+      const editor = document.querySelector('daw-editor') as unknown as Editor & {
+        canUndo: boolean;
+      };
+      const kick = editor.querySelector('daw-track[name="Kick"]')!;
+      const notes = editor.querySelector('daw-track[name="Notes"]') as unknown as {
+        moveBefore(n: Node, c: Node | null): void;
+      };
+      const clip = kick.querySelector('daw-clip')!;
+      const before = editor.arrangement!.getTracks();
+      const canUndo = editor.canUndo;
+      let errors = 0;
+      editor.addEventListener('daw-clip-error', () => errors++);
+      notes.moveBefore(clip, null);
+      await new Promise((r) => setTimeout(r, 300));
+      return {
+        backInKick: clip.parentElement === kick,
+        sameTracks: editor.arrangement!.getTracks() === before,
+        sameUndo: editor.canUndo === canUndo,
+        errors,
+      };
+    });
+    expect(result).toEqual({ backInKick: true, sameTracks: true, sameUndo: true, errors: 1 });
+  });
 });
 
 test.describe('React: an outside change cancels a drag (#848 PR 3)', () => {

@@ -171,13 +171,22 @@ export class DawClipElement extends LitElement {
    * A move with `Node.moveBefore()` (#848; modern-web-guidance
    * `custom-elements`): the browser calls this instead of
    * `disconnectedCallback` → `connectedCallback`, so the element stays
-   * registered and sends no connected event again. The editor's
-   * MutationObserver still sees the move and reads the new position.
+   * connected, and Lit's disconnect and connect do not run. It announces
+   * itself again, as a connect does, so the editor sees its new place: a
+   * clip in another track, a track back in an editor (#848; a real-Chromium
+   * check found both missed with an empty hook).
    */
-  connectedMoveCallback(): void {}
+  connectedMoveCallback(): void {
+    this._announceConnected();
+  }
 
   connectedCallback() {
     super.connectedCallback();
+    this._announceConnected();
+  }
+
+  /** Tell the editor this element is here (a connect or a moveBefore() move). */
+  private _announceConnected(): void {
     // Defer dispatch so:
     //  1. The editor's connectedCallback (which registers the daw-clip-connected
     //     listener) has time to run when parsed all-at-once.
