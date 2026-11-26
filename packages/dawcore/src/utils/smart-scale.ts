@@ -46,10 +46,11 @@ export function computeTemporalTicks(
   const labels: Array<{ pix: number; text: string }> = [];
 
   // Each tick's pixel comes from its own time (an integer counter in
-  // milliseconds), in one division of integers (#722): the floor of
-  // samples / samplesPerPixel, as for a clip at that time.
-  // `(counter / 1000) * pixPerSec` rounds twice and put 2:27 at 15999 instead
-  // of 16000 at 48000 Hz and 441 samples per pixel.
+  // milliseconds), in one division (#722): the floor of
+  // samples / samplesPerPixel, as the editor draws a clip at that time. With
+  // an integer zoom both operands are exact integers, so the floor is exact.
+  // `(counter / 1000) * pixPerSec` rounds twice and put some ticks one pixel
+  // early, also at the default 1024 samples per pixel.
   for (let counter = 0; ; counter += smallStep) {
     const pix = Math.floor((counter * sampleRate) / (1000 * samplesPerPixel));
     // Written as `!(<)` so a NaN width ends the loop too.

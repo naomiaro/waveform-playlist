@@ -4,7 +4,7 @@
  * 2:27 at pixel 15999 at 48000 Hz and 441 samples per pixel.
  */
 import { describe, it, expect } from 'vitest';
-import { computeTemporalTicks } from '../utils/smart-scale';
+import { computeTemporalTicks, getScaleInfo } from '../utils/smart-scale';
 
 /** The pixel of a time, in exact integer arithmetic. */
 function exactPixel(ms: number, sampleRate: number, samplesPerPixel: number): number {
@@ -37,6 +37,34 @@ describe('computeTemporalTicks pixels (#722)', () => {
       .filter(({ text, pix }) => pix !== exactPixel(labelMs(text), sr, spp))
       .map(({ text, pix }) => `${text}: ${pix}, exact ${exactPixel(labelMs(text), sr, spp)}`);
     expect(wrong).toEqual([]);
+  });
+
+  it.each([
+    [48000, 1024],
+    [96000, 1024],
+    [44100, 1024],
+  ])('places every tick mark at its exact pixel at %i Hz, %i samples per pixel', (sr, spp) => {
+    const durationSeconds = 20 * 60;
+    const { canvasInfo, widthX } = computeTemporalTicks(spp, sr, durationSeconds, 30);
+    const { smallStep } = getScaleInfo(spp);
+    const expected: number[] = [];
+    for (let ms = 0; exactPixel(ms, sr, spp) < widthX; ms += smallStep) {
+      expected.push(exactPixel(ms, sr, spp));
+    }
+    expect([...canvasInfo.keys()]).toEqual(expected);
+  });
+
+  it('draws a tick one pixel before the end of the ruler, and none at the end', () => {
+    // 10 s at 48 px per second is 480 px, so the 0:10 tick (pixel 480) is past it.
+    expect(computeTemporalTicks(1000, 48000, 10, 30).labels.map((l) => l.text)).not.toContain(
+      '0:10'
+    );
+    // 10.001 s is 481 px wide, so pixel 480 is the last one.
+    const { labels } = computeTemporalTicks(1000, 48000, 10.001, 30);
+    expect(labels[labels.length - 1]).toEqual({
+      pix: 480,
+      text: '0:10',
+    });
   });
 
   it('returns no ticks for a duration that is not a number', () => {

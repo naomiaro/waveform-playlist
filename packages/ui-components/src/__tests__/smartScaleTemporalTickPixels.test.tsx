@@ -78,6 +78,14 @@ describe('SmartScale temporal tick pixels (#722)', () => {
     expect(wrong).toEqual([]);
   });
 
+  it('draws a label one pixel before the end of the scale, and none at the end', () => {
+    // 10 s at 48 px per second is 480 px, so the 0:10 label (pixel 480) is past it.
+    expect(labelPixels({}, 10000).has('0:10')).toBe(false);
+    cleanup();
+    // 10.001 s is 481 px wide, so pixel 480 is the last one.
+    expect(labelPixels({}, 10001).get('0:10')).toBe(480);
+  });
+
   it('draws no labels, and returns, for a duration that is not a number', () => {
     expect(labelPixels({}, NaN).size).toBe(0);
   });
