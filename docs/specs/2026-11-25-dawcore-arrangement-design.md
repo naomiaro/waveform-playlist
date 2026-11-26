@@ -136,13 +136,16 @@ Independent of PRs 2 and 3.
   `abortTransaction()` for a clip drag, the saved order for a track drag, the
   snapshot for an annotation drag; the rest of the pointer's travel is
   ignored.
+- Escape during a drag only cancels the drag, in both editors (decided,
+  2026-11-25). It does not also stop playback (`<daw-keyboard-shortcuts
+  playback>` and React's `usePlaybackShortcuts` bind Escape to Stop) and does
+  not deselect an annotation (React's `useAnnotationKeyboardControls`). A
+  second Escape after the drag does those as usual. The native drag swallows
+  the key the same way. Not checked yet: whether React does both today during
+  a dnd-kit drag; PR 1 runs it before changing it.
 
 **Calls:**
 
-- Escape during a drag cancels the drag and does nothing else: it does not
-  also stop playback through `<daw-keyboard-shortcuts playback>` (which binds
-  Escape to stop) or React's `usePlaybackShortcuts`. The native drag swallows
-  the key the same way.
 - `canUndo` / `canRedo` are unchanged during a drag (no extra re-render on
   drag start and end). Only the actions are inert.
 - The undo call during a drag is silent (no console warning): it is a normal
