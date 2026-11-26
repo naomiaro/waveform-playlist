@@ -356,3 +356,48 @@ describe('review round 3', () => {
     await expect(ed.addTrack({}, { signal: pre.signal })).rejects.toBe('early');
   });
 });
+
+describe('addTrack() targets the arrangement played when it is called (capture-it)', () => {
+  it('a swap before the track enters rejects with an AbortError; it enters neither arrangement', async () => {
+    stubFetch({});
+    const ed: Editor = await mountEditor({ before: (e) => stubPeakPipeline(e) }); // no adapter: it waits
+    editors.push(ed);
+    const own = ed.arrangement;
+    const o = outcomeOf(ed.addTrack({ name: 'Queued' }));
+    const x = handed();
+    ed.arrangement = x;
+    await tick(2);
+    expect(o.value).toBe('rejected');
+    expect(isAbortError(o.error)).toBe(true);
+    ed.adapter = makeFakeAdapter().adapter;
+    await settle(ed);
+    expect(x.getTracks().map((t) => t.name)).toEqual(['H']);
+    expect(own.getTracks()).toHaveLength(0);
+  });
+
+  it('with an adapter, a swap in the same task, before the entry flush, rejects too', async () => {
+    const { ed } = await setup('');
+    const own = ed.arrangement;
+    const x = handed();
+    const o = outcomeOf(ed.addTrack({ name: 'Now' }));
+    ed.arrangement = x;
+    await tick(3);
+    expect(o.value).toBe('rejected');
+    expect(x.getTracks().map((t) => t.name)).toEqual(['H']);
+    expect(own.getTracks()).toHaveLength(0);
+  });
+
+  it('a call made while a handed-in arrangement plays adds to it, and a swap back rejects one not entered', async () => {
+    const { ed } = await setup('');
+    const x = handed();
+    ed.arrangement = x;
+    await tick(2);
+    const id = await ed.addTrack({ name: 'InX' });
+    expect(x.getTracks().map((t) => t.id)).toContain(id);
+    const o = outcomeOf(ed.addTrack({ name: 'Late' }));
+    ed.arrangement = null;
+    await tick(3);
+    expect(o.value).toBe('rejected');
+    expect(ed.arrangement.getTracks().map((t: { name: string }) => t.name)).not.toContain('Late');
+  });
+});

@@ -627,13 +627,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       this._arrangement,
       abortError('the arrangement was swapped out (editor.arrangement) before it finished')
     );
-    // A dropped file not entered yet does not enter the arrangement swapped in.
-    for (const trackId of [...this._droppedEntries]) {
-      this._abortEntry(
-        trackId,
-        abortError('the arrangement was swapped out (editor.arrangement) before the file entered')
-      );
-    }
     this._handedIn = next;
     // A new load cycle: every track of the arrangement now played is announced.
     this._announcer = new LoadAnnouncer((event) => this.dispatchEvent(event));
@@ -3057,8 +3050,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._pending = new Map(this._pending).set(trackId, { descriptor, mix: DEFAULT_TRACK_MIX });
     const entered = this._waitForEntry(trackId);
     // A swap before it enters ends it, as a disconnect does (review of #919).
-    this._droppedEntries.add(trackId);
-    void entered.finally(() => this._droppedEntries.delete(trackId)).catch(() => {});
+    this._endEntryOnSwap(trackId, entered);
     this._queueEntry(trackId);
     return entered;
   }
@@ -3076,8 +3068,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     from.removeTrack(trackId, { undoable: false });
     this._onTrackRemoved(trackId);
   }
-  /** Dropped files waiting to enter (loadFiles): a swap ends them, as a disconnect does. */
-  private _droppedEntries = new Set<string>();
   /** One AbortController per arrangement while it is played (D2, interactions/abort.ts). */
   private _playSignals = new PlaySignals();
   /** The signal of the arrangement played now: aborted when it is swapped out. */
@@ -3451,9 +3441,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return this._ensureEngine();
   }
   /**
-   * Add a track built from `config` to the arrangement the editor plays and
-   * resolve with its id once it has entered (#848), before its audio has
-   * loaded. No element is created: the track is drawn and listed like any
+   * Add a track built from `config` to the arrangement the editor plays when
+   * it is called, and resolve with its id once it has entered (#848), before
+   * its audio has loaded. A swap of `editor.arrangement` before it enters
+   * rejects with an `AbortError` and the track enters nowhere; to add to
+   * another arrangement, call that arrangement's own `addTrack`. No element is created: the track is drawn and listed like any
    * other, and `<daw-track>` children stay the page's declaration. To follow
    * loading, add the `daw-track-ready` / `daw-track-error` listener BEFORE
    * calling: for a track with nothing to fetch it fires before this
@@ -3510,6 +3502,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     };
     this._pending = new Map(this._pending).set(trackId, { descriptor, mix });
     const entered = this._waitForEntry(trackId);
+    // It goes into the arrangement played now: a swap before it enters ends
+    // the call (the maintainer's choice, #848: capture it).
+    this._endEntryOnSwap(trackId, entered);
     this._queueEntry(trackId);
     if (!signal) return entered;
     const settled = new AbortController();
@@ -3517,6 +3512,23 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       signal: settled.signal,
     });
     return entered.finally(() => settled.abort());
+  }
+  /**
+   * A queued track goes into the arrangement played when it was queued: when
+   * that one is swapped out first, the track leaves the queue and its wait
+   * rejects with the swap's AbortError (addTrack, a dropped file).
+   */
+  private _endEntryOnSwap(trackId: string, entered: Promise<string>): void {
+    const settled = new AbortController();
+    this._playSignal.addEventListener(
+      'abort',
+      (e) => this._abortEntry(trackId, reasonOf(e.target as AbortSignal)),
+      { signal: settled.signal }
+    );
+    void entered.then(
+      () => settled.abort(),
+      () => settled.abort()
+    );
   }
   /** A track that has not entered leaves the queue and its wait rejects with `reason` (D4). */
   private _abortEntry(trackId: string, reason: unknown): void {

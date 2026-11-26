@@ -1628,8 +1628,9 @@ interface MidiLoadResult {
 
 // addTrack(config, options?), addClip(trackId, config, options?) and loadFiles(files, options?) take:
 interface EditorCallOptions {
-  signal?: AbortSignal;                        // Cancels the call: rejects with its reason; what it added is taken out, no undo step
+  signal?: AbortSignal;                        // Cancels the call: rejects with its reason; what it added is taken out, no undo step (a Redo list its arrival cleared stays cleared)
 }
+// addTrack adds to the arrangement played when it is called; a swap before the track enters rejects it (AbortError)
 ```
 
 Created tracks are MIDI tracks (`kind="midi"`), drawn as piano rolls, with no `<daw-track>` element (`addTrack` creates none since #848). **Cleanup-on-failure:** any per-track rejection removes every track the call added (by id); a track whose `addTrack` rejected never entered (the call waits for every `addTrack` with `Promise.allSettled`). Each removal is an undo step, so the history is not rewound to before the call. If `@dawcore/midi` is not installed, rejects with a friendly install hint and `console.warn`s the original module-resolution error.

@@ -380,7 +380,7 @@ editor.zoomOut(): void
 editor.setMasterVolume(volume: number): void
 // Programmatic track/clip mutation (see "Programmatic Track Mutation" section)
 editor.ready(): Promise<PlaylistEngine>                                  // Ensure engine is built; resolves with it
-editor.addTrack(config: TrackConfig, options?: EditorCallOptions): Promise<string> // Add a track to the arrangement played (no element, #848); resolves with its id once it has entered (before its audio loads)
+editor.addTrack(config: TrackConfig, options?: EditorCallOptions): Promise<string> // Add a track to the arrangement played at the call (no element, #848; a swap before it enters rejects); resolves with its id once it has entered (before its audio loads)
 editor.retryTrack(trackId: string): void                                 // Load the track's failed sources again
 editor.removeTrack(trackId: string): void                                // Remove track by ID
 editor.updateTrack(trackId: string, partial: Partial<TrackConfig>): void

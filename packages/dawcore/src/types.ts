@@ -155,8 +155,9 @@ export function isDomClip(desc: ClipDescriptor): desc is DomClipDescriptor {
 /**
  * Options of `addTrack`, `addClip` and `loadFiles` (#848). `signal` cancels
  * the call: it rejects with the signal's `reason`, and what it added is
- * taken out for good (see each method). A signal already aborted rejects at
- * once and adds nothing.
+ * taken out for good (see each method), with no undo step left. A Redo list
+ * its arrival cleared stays cleared, as after any edit. A signal already
+ * aborted rejects at once and adds nothing.
  */
 export interface EditorCallOptions {
   signal?: AbortSignal;
