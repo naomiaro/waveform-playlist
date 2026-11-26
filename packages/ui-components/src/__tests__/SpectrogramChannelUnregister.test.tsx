@@ -80,39 +80,70 @@ describe('SpectrogramChannel unregisters each canvas id once', () => {
     expect(unregistered).toEqual([second, first]);
   });
 
-  it('under StrictMode, a mounted canvas stays registered after the simulated remount', () => {
-    const log: string[] = [];
-    render(
-      <StrictMode>
-        <SpectrogramChannel
-          {...baseProps}
-          length={500}
-          waveHeight={100}
-          onCanvasRegister={(reg) => log.push(`register ${reg.canvasId}`)}
-          onCanvasUnregister={(id) => log.push(`unregister ${id}`)}
-        />
-      </StrictMode>
-    );
-    expect(log).toEqual(['register clip-ch0-chunk0']);
+  // A canvas handed to the worker cannot be handed over again, so a canvas the
+  // provider released is replaced by a fresh one when the effects run again.
+  const logged = (log: string[]) => ({
+    onCanvasRegister: (reg: { canvasId: string; canvas: unknown }) =>
+      log.push(`register ${reg.canvasId}`),
+    onCanvasUnregister: (id: string) => log.push(`unregister ${id}`),
   });
 
-  it('a hidden <Activity> keeps the canvas registered, and the unmount after it unregisters it', () => {
+  it('under StrictMode, the simulated remount registers a fresh canvas for the one it released', () => {
+    const log: string[] = [];
+    const { container } = render(
+      <StrictMode>
+        <SpectrogramChannel {...baseProps} length={500} waveHeight={100} {...logged(log)} />
+      </StrictMode>
+    );
+    expect(log).toEqual([
+      'register clip-ch0-chunk0',
+      'unregister clip-ch0-chunk0',
+      'register clip-ch0-chunk0',
+    ]);
+    expect(container.querySelectorAll('canvas')).toHaveLength(1);
+  });
+
+  it('a hidden <Activity> releases the canvas; the reveal registers a fresh one', () => {
     const log: string[] = [];
     const channel = (
-      <SpectrogramChannel
-        {...baseProps}
-        length={500}
-        waveHeight={100}
-        onCanvasRegister={(reg) => log.push(`register ${reg.canvasId}`)}
-        onCanvasUnregister={(id) => log.push(`unregister ${id}`)}
-      />
+      <SpectrogramChannel {...baseProps} length={500} waveHeight={100} {...logged(log)} />
+    );
+    const { rerender, unmount, container } = render(<Activity mode="visible">{channel}</Activity>);
+    const first = container.querySelector('canvas');
+    rerender(<Activity mode="hidden">{channel}</Activity>);
+    expect(log).toEqual(['register clip-ch0-chunk0', 'unregister clip-ch0-chunk0']);
+
+    rerender(<Activity mode="visible">{channel}</Activity>);
+    expect(log).toEqual([
+      'register clip-ch0-chunk0',
+      'unregister clip-ch0-chunk0',
+      'register clip-ch0-chunk0',
+    ]);
+    expect(container.querySelector('canvas')).not.toBe(first);
+
+    unmount();
+    expect(log.slice(3)).toEqual(['unregister clip-ch0-chunk0']);
+  });
+
+  it('a channel deleted while its <Activity> is hidden leaves nothing registered', () => {
+    const log: string[] = [];
+    const channel = (
+      <SpectrogramChannel {...baseProps} length={1500} waveHeight={100} {...logged(log)} />
     );
     const { rerender, unmount } = render(<Activity mode="visible">{channel}</Activity>);
     rerender(<Activity mode="hidden">{channel}</Activity>);
-    rerender(<Activity mode="visible">{channel}</Activity>);
-    expect(log).toEqual(['register clip-ch0-chunk0']);
-
+    // Deleted while hidden: React runs no cleanup for it after the hide's.
+    rerender(
+      <Activity mode="hidden">
+        <div />
+      </Activity>
+    );
     unmount();
-    expect(log).toEqual(['register clip-ch0-chunk0', 'unregister clip-ch0-chunk0']);
+    expect(log).toEqual([
+      'register clip-ch0-chunk0',
+      'register clip-ch0-chunk1',
+      'unregister clip-ch0-chunk0',
+      'unregister clip-ch0-chunk1',
+    ]);
   });
 });
