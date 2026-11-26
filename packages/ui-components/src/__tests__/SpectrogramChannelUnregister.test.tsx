@@ -172,4 +172,27 @@ describe('SpectrogramChannel unregisters each canvas id once', () => {
     expect([...live]).toEqual([]);
     expect(log.filter((e) => e === 'unregister clip-ch0-chunk1')).toHaveLength(1);
   });
+
+  it.each([
+    ['while hidden', true],
+    ['in the reveal commit', false],
+  ])('a canvas whose key changed %s is registered once at the reveal', (_when, whileHidden) => {
+    const log: string[] = [];
+    const channel = (length: number) => (
+      <SpectrogramChannel {...baseProps} length={length} waveHeight={100} {...logged(log)} />
+    );
+    const { rerender, unmount } = render(<Activity mode="visible">{channel(1500)}</Activity>);
+    rerender(<Activity mode="hidden">{channel(1500)}</Activity>);
+    if (whileHidden) rerender(<Activity mode="hidden">{channel(800)}</Activity>);
+    rerender(<Activity mode="visible">{channel(800)}</Activity>);
+    expect(log).toEqual([
+      'register clip-ch0-chunk0',
+      'register clip-ch0-chunk1',
+      'unregister clip-ch0-chunk0',
+      'unregister clip-ch0-chunk1',
+      'register clip-ch0-chunk0',
+    ]);
+    unmount();
+    expect(log.slice(5)).toEqual(['unregister clip-ch0-chunk0']);
+  });
 });

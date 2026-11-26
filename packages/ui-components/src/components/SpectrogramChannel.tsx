@@ -148,6 +148,9 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
   // Clean up stale canvases, then transfer new ones to the spectrogram provider.
   useEffect(() => {
     if (!clipId) return;
+    // A cleanup released the canvases and the effect below is about to replace
+    // them: registering one now would be undone at once (#856).
+    if (releasedRef.current) return;
 
     const unregister = onCanvasUnregisterRef.current;
     const register = onCanvasRegisterRef.current;
