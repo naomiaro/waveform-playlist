@@ -147,4 +147,39 @@ describe('Arrangement.removeClip', () => {
     expect(clipIds(a, 'T')).toEqual(['c1']);
     expect(a.canRedo).toBe(false);
   });
+
+  it('undoable: false leaves no no-op step when the track held the same content at two times (review round 3)', () => {
+    const a = createArrangement({ tracks: [track('B', [])] });
+    a.updateTrack('B', (t) => ({ ...t, clips: [clip('y', 0)] }));
+    a.updateTrack('B', (t) => ({ ...t, clips: [] })); // empty again: another object
+    a.updateTrack('B', (t) => ({ ...t, clips: [clip('c', 0)] }));
+    a.removeClip('B', 'c', { undoable: false });
+    expect(clipIds(a, 'B')).toEqual([]);
+    a.undo(); // the first undo changes something: y comes back
+    expect(clipIds(a, 'B')).toEqual(['y']);
+  });
+
+  it('undoable: false drops a redo step the purge made a no-op', () => {
+    const a = createArrangement({ tracks: [track('B', [])] });
+    a.updateTrack('B', (t) => ({ ...t, clips: [clip('c', 0)] }));
+    a.updateTrack('B', (t) => ({ ...t, clips: [] })); // the clip removed as a step
+    a.undo(); // c is back; the removal is a redo
+    a.removeClip('B', 'c', { undoable: false });
+    expect(clipIds(a, 'B')).toEqual([]);
+    expect(a.canUndo).toBe(false);
+    expect(a.canRedo).toBe(false);
+  });
+
+  it('undoable: false walks the redo steps nearest first', () => {
+    const a = createArrangement({ tracks: [track('B', [])] });
+    a.updateTrack('B', (t) => ({ ...t, clips: [clip('c', 0)] }));
+    a.updateTrack('B', (t) => ({ ...t, clips: [] })); // c removed as a step
+    a.updateTrack('B', (t) => ({ ...t, clips: [clip('y', 0)] })); // then y added
+    a.undo();
+    a.undo(); // c is back; two redo steps: its removal, then y
+    a.removeClip('B', 'c', { undoable: false });
+    expect(clipIds(a, 'B')).toEqual([]);
+    a.redo(); // the first redo changes something: y comes
+    expect(clipIds(a, 'B')).toEqual(['y']);
+  });
 });

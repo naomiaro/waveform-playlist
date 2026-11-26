@@ -358,4 +358,21 @@ describe('<daw-editor>: a <daw-clip> moved to another <daw-track>', () => {
       expect(ed._clipLinkState(late.trackId, clip.clipId)).toBe('live');
     });
   });
+
+  it('removing a page track while an app holds a transaction open on its handed-in arrangement leaves that transaction alone', async () => {
+    const { ed, b } = await twoTracks();
+    const x = createArrangement({
+      tracks: [{ ...createTrack({ name: 'X', kind: 'midi', clips: [] }), id: 'x1' }],
+    });
+    ed.arrangement = x;
+    await tick(2);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    x.beginTransaction();
+    x.setTrackVolume('x1', 0.3);
+    b.remove(); // a page track: its removal is in the own arrangement only
+    await tick(3);
+    expect(warn.mock.calls.some(([m]) => /already in a transaction/.test(String(m)))).toBe(false);
+    x.abortTransaction(); // still open: the abort takes the change back
+    expect(x.getMixer().get('x1')?.volume).toBe(1);
+  });
 });

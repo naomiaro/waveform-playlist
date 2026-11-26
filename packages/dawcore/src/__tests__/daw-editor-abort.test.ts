@@ -304,3 +304,55 @@ describe('loadFiles(files, { signal }) (D5)', () => {
     expect(removed).toEqual([]); // nothing entered, so nothing was taken out
   });
 });
+
+describe('review round 3', () => {
+  const file = (name: string) => {
+    const f = new File([new Uint8Array(8)], name, { type: 'audio/wav' });
+    (f as unknown as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer = async () =>
+      new ArrayBuffer(8);
+    return f;
+  };
+
+  it('a swap ends loadFiles() as a disconnect does: the file loading stays, the rest fail and enter nowhere', async () => {
+    const { ed, fake } = await setup('');
+    const own = ed.arrangement;
+    fake.holdDecode('');
+    const o = ed.loadFiles([file('one.wav'), file('two.wav')]);
+    await tick(4);
+    expect(own.getTracks().map((t: { name: string }) => t.name)).toEqual(['one']);
+    const h = handed();
+    ed.arrangement = h;
+    const result = await o;
+    expect(result.loaded).toHaveLength(1);
+    expect(result.failed.map((f: { file: File }) => f.file.name)).toEqual(['two.wav']);
+    await tick(4);
+    expect(h.getTracks().map((t) => t.name)).toEqual(['H']);
+    expect(own.getTracks().map((t: { name: string }) => t.name)).toEqual(['one']);
+  });
+
+  it('a swap before the first file has entered: it fails and enters nowhere', async () => {
+    const { ed } = await setup('');
+    const own = ed.arrangement;
+    const o = ed.loadFiles([file('one.wav')]);
+    const h = handed();
+    ed.arrangement = h; // before the entry flush
+    const result = await o;
+    expect(result.failed.map((f: { file: File }) => f.file.name)).toEqual(['one.wav']);
+    await tick(4);
+    expect(h.getTracks().map((t) => t.name)).toEqual(['H']);
+    expect(own.getTracks()).toHaveLength(0);
+  });
+
+  it('a signal aborted with a reason that is not an Error rejects with that reason, as fetch() does', async () => {
+    const { ed, fake } = await setup();
+    const trackId = ed.arrangement.getTracks()[0].id;
+    fake.holdDecode('/b.wav');
+    const c = new AbortController();
+    const p = ed.addClip(trackId, { src: '/b.wav' }, { signal: c.signal });
+    c.abort('user');
+    await expect(p).rejects.toBe('user');
+    const pre = new AbortController();
+    pre.abort('early');
+    await expect(ed.addTrack({}, { signal: pre.signal })).rejects.toBe('early');
+  });
+});

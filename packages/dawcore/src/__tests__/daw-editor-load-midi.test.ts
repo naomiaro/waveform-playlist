@@ -314,4 +314,28 @@ describe('<daw-editor>.loadMidi', () => {
       expect(editor.arrangement!.getTracks()).toHaveLength(0);
     });
   });
+
+  it('an abort after a swap takes the tracks out of the arrangement they entered (review round 3)', async () => {
+    mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 2 }));
+    const { createArrangement } = await import('@waveform-playlist/engine');
+    const x = createArrangement();
+    editor.arrangement = x;
+    await new Promise((r) => setTimeout(r, 0));
+    const original = editor.addTrack.bind(editor);
+    let calls = 0;
+    editor.addTrack = vi.fn((config, options) => {
+      calls += 1;
+      if (calls === 1) return original(config, options);
+      // The second never enters: it ends with the signal.
+      return new Promise<string>((_, reject) =>
+        options?.signal?.addEventListener('abort', () => reject(options.signal!.reason))
+      );
+    });
+    const p = editor.loadMidi('/midi/swap.mid');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(x.getTracks().map((t) => t.name)).toEqual(['Track 1']);
+    editor.arrangement = null; // x is swapped out: the call aborts
+    await expect(p).rejects.toMatchObject({ name: 'AbortError' });
+    expect(x.getTracks()).toHaveLength(0);
+  });
 });

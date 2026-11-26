@@ -9,6 +9,7 @@
 
 import type { MidiLoadOptions, MidiLoadResult } from '@dawcore/midi';
 import type { EditorCallOptions, TrackConfig } from '../types';
+import type { Arrangement } from '@waveform-playlist/engine';
 import { installCommand } from '../utils/install-command';
 import { reasonOf } from './abort';
 
@@ -24,7 +25,9 @@ export interface MidiLoaderHost {
   /** Resolves with the track id once the track has entered (#848). */
   addTrack(config: TrackConfig, options?: EditorCallOptions): Promise<string>;
   /** Take a track out for good: no undo step, and no undo brings it back. */
-  _discardTrack(trackId: string): void;
+  _discardTrack(trackId: string, from?: Arrangement): void;
+  /** The arrangement played (the tracks enter it). */
+  readonly arrangement: Arrangement;
   /** The caller's signal combined with the arrangement played (D6). */
   _operationSignal(signal?: AbortSignal): AbortSignal;
 }
@@ -64,6 +67,8 @@ export async function loadMidiImpl(
   // ES2020 means we can't use Error.cause yet; console.warn carries the
   // diagnostic detail.
   const signal = host._operationSignal(options.signal);
+  // The arrangement the tracks enter: a cleanup after a swap removes them there.
+  const target = host.arrangement;
   if (signal.aborted) throw reasonOf(signal);
   let midiModule: typeof import('@dawcore/midi');
   try {
@@ -138,7 +143,7 @@ export async function loadMidiImpl(
   if (rejections.length > 0) {
     for (const trackId of succeeded) {
       try {
-        host._discardTrack(trackId);
+        host._discardTrack(trackId, target);
       } catch (cleanupErr) {
         console.warn('[dawcore] loadMidi cleanup failed for a track: ' + String(cleanupErr));
       }

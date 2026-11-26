@@ -9,6 +9,7 @@
 import type { DawFilesLoadErrorDetail, LoadFilesResult } from '../events';
 import { reasonOf, untilAborted } from './abort';
 import type { EditorCallOptions } from '../types';
+import type { Arrangement } from '@waveform-playlist/engine';
 
 export interface FileLoaderHost {
   readonly isConnected: boolean;
@@ -17,7 +18,11 @@ export interface FileLoaderHost {
   /** Resolves when the track has loaded or the editor was disconnected; rejects when its audio failed. */
   _whenTrackLoaded(trackId: string): Promise<void>;
   /** Take a track out for good: no undo step, and no undo brings it back. */
-  _discardTrack(trackId: string): void;
+  _discardTrack(trackId: string, from?: Arrangement): void;
+  /** The arrangement played (the tracks enter it). */
+  readonly arrangement: Arrangement;
+  /** The signal of the arrangement played: aborted when it is swapped out. */
+  _operationSignal(signal?: AbortSignal): AbortSignal;
   dispatchEvent(event: Event): boolean;
 }
 
@@ -39,6 +44,10 @@ export async function loadFiles(
   }
 
   const fileArray = Array.from(files);
+  // The arrangement the files enter, and its signal: a swap ends the call as
+  // a disconnect does (the file loading is kept; the rest fail).
+  const target = host.arrangement;
+  const played = host._operationSignal();
   const loaded: string[] = [];
   const failed: Array<{ file: File; error: unknown }> = [];
 
@@ -62,6 +71,10 @@ export async function loadFiles(
       dispatchLoadError(file, new Error('<daw-editor> was disconnected'));
       continue;
     }
+    if (played.aborted) {
+      dispatchLoadError(file, reasonOf(played));
+      continue;
+    }
     // file.type can be '' for valid audio (.opus on some browsers) — only
     // reject explicitly non-audio MIME types.
     if (file.type && !file.type.startsWith('audio/')) {
@@ -78,7 +91,7 @@ export async function loadFiles(
         // Aborted while it entered: it is taken out once it has.
         if (signal?.aborted)
           void adding.then(
-            (id) => host._discardTrack(id),
+            (id) => host._discardTrack(id, target),
             () => {}
           );
         throw err;
@@ -89,11 +102,11 @@ export async function loadFiles(
       if (signal?.aborted) {
         // The caller's abort: everything this call added goes, and it rejects.
         for (const id of [...loaded, ...(trackId !== null ? [trackId] : [])])
-          host._discardTrack(id);
+          host._discardTrack(id, target);
         throw reasonOf(signal);
       }
       console.warn('[dawcore] Failed to load file: ' + file.name + ' — ' + String(err));
-      if (trackId !== null) host._discardTrack(trackId);
+      if (trackId !== null) host._discardTrack(trackId, target);
       dispatchLoadError(file, err);
     }
   }

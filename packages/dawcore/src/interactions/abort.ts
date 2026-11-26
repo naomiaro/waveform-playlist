@@ -15,10 +15,12 @@ export function isAbortError(error: unknown): boolean {
   return (error as { name?: unknown } | null)?.name === 'AbortError';
 }
 
-/** The reason of an aborted signal, as an Error (a signal may be aborted with anything). */
-export function reasonOf(signal: AbortSignal): Error {
-  const reason: unknown = signal.reason;
-  return reason instanceof Error ? reason : abortError(String(reason ?? 'aborted'));
+/**
+ * The reason of an aborted signal, as it is: a call rejects with it, as
+ * `fetch()` does (`abort()` without one gives an `AbortError` DOMException).
+ */
+export function reasonOf(signal: AbortSignal): unknown {
+  return signal.reason;
 }
 
 /**

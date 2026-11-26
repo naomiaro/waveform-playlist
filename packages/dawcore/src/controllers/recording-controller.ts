@@ -62,10 +62,6 @@ export interface RecordingSession {
   /** Display name for the take (preview header + finalized clip name). */
   readonly clipName?: string;
   readonly wasOverdub: boolean;
-  /** The mic-unplug handler and its track. Its listener goes on stop/cleanup, not just when
-   * the stream ends (through a signal the controller keeps, D8). */
-  readonly _onTrackEnded: (() => void) | null;
-  readonly _audioTrack: MediaStreamTrack | null;
   /** Set during stopRecording, cleared by the done message from the worklet. */
   stopAckResolve: (() => void) | null;
   /** In-flight stop completion — re-entrant stopRecording calls await this
@@ -79,7 +75,7 @@ export interface RecordingSession {
 
 /** Readonly view of a recording session for external consumers. */
 export type ReadonlyRecordingSession = Readonly<
-  Omit<RecordingSession, 'chunks' | 'peaks' | '_onTrackEnded' | '_audioTrack' | 'latencySamples'>
+  Omit<RecordingSession, 'chunks' | 'peaks' | 'latencySamples'>
 > & {
   readonly latencySamples: number;
   readonly chunks: ReadonlyArray<ReadonlyArray<Float32Array>>;
@@ -348,8 +344,6 @@ export class RecordingController implements ReactiveController {
         latencySamples,
         clipName: options.clipName,
         wasOverdub: options.overdub ?? false,
-        _onTrackEnded: onTrackEnded,
-        _audioTrack: audioTrack,
         stopAckResolve: null,
         stopPromise: null,
         stopping: false,

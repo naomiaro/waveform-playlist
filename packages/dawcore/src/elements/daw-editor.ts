@@ -627,6 +627,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       this._arrangement,
       abortError('the arrangement was swapped out (editor.arrangement) before it finished')
     );
+    // A dropped file not entered yet does not enter the arrangement swapped in.
+    for (const trackId of [...this._droppedEntries]) {
+      this._abortEntry(
+        trackId,
+        abortError('the arrangement was swapped out (editor.arrangement) before the file entered')
+      );
+    }
     this._handedIn = next;
     // A new load cycle: every track of the arrangement now played is announced.
     this._announcer = new LoadAnnouncer((event) => this.dispatchEvent(event));
@@ -654,7 +661,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * reject the call: a removal of the clip or of its track before the clip
    * loads settles it here, without a public event (#917).
    */
-  private _awaitedClips = new Map<string, { trackId: string; reject: (error: Error) => void }>();
+  private _awaitedClips = new Map<string, { trackId: string; reject: (error: unknown) => void }>();
   /** Reject the `addClip()` calls waiting for clips that match `which`. */
   private _rejectAwaitedClips(
     which: (clipId: string, trackId: string) => boolean,
@@ -1515,9 +1522,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       refused,
     };
   }
-  /** Run `fn` as one undo step of the arrangements it may change (the played one and the own one). */
-  private _inOneStep(fn: () => void): void {
-    const arrangements = [...new Set([this._arrangement, this._ownArrangement])];
+  /** Run `fn` as one undo step of each arrangement it changes. */
+  private _inOneStep(arrangements: readonly Arrangement[], fn: () => void): void {
     for (const a of arrangements) a.beginTransaction();
     try {
       fn();
@@ -1710,7 +1716,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         // child may be the element of another track's clip (after an Undo
         // of a move), which goes with it (the maintainer's choice, #848).
         const children = (clipsOfRemoved.get(trackId) ?? []).filter((c) => !c.isConnected);
-        this._inOneStep(() => {
+        // Only the arrangement that holds the track (a page track's children
+        // declare clips of the same one): an app's open transaction on
+        // another is left alone (review of #919).
+        this._inOneStep([this._historyOf(trackId)], () => {
           this._onTrackRemoved(trackId);
           for (const clip of children) {
             removedClips.delete(clip);
@@ -2886,7 +2895,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       if (moved.from.size === 0) {
         this._arrangement.addTrack(entering, index === undefined ? undefined : { index });
       } else {
-        this._inOneStep(() => {
+        this._inOneStep([this._arrangement], () => {
           for (const [fromId, clipIds] of moved.from) {
             this._arrangement.updateTrack(fromId, (t) => ({
               ...t,
@@ -2997,7 +3006,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   /** Who waits for a track to enter (addTrack, a dropped file). */
   private _entryWaiters = new Map<
     string,
-    { resolve: (trackId: string) => void; reject: (error: Error) => void }
+    { resolve: (trackId: string) => void; reject: (error: unknown) => void }
   >();
   private _waitForEntry(trackId: string): Promise<string> {
     return new Promise<string>((resolve, reject) => {
@@ -3005,7 +3014,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     });
   }
   /** Settle the wait for a track's entry: entered (`null`), or refused or gone. */
-  private _settleEntry(trackId: string, error: Error | null): void {
+  private _settleEntry(trackId: string, error: unknown): void {
     const waiter = this._entryWaiters.get(trackId);
     if (!waiter) return;
     this._entryWaiters.delete(trackId);
@@ -3047,6 +3056,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     };
     this._pending = new Map(this._pending).set(trackId, { descriptor, mix: DEFAULT_TRACK_MIX });
     const entered = this._waitForEntry(trackId);
+    // A swap before it enters ends it, as a disconnect does (review of #919).
+    this._droppedEntries.add(trackId);
+    void entered.finally(() => this._droppedEntries.delete(trackId)).catch(() => {});
     this._queueEntry(trackId);
     return entered;
   }
@@ -3054,12 +3066,18 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * Take a track out for good: no undo step, and no undo or redo brings it
    * back (a dropped file that could not be loaded was never a declaration).
    */
-  _discardTrack(trackId: string): void {
-    const track = this._arrangement.getTracks().find((t) => t.id === trackId);
-    this._announcer.forget(trackId, track?.clips.map((c) => c.id) ?? []);
-    this._arrangement.removeTrack(trackId, { undoable: false });
+  _discardTrack(trackId: string, from: Arrangement = this._arrangement): void {
+    // From the arrangement it entered: after a swap that is no longer the one
+    // played (review of #919).
+    const track = from.getTracks().find((t) => t.id === trackId);
+    if (from === this._arrangement) {
+      this._announcer.forget(trackId, track?.clips.map((c) => c.id) ?? []);
+    }
+    from.removeTrack(trackId, { undoable: false });
     this._onTrackRemoved(trackId);
   }
+  /** Dropped files waiting to enter (loadFiles): a swap ends them, as a disconnect does. */
+  private _droppedEntries = new Set<string>();
   /** One AbortController per arrangement while it is played (D2, interactions/abort.ts). */
   private _playSignals = new PlaySignals();
   /** The signal of the arrangement played now: aborted when it is swapped out. */
@@ -3409,11 +3427,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   /**
    * Imperatively load a `.mid` file (URL or File) and add N tracks (no
    * element, #848), one per note-bearing MIDI track. On any per-track
-   * failure, every track the call added is removed; each removal is an undo
-   * step, so the history is not rewound.
+   * failure, every track the call added is removed with no undo step, so the
+   * editor is as before the call.
    *
-   * `options.signal` is forwarded to `fetch()` only for URL sources; aborting
-   * after parsing does not cancel in-flight `addTrack` calls.
+   * `options.signal` cancels the fetch, the parse and the tracks still
+   * waiting to enter (combined with the arrangement played: a swap cancels
+   * too); the call rejects with its `reason` and removes the tracks it added.
    *
    * Requires the optional `@dawcore/midi` peer dep — throws with an install
    * hint (and `console.warn`s the original error) when the dynamic import
@@ -3500,7 +3519,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return entered.finally(() => settled.abort());
   }
   /** A track that has not entered leaves the queue and its wait rejects with `reason` (D4). */
-  private _abortEntry(trackId: string, reason: Error): void {
+  private _abortEntry(trackId: string, reason: unknown): void {
     if (!this._pending.has(trackId) || this._isEntered(trackId)) return;
     // Out of what is waiting; its id left in the queue enters nothing.
     const nextPending = new Map(this._pending);
