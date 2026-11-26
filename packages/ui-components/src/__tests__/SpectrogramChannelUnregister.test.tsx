@@ -146,4 +146,30 @@ describe('SpectrogramChannel unregisters each canvas id once', () => {
       'unregister clip-ch0-chunk1',
     ]);
   });
+
+  it('a canvas released by a hide is not unregistered again when the reveal finds it gone', () => {
+    // The clip gets shorter while hidden: its second canvas is gone at the reveal.
+    const log: string[] = [];
+    const channel = (length: number) => (
+      <SpectrogramChannel {...baseProps} length={length} waveHeight={100} {...logged(log)} />
+    );
+    const { rerender, unmount } = render(<Activity mode="visible">{channel(1500)}</Activity>);
+    rerender(<Activity mode="hidden">{channel(1500)}</Activity>);
+    rerender(<Activity mode="hidden">{channel(800)}</Activity>);
+    rerender(<Activity mode="visible">{channel(800)}</Activity>);
+    unmount();
+
+    // Replay the log: an unregister must name an id registered at that moment,
+    // and nothing may stay registered after the unmount.
+    const live = new Set<string>();
+    const faults: string[] = [];
+    for (const entry of log) {
+      const [kind, id] = entry.split(' ');
+      if (kind === 'register') live.add(id);
+      else if (!live.delete(id)) faults.push(entry);
+    }
+    expect(faults).toEqual([]);
+    expect([...live]).toEqual([]);
+    expect(log.filter((e) => e === 'unregister clip-ch0-chunk1')).toHaveLength(1);
+  });
 });
