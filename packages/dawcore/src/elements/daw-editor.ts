@@ -1464,6 +1464,62 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const src = clip && typeof clip.src === 'string' ? clip.src : '';
     this._applyClipUpdate(holderId, clipId, { ...current, ...partial, src });
   }
+  /**
+   * The clips of an entering track that another track of the arrangement
+   * holds (the page moved their `<daw-clip>` here while the track waited):
+   * the track takes the held clip as it is, and `from` names what leaves
+   * where. A held clip of the other kind is refused and stays.
+   */
+  private _takeOverMovedClips(
+    trackId: string,
+    track: ArrangementTrack
+  ): {
+    track: ArrangementTrack;
+    from: Map<string, Set<string>>;
+    movedIds: Set<string>;
+    refused: Array<{ clipId: string; error: Error }>;
+  } {
+    const from = new Map<string, Set<string>>();
+    const movedIds = new Set<string>();
+    const refused: Array<{ clipId: string; error: Error }> = [];
+    const others = this._arrangement.getTracks().filter((t) => t.id !== trackId);
+    const kind = trackKind(track);
+    const clips: ArrangementTrack['clips'] = [];
+    for (const clip of track.clips) {
+      const holder = others.find((t) => t.clips.some((c) => c.id === clip.id));
+      const held = holder?.clips.find((c) => c.id === clip.id);
+      if (!holder || !held) {
+        clips.push(clip);
+        continue;
+      }
+      const isMidi = 'midiNotes' in held && held.midiNotes != null;
+      const error = clipKindError(track.name ?? '', kind, isMidi, held.name || held.id);
+      if (error) {
+        refused.push({ clipId: clip.id, error });
+        continue;
+      }
+      clips.push(held);
+      movedIds.add(clip.id);
+      const ids = from.get(holder.id) ?? new Set<string>();
+      from.set(holder.id, ids.add(clip.id));
+    }
+    return {
+      track: movedIds.size || refused.length ? { ...track, clips } : track,
+      from,
+      movedIds,
+      refused,
+    };
+  }
+  /** Run `fn` as one undo step of the arrangements it may change (the played one and the own one). */
+  private _inOneStep(fn: () => void): void {
+    const arrangements = [...new Set([this._arrangement, this._ownArrangement])];
+    for (const a of arrangements) a.beginTransaction();
+    try {
+      fn();
+    } finally {
+      for (const a of arrangements) a.commitTransaction();
+    }
+  }
   /** The `peaks-src` some track took for a clip element, if any. */
   private _takenPeaksSrc(clipId: string): string | undefined {
     for (const extras of this._extras.values()) {
@@ -1590,6 +1646,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._childObserver = new MutationObserver((mutations) => {
       const removedTracks = new Map<string, DawTrackElement>();
       const removedClips = new Set<DawClipElement>();
+      // The clips that left inside a removed <daw-track>, by its id.
+      const clipsOfRemoved = new Map<string, DawClipElement[]>();
       const addedTrackIds = new Set<string>();
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
@@ -1614,6 +1672,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           node.querySelectorAll?.('daw-clip').forEach((c) => {
             removedClips.add(c as DawClipElement);
           });
+          for (const t of node.tagName === 'DAW-TRACK'
+            ? [node]
+            : [...(node.querySelectorAll?.('daw-track') ?? [])]) {
+            clipsOfRemoved.set((t as DawTrackElement).trackId, [
+              ...t.querySelectorAll('daw-clip'),
+            ] as DawClipElement[]);
+          }
         }
       }
       const movedTrackIds = new Set<string>();
@@ -1622,7 +1687,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           movedTrackIds.add(trackId); // move, not removal
           continue;
         }
-        this._onTrackRemoved(trackId);
+        // The track and what its children declared are one undo step: a
+        // child may be the element of another track's clip (after an Undo
+        // of a move), which goes with it (the maintainer's choice, #848).
+        const children = (clipsOfRemoved.get(trackId) ?? []).filter((c) => !c.isConnected);
+        this._inOneStep(() => {
+          this._onTrackRemoved(trackId);
+          for (const clip of children) {
+            removedClips.delete(clip);
+            this._onClipRemovedFromDom(clip);
+          }
+        });
       }
       for (const clip of removedClips) {
         // A clip that moved with its track, or into another track of this
@@ -2108,7 +2183,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const entered = this._arrangementOf(trackId)
       .getTracks()
       .some((t) => t.id === trackId);
-    if (!entered && this._trackLinkState(trackId) === 'detached') {
+    if (!entered && !this._pending.has(trackId) && this._trackLinkState(trackId) === 'detached') {
       // Added under a detached track (an Undo of its arrival): it never
       // enters, also after a Redo. It is taken, so it shows detached
       // (maintainer's choice, #848).
@@ -2159,7 +2234,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // Declared here already (its own deferred connect, a move inside the
     // track, an Undo that left the element here): not a move.
     if (this._extras.get(trackId)?.peaksSrc.has(clipId)) return true;
-    const arrangement = this._arrangementOf(trackId);
+    // The arrangement whose history holds the track: the own one for a page
+    // track that is waiting or detached while a handed-in one is played.
+    const arrangement = this._historyOf(trackId);
     // Back in the track that holds its clip (the page moved it back after an
     // Undo of its move): what the other tracks took comes here.
     if (
@@ -2183,10 +2260,33 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       return false;
     }
     const entered = arrangement.getTracks().some((t) => t.id === trackId);
+    // Into a track waiting to enter: the clip moves when it enters, as it is,
+    // with its arrival (the maintainer's choice c, #848; _enterTrack).
+    if (!entered && this._pending.has(trackId)) return true;
     const toExtras = this._extras.get(trackId) ?? this._defaultExtras(trackId);
     if (!entered || !toExtras) {
-      this._removeClipFromTrack(fromTrackId, clipId);
-      return false;
+      // Into a detached track (an Undo took its arrival): refused. The clip
+      // stays where it is; the element is taken here, shows detached, and is
+      // linked to its clip by id once a Redo brings the track back.
+      this._takeClip(trackId, clipId, this._takenPeaksSrc(clipId) ?? clipEl.peaksSrc ?? '');
+      console.warn(
+        '[dawcore] <daw-clip> cannot move into <daw-track> "' +
+          (this._trackElements.get(trackId)?.name || 'Untitled') +
+          '": the track is not in the arrangement (an Undo took it out). Its clip stays in its track.'
+      );
+      this.dispatchEvent(
+        new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
+          bubbles: true,
+          composed: true,
+          detail: {
+            trackId,
+            clipId,
+            error: new Error('track "' + trackId + '" is not in the arrangement'),
+          },
+        })
+      );
+      this._refreshLinkStates();
+      return true;
     }
     const error = moveClipToTrack(arrangement, fromTrackId, trackId, clipId, toExtras.kind);
     if (error) {
@@ -2715,14 +2815,42 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           this._arrangement.getTracks().map((t) => t.id)
         )
       : undefined;
+    // A child whose clip another track holds was moved here by the page: the
+    // clip moves in as it is, in the same undo step as the arrival (the
+    // maintainer's choice c, #848). One of the other kind stays where it is.
+    const moved = this._takeOverMovedClips(trackId, built.track);
+    const entering = moved.track;
+    for (const { clipId, error } of moved.refused) {
+      console.warn('[dawcore] ' + error.message);
+      this.dispatchEvent(
+        new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
+          bubbles: true,
+          composed: true,
+          detail: { trackId, clipId, error },
+        })
+      );
+    }
     // Before the add: the announcement it causes counts the refused clips,
     // and a clip whose source is loaded already is still announced ready.
-    this._announcer.expect(trackId, built.refused.length);
-    for (const clip of built.track.clips) {
+    this._announcer.expect(trackId, built.refused.length + moved.refused.length);
+    for (const clip of entering.clips) {
       if (isLoadingClip(clip)) this._announcer.expectClip(clip.id);
     }
     try {
-      this._arrangement.addTrack(built.track, index === undefined ? undefined : { index });
+      if (moved.from.size === 0) {
+        this._arrangement.addTrack(entering, index === undefined ? undefined : { index });
+      } else {
+        this._inOneStep(() => {
+          for (const [fromId, clipIds] of moved.from) {
+            this._arrangement.updateTrack(fromId, (t) => ({
+              ...t,
+              clips: t.clips.filter((c) => !clipIds.has(c.id)),
+            }));
+            for (const clipId of clipIds) this._forgetClip(fromId, clipId);
+          }
+          this._arrangement.addTrack(entering, index === undefined ? undefined : { index });
+        });
+      }
     } catch (err) {
       console.warn('[dawcore] Failed to add track "' + trackId + '": ' + String(err));
       // An element stays linked to the refused track (it is not added
@@ -2745,6 +2873,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
     this._settleEntry(trackId, null);
     for (const clipDesc of built.descriptor.clips) {
+      if (clipDesc.clipId && moved.movedIds.has(clipDesc.clipId)) continue; // loaded as it is
       if (clipDesc.peaksSrc && clipDesc.clipId && clipSourceOf(clipDesc)) {
         this._requestPreview(clipDesc.clipId, clipDesc.peaksSrc);
       }

@@ -1533,6 +1533,54 @@ annotationTrack.moveEndBoundary(deltaMs: number): void
 
 ---
 
+## Element Lifecycle: Declaration and Live State (#848)
+
+`<daw-track>` and `<daw-clip>` behave like native form elements. **The markup is the page's declaration; live state is read from properties.** The editor never writes an attribute and never moves an element. The one exception is an explicit request to remove: `editor.removeTrack()` / `removeClip()` remove the element, as `select.remove(i)` does. Everything a consumer can observe follows from that rule and from the native element each case is modelled on.
+
+### Native precedents
+
+| Native | What it shows | Here |
+|---|---|---|
+| `<input value>` / `input.value` | The attribute is the default; the property is live, and setting it never writes the attribute | `<daw-track volume>` / `trackEl.volume`, `<daw-clip start>` / `clipEl.start` |
+| `<option selected>` / `option.index` | A property that reports position in the parent's list | `trackEl.index`: the position in the arrangement, -1 when not there |
+| `<video>` with `<source>` children and `srcObject` | The children declare the content; `srcObject` replaces it while set, and the children are inert | `editor.arrangement = other` plays `other` alone; `null` goes back to the arrangement the children declare |
+| `<track>` in `<video>` | Removing the element removes its text track; moving it moves it | Removing a `<daw-clip>` removes its clip; moving it into another `<daw-track>` moves the clip |
+| Custom states (`ElementInternals.states`) | Runtime state for CSS, never written to the DOM | `:state(detached)` |
+| `<details open>` (counter-example) | Writes its own attribute back on user action | Not followed: a state change shows in a property or a custom state, never in the page's attribute |
+
+### The three states of an element
+
+An element is linked to the arrangement by id (`trackEl.trackId`, `clipEl.clipId`).
+
+| State | When | Properties read | A property set / attribute change |
+|---|---|---|---|
+| **pending** | Outside an editor, or registered and not entered yet (waiting for `editor.adapter`) | The declaration | Changes the declaration: it is the value the track enters with |
+| **live** | The arrangement played holds the id | The arrangement (`name`, `volume`, `pan`, `muted`, `soloed`, `kind`; `start`, `duration`, `offset`, `gain`, `name`, the MIDI fields) | A request to the arrangement, synchronous, one undo step (mix changes in one synchronous run are one step); the attribute keeps what the page wrote |
+| **detached** | The editor took it and the arrangement no longer holds its id (an Undo of its arrival, a removal made through the arrangement, a refusal), or a handed-in arrangement is set | The declaration | Changes nothing in the arrangement and logs a warning; an attribute change still updates the declaration. The element carries `:state(detached)`; a Redo of its arrival makes it live again |
+
+`src`, `render-mode`, `spectrogramConfig`, fades and `color` are declaration-only: the arrangement has no field for them (`editor.updateTrack()` changes what is drawn; read it from `editor.tracks`). `kind` is live and cannot change after entry: a later change warns, and the attribute keeps what the page wrote. A `<daw-clip>` is linked to its clip by id wherever it sits, so after an Undo of a move it can sit in another track's element and still be live.
+
+### What the page does, and what follows
+
+| The page… | Result | Undo / Redo |
+|---|---|---|
+| appends a `<daw-track>` | It enters the arrangement at the next flush, in DOM position, its `<daw-clip>` children read then | One undo step (except at page load: tracks entering an empty history make none) |
+| appends a `<daw-clip>` to a live track | A loading clip (a loaded one for MIDI) enters the track | One step |
+| appends a `<daw-clip>` to a pending track | Read when the track enters | Part of the track's entry |
+| appends a `<daw-clip>` to a detached track | Never enters, also after a Redo; warns; `:state(detached)` | None |
+| moves a `<daw-track>` (`insertBefore`, `moveBefore()`) | A reorder request: placed after the track of the `<daw-track>` before it | One step per observer batch; an Undo moves no element |
+| moves a `<daw-clip>` into another live track | Its clip moves there as it is (times, audio) | One step; an Undo moves no element: the element stays, linked by id |
+| moves a `<daw-clip>` into a track of the other kind | Refused: nothing changes, `daw-clip-error`, a warning; the element stays where the page put it | None |
+| moves a `<daw-clip>` into a pending track | The clip moves when the track enters, as it is (times, audio); one of the other kind stays where it is, with `daw-clip-error` | Part of the track's arrival step |
+| moves a `<daw-clip>` into a detached track | Refused: the clip stays in its track, `daw-clip-error`, a warning; the element shows `:state(detached)` and, once a Redo brings the track back, is live, linked to its clip by id | None |
+| removes a `<daw-clip>` | Its clip leaves the track that holds it | One step |
+| removes a `<daw-track>` | The track leaves, with every clip its children declared (also a clip another track holds, whose element sat inside it) | One step for the whole removal |
+| removes an element whose clip or track an Undo took out | Gone for good: taken out of the undo and redo states too, so no Redo brings it back (and no Redo is lost) | None |
+| removes an element while a handed-in arrangement is set | An ordinary undo step in the editor's own arrangement | One step there |
+| moves the elements with `moveBefore()` | As the moves above; `connectedMoveCallback` keeps the elements' state and announces their new place | As above |
+
+The editor reads its children again when it is put back in the page (a `<daw-track>` or `<daw-clip>` removed meanwhile goes as the observer would have done) and shows the link states then.
+
 ## Programmatic Track Mutation
 
 Two consumer-facing ways to mutate tracks at runtime exist by design: **declarative DOM mutation** (append/remove/update `<daw-track>` and `<daw-clip>` elements) and **imperative editor methods** (`editor.addTrack`, `editor.removeTrack`, `editor.loadFiles`). The engine API (`editor.engine.setTracks`, `editor.engine.addTrack`, …) is **internal plumbing**, not a consumer surface — the editor reads its arrangement, so a change made through `editor.arrangement` (or the engine) is drawn; see "Drive tracks through `editor.arrangement`, not `editor.engine`" below (#848).

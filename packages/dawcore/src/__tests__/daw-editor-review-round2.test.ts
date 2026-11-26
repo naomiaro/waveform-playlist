@@ -191,4 +191,91 @@ describe('review round 2 of #848 PR 3', () => {
     await settle(ed);
     expect(where(own, clip.clipId)).toEqual([]);
   });
+
+  it('a clip moved into a detached page track while handed in is refused (daw-clip-error)', async () => {
+    const { ed, own, late } = await lateTrack();
+    const A = ed.querySelector('daw-track');
+    const clip: El = A.querySelector('daw-clip');
+    own.undo(); // the arrival of Late: detached
+    ed.arrangement = other();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const errors: unknown[] = [];
+    ed.addEventListener('daw-clip-error', (e: CustomEvent) => errors.push(e.detail));
+    late.appendChild(clip);
+    await tick(3);
+    expect(errors).toHaveLength(1);
+    expect(where(own, clip.clipId)).toEqual(['A']);
+  });
+
+  it('a new <daw-clip> appended to a page track waiting while handed in: no warning, it enters with the track', async () => {
+    const ed = await three();
+    const own: Arrangement = ed.arrangement;
+    ed.arrangement = other();
+    const late: El = document.createElement('daw-track');
+    late.setAttribute('name', 'Late');
+    ed.appendChild(late);
+    await tick(3);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const clip: El = document.createElement('daw-clip');
+    clip.setAttribute('src', '/c.wav');
+    late.appendChild(clip);
+    await tick(3);
+    expect(warn).not.toHaveBeenCalled();
+    ed.arrangement = null;
+    await settle(ed);
+    await tick(3);
+    expect(where(own, clip.clipId)).toEqual(['Late']);
+  });
+
+  it('an entering track refuses a held clip of the other kind whose element declares its kind', async () => {
+    stubFetch({ '/a.wav': 'ok' });
+    const ed: Editor = await mountEditor({ before: (e) => stubPeakPipeline(e), html: '' });
+    editors.push(ed);
+    const m: El = document.createElement('daw-track');
+    m.setAttribute('name', 'M');
+    m.setAttribute('kind', 'midi');
+    const clip: El = document.createElement('daw-clip');
+    clip.midiNotes = [{ midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 }];
+    m.appendChild(clip);
+    ed.appendChild(m);
+    await settle(ed);
+    await tick(3);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    clip.setAttribute('src', '/a.wav'); // the declaration now says audio; the clip is MIDI
+    await tick(3);
+    const own: Arrangement = ed.arrangement;
+    const errors: unknown[] = [];
+    ed.addEventListener('daw-clip-error', (e: CustomEvent) => errors.push(e.detail));
+    const late: El = document.createElement('daw-track');
+    late.setAttribute('name', 'Audio');
+    ed.appendChild(late);
+    late.appendChild(clip);
+    await tick(4);
+    expect(own.getTracks().map((t) => t.name)).toContain('Audio'); // the track entered
+    expect(where(own, clip.clipId)).toEqual(['M']);
+    expect(errors.length).toBeGreaterThan(0);
+  });
+
+  it('a clip moved in with an entering track does not fetch its peaks again', async () => {
+    const fetchStub = stubFetch({ '/a.wav': 'ok', '/a.dat': 'ok' });
+    const ed: Editor = await mountEditor({
+      before: (e) => stubPeakPipeline(e),
+      html: '<daw-track name="A"><daw-clip src="/a.wav" peaks-src="/a.dat"></daw-clip></daw-track>',
+    });
+    editors.push(ed);
+    await settle(ed);
+    await tick(3);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const datCalls = () =>
+      fetchStub.mock.calls.filter(([url]) => String(url).endsWith('/a.dat')).length;
+    const before = datCalls();
+    const clip: El = ed.querySelector('daw-clip');
+    const late: El = document.createElement('daw-track');
+    late.setAttribute('name', 'Late');
+    ed.appendChild(late);
+    late.appendChild(clip);
+    await tick(4);
+    expect(where(ed.arrangement, clip.clipId)).toEqual(['Late']);
+    expect(datCalls()).toBe(before);
+  });
 });

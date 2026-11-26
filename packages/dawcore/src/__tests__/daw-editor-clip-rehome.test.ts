@@ -5,6 +5,8 @@
  * track. The elements' `connectedMoveCallback` announces the new place.
  */
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest';
+import { createArrangement } from '@waveform-playlist/engine';
+import { createTrack } from '@waveform-playlist/core';
 import {
   makeFakeAdapter,
   mountEditor,
@@ -222,5 +224,138 @@ describe('<daw-editor>: a <daw-clip> moved to another <daw-track>', () => {
     ed.redo();
     await tick(3);
     expect(clip.parentElement).toBe(a);
+  });
+
+  it("removing a <daw-track> holding the element of another track's clip removes both, one undo step", async () => {
+    const { ed, a, b, clip } = await twoTracks();
+    b.appendChild(clip);
+    await tick(3);
+    ed.undo(); // the clip is in A again; its element stays in B
+    await tick(3);
+    b.remove();
+    await tick(3);
+    expect(ids(ed, a.trackId)).not.toContain(clip.clipId);
+    expect(ed.arrangement.getTracks().some((t: { id: string }) => t.id === b.trackId)).toBe(false);
+    ed.undo(); // one step brings back the track and the clip
+    expect(ids(ed, a.trackId)).toContain(clip.clipId);
+    expect(ed.arrangement.getTracks().some((t: { id: string }) => t.id === b.trackId)).toBe(true);
+  });
+
+  it('removing two <daw-track>s in one go stays two undo steps', async () => {
+    const { ed, a, b } = await twoTracks();
+    ed.arrangement.setTrackVolume(a.trackId, 0.5); // a step before, to undo to
+    a.remove();
+    b.remove();
+    await tick(3);
+    expect(ed.arrangement.getTracks()).toHaveLength(0);
+    ed.undo();
+    expect(ed.arrangement.getTracks()).toHaveLength(1);
+  });
+
+  describe("into a track the arrangement does not hold (the maintainer's choice c)", () => {
+    it('a track appended, then a clip moved into it, in one task: the clip moves when the track enters', async () => {
+      const { ed, a, clip } = await twoTracks();
+      ed.arrangement.setTrackVolume(a.trackId, 0.5); // an edit first: the arrival is a step
+      const before = clipsOf(ed, a.trackId).find((c: { id: string }) => c.id === clip.clipId);
+      const late: El = document.createElement('daw-track');
+      late.setAttribute('name', 'Late');
+      ed.appendChild(late);
+      late.appendChild(clip);
+      await tick(4);
+      expect(ids(ed, a.trackId)).not.toContain(clip.clipId);
+      expect(ids(ed, late.trackId)).toEqual([clip.clipId]);
+      const after = clipsOf(ed, late.trackId)[0];
+      expect(after.startSample).toBe(before.startSample); // as it is
+      ed.undo(); // one step: the arrival and the move
+      expect(ids(ed, a.trackId)).toContain(clip.clipId);
+      expect(ed.arrangement.getTracks().some((t: { id: string }) => t.id === late.trackId)).toBe(
+        false
+      );
+    });
+
+    it('a clip moved into a track before the track is appended: the same', async () => {
+      const { ed, a, clip } = await twoTracks();
+      const late: El = document.createElement('daw-track');
+      late.setAttribute('name', 'Late');
+      late.appendChild(clip);
+      ed.appendChild(late);
+      await tick(4);
+      expect(ids(ed, a.trackId)).not.toContain(clip.clipId);
+      expect(ids(ed, late.trackId)).toEqual([clip.clipId]);
+    });
+
+    it('into a page track waiting while a handed-in arrangement is set: the clip moves when it enters', async () => {
+      const { ed, a, clip } = await twoTracks();
+      const own = ed.arrangement;
+      ed.arrangement = createArrangement({
+        tracks: [{ ...createTrack({ name: 'Other', kind: 'midi', clips: [] }), id: 'other-1' }],
+      });
+      const late: El = document.createElement('daw-track');
+      late.setAttribute('name', 'Late');
+      ed.appendChild(late);
+      await tick(3);
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      late.appendChild(clip);
+      await tick(3);
+      expect(warn).not.toHaveBeenCalled();
+      expect(
+        own
+          .getTracks()
+          .find((t: { id: string }) => t.id === a.trackId)
+          ?.clips.map((c: { id: string }) => c.id)
+      ).toContain(clip.clipId);
+      ed.arrangement = null;
+      await settle(ed);
+      await tick(3);
+      const holders = own
+        .getTracks()
+        .filter((t: { clips: { id: string }[] }) => t.clips.some((c) => c.id === clip.clipId))
+        .map((t: { id: string }) => t.id);
+      expect(holders).toEqual([late.trackId]);
+    });
+
+    it('a clip of the wrong kind in an entering track stays in its track, with daw-clip-error', async () => {
+      const { ed, a, clip } = await twoTracks();
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const errors: unknown[] = [];
+      ed.addEventListener('daw-clip-error', (e: CustomEvent) => errors.push(e.detail));
+      const late: El = document.createElement('daw-track');
+      late.setAttribute('name', 'Notes');
+      late.setAttribute('kind', 'midi');
+      ed.appendChild(late);
+      late.appendChild(clip);
+      await tick(4);
+      expect(ids(ed, a.trackId)).toContain(clip.clipId);
+      expect(ids(ed, late.trackId)).toEqual([]);
+      expect(errors).toHaveLength(1);
+    });
+
+    it('into a detached track: refused, the clip stays; after a Redo the element is live, linked by id', async () => {
+      const { ed, a, clip } = await twoTracks();
+      ed.arrangement.setTrackVolume(a.trackId, 0.5); // an edit first: the arrival is a step
+      const late: El = document.createElement('daw-track');
+      late.setAttribute('name', 'Late');
+      ed.appendChild(late);
+      await tick(4);
+      ed.undo(); // the arrival of Late: detached
+      expect(ed._trackLinkState(late.trackId)).toBe('detached');
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const errors: unknown[] = [];
+      ed.addEventListener('daw-clip-error', (e: CustomEvent) => errors.push(e.detail));
+      late.appendChild(clip);
+      await tick(3);
+      expect(ids(ed, a.trackId)).toContain(clip.clipId);
+      expect(errors).toHaveLength(1);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(ed._clipLinkState(late.trackId, clip.clipId)).toBe('detached');
+      clip.connectedMoveCallback(); // announced again: not refused a second time
+      await tick(3);
+      expect(errors).toHaveLength(1);
+      ed.redo();
+      await tick(3);
+      expect(ids(ed, a.trackId)).toContain(clip.clipId);
+      expect(ids(ed, late.trackId)).toEqual([]);
+      expect(ed._clipLinkState(late.trackId, clip.clipId)).toBe('live');
+    });
   });
 });
