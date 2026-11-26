@@ -21,7 +21,7 @@ Used by `WaveformPlaylistProvider` only (#812). The provider file composes them 
 - `useReadyOnce`: `isReady`, the one `onReady` and `waveform-playlist:ready` per mount, and `refusePlayBeforeFirstReady`. See `playback-and-engine.md`, "Playlist Loading Detection".
 - `useArrangementEditing`: the editor actions that change the arrangement (the four mixer setters, which pass the caller's `MixerChangeOptions` on, `reorderTrack`, `undo`, `redo`, `setRecordingActive`, which sets and clears the take's mute through `arrangement.setTrackRecording`), each a stable function that calls the arrangement and works with no engine attached; a mixer setter given anything but a string id is ignored with one warning (`warnOnce`). Also the value of `RecordingTrackContext`, read from `arrangement.recordingTrackIds` (#843).
 
-The owner table of these pieces is in the package's `CLAUDE.md`, "The Provider Plays an Arrangement". Tests: `engineLifetime.test.tsx`, `arrangementView.test.tsx`, `readyOnce.test.tsx`, `providerOnArrangement.test.tsx`, `recordingArmMute.test.tsx`.
+The owner table of these pieces is in the package's `CLAUDE.md`, "The Provider Plays an Arrangement". Tests: `engineLifetime.test.tsx`, `arrangementView.test.tsx`, `readyOnce.test.tsx`, `providerOnArrangement.test.tsx`, `recordingTakeMute.test.tsx`.
 
 `followAnnotations` takes `followOnly` and `holdHighlight` from the caller. WebAudio passes `continuousPlay || selection playback` and "this frame reaches a bounded play's end"; MediaElement passes `continuousPlay || selection playback` and the same end-of-range test since #688. `holdHighlight` is read in the follow-only branch only (the #727 lesson: applied to the other branch it skips the stop at an annotation's end).
 

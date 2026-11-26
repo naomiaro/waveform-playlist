@@ -4182,6 +4182,8 @@ A range input calls its `onChange` on every move, so a slider of your own that c
 
 `createMixerGesture` is exported from `@waveform-playlist/core`, the package the app already imports `audioTrack` from. The type of the options, `MixerChangeOptions`, is exported from `@waveform-playlist/engine`.
 
+The snippets pass a track id, as the setters have taken since [the track controls became pieces](#track-controls-are-composed-from-pieces-bound-to-a-track-the-mixer-setters-take-a-track-id); on the last release they took a track index, so make that change first.
+
 **Find:** `setTrackVolume(`, `setTrackPan(`, `setVolume(` and `setPan(` called from an `onChange` (or an `onInput`, or a listener of the `input` event); also `setTrackMute(` and `setTrackSolo(` or `setMuted(` and `setSoloed(` called from a control that fires many times per gesture.
 
 **Replace with:**
@@ -4233,6 +4235,8 @@ A slider component that is not an `<input>` (Radix's `Slider`, for one) has no `
 **Packages:** `@waveform-playlist/browser`, `@waveform-playlist/engine`.
 
 A mixer setter called from code is an undo step too, each call one: restoring a saved mix, automation, a value synced from elsewhere. Before, no such call was a step. A change that is not the user's edit takes `{ undoable: false }`: no step, and the value is also written into every undo and redo state, so no undo or redo brings back an older one. With `gesture` as well, `undoable: false` wins.
+
+The snippets pass a track id, as the setters have taken since [the track controls became pieces](#track-controls-are-composed-from-pieces-bound-to-a-track-the-mixer-setters-take-a-track-id); on the last release they took a track index, so make that change first.
 
 **Find:** `setTrackMute(`, `setTrackSolo(`, `setTrackVolume(` and `setTrackPan(` (of `useEditorControls()` or of the arrangement) and `setMuted(`, `setSoloed(`, `setVolume(` and `setPan(` (of `useTrack()`) called from an effect, a timer, a load or restore function, or a subscription, rather than from a control.
 

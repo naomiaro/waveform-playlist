@@ -172,7 +172,7 @@ The `soundFontCache` prop is deliberately NOT a dependency of the engine build e
 - **Release:** `useRecordingSession` (`hooks/useRecordingSession.ts`) calls `setRecordingActive(true, trackId)` in an effect while `isRecording` and `setRecordingActive(false)` in its cleanup (recording end, a change of track, unmount, an `<Activity>` hide; it sets it again on the reveal). The provider also clears it in its own cleanup when a track is still recording, because the arrangement outlives the provider.
 - A call that names the track already recording changes nothing (the arrangement's `setTrackRecording` ignores the same value).
 
-Explicit ends (selection playback via `playbackEndTimeRef`, annotation boundaries) stop regardless of all of the above. Tests: `animationLoopEndOfAudio.test.tsx`, `recordingArmMute.test.tsx`.
+Explicit ends (selection playback via `playbackEndTimeRef`, annotation boundaries) stop regardless of all of the above. Tests: `animationLoopEndOfAudio.test.tsx`, `recordingTakeMute.test.tsx`.
 
 ## Per-Track Things That Are Not Plain Data Go Through a Provider Prop (#752)
 
