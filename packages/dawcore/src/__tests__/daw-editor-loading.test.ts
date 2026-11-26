@@ -709,3 +709,69 @@ describe('review fixes, round 1 fuzz (#917)', () => {
     );
   });
 });
+
+describe('review fixes, round 2 (#917)', () => {
+  it('N1: a <daw-track> removed while the editor is detached removes its track at reconnect', async () => {
+    const editor = await mount(makeFakeAdapter(), MIDI_TRACK.replace('Keys', 'A') + MIDI_TRACK);
+    editor.remove();
+    editor.querySelectorAll('daw-track')[1].remove();
+    document.body.appendChild(editor);
+    editor.adapter = makeFakeAdapter().adapter;
+    await tick(2);
+    expect(names(editor)).toEqual(['A']);
+    expect(editor.tracks.map((t: { name: string }) => t.name)).toEqual(['A']);
+  });
+
+  it('N2: addClip onto a track whose arrival an Undo took out rejects', async () => {
+    const editor = await mount(makeFakeAdapter(), MIDI_TRACK);
+    editor._arrangement.setTrackVolume(editor._arrangement.getTracks()[0].id, 0.5);
+    const id = await editor.addTrack({ name: 'Added', clips: [] });
+    editor._arrangement.undo();
+    stubFetch({ '/a.wav': 'ok' });
+    const outcome = editor.addClip(id, { src: '/a.wav', duration: 1 }).then(
+      () => 'resolved',
+      (err: Error) => err.message
+    );
+    expect(await Promise.race([outcome, tick(10).then(() => 'still pending')])).toMatch(
+      /not in the editor/
+    );
+  });
+
+  it('addClip onto a track waiting for the adapter rejects when that track is removed first', async () => {
+    stubFetch({ '/a.wav': 'ok' });
+    const editor = (await mountEditor({
+      adapter: null,
+      html: MIDI_TRACK.replace('kind="midi"', '').replace('<daw-clip duration="1"></daw-clip>', ''),
+    })) as any;
+    const trackId = editor.tracks[0].trackId;
+    const outcome = editor.addClip(trackId, { src: '/a.wav', duration: 1 }).then(
+      () => 'resolved',
+      (err: Error) => err.message
+    );
+    await tick(2);
+    editor.removeTrack(trackId);
+    expect(await Promise.race([outcome, tick(10).then(() => 'still pending')])).toMatch(
+      /removed before/
+    );
+  });
+
+  it('N3: a rejected addClip leaves no listener on the editor', async () => {
+    const fake = makeFakeAdapter();
+    stubFetch({ '/a.wav': 'ok', '/b.wav': 'ok' });
+    const editor = await mount(fake, audioTrack('A', '/a.wav'));
+    await settle(editor);
+    const trackId = editor._arrangement.getTracks()[0].id;
+    fake.holdDecode('/b.wav');
+    const added = vi.spyOn(editor, 'addEventListener');
+    const removed = vi.spyOn(editor, 'removeEventListener');
+    const outcome = editor.addClip(trackId, { src: '/b.wav', duration: 1 }).catch(() => 'rejected');
+    await vi.waitFor(() => expect(editor._arrangement.getTracks()[0].clips).toHaveLength(2));
+    editor.removeClip(trackId, editor._arrangement.getTracks()[0].clips[1].id);
+    expect(await outcome).toBe('rejected');
+    const types = (spy: typeof added) =>
+      spy.mock.calls
+        .map((c) => c[0])
+        .filter((t) => t === 'daw-clip-ready' || t === 'daw-clip-error');
+    expect(types(removed).sort()).toEqual(types(added).sort());
+  });
+});

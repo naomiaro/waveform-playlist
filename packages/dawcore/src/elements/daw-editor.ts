@@ -80,6 +80,7 @@ import type {
   DawTrackReorderDetail,
   DawTrackReorderGrabDetail,
   DawClipErrorDetail,
+  DawClipIdDetail,
   DawRecordingErrorDetail,
   DawErrorDetail,
   DawTimeFormatChangeDetail,
@@ -491,6 +492,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    */
   private _entryQueue: string[] = [];
   private _entryFlushScheduled = false;
+  /** Clips an `addClip()` is waiting for (settled with daw-clip-error if their track goes first). */
+  private _awaitedClips = new Set<string>();
   /** `<daw-track>` elements `addTrack()` made: every other one is the page's (the history rule). */
   private _editorMadeTracks = new WeakSet<DawTrackElement>();
   /** `.dat` peaks drawn for a clip still loading, by clip id (an editor-only render cache). */
@@ -1236,6 +1239,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       if (orderMayHaveChanged) this._syncEngineOrderToDom();
     });
     this._childObserver.observe(this, { childList: true, subtree: true });
+    // A <daw-track> the page removed while the editor was detached (the
+    // observer was off): its track goes now, as the observer would have done
+    // (#917; `_trackElements` is kept across a disconnect).
+    for (const [trackId, el] of [...this._trackElements]) {
+      if (!this.contains(el)) this._onTrackRemoved(trackId);
+    }
     if (this._externalAdapter && !this._engine) this._buildEngineReporting();
   }
   disconnectedCallback() {
@@ -1448,6 +1457,24 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // Captured before the cleanup below mutates _tracks — gates the outbound
     // event so it only fires for a track that was actually registered.
     const existed = this._tracks.has(trackId);
+    // A track removed before it entered: an addClip() waiting for one of its
+    // clips would never settle (#917).
+    if (this._entryQueue.includes(trackId)) {
+      for (const clip of this._tracks.get(trackId)?.clips ?? []) {
+        if (!clip.clipId || !this._awaitedClips.has(clip.clipId)) continue;
+        this.dispatchEvent(
+          new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
+            bubbles: true,
+            composed: true,
+            detail: {
+              trackId,
+              clipId: clip.clipId,
+              error: new Error('track "' + trackId + '" was removed before it entered'),
+            },
+          })
+        );
+      }
+    }
     this._entryQueue = this._entryQueue.filter((id) => id !== trackId);
     this._settleEntry(trackId, new Error('track "' + trackId + '" was removed before it entered'));
     const arrangementTrack = this._arrangement.getTracks().find((t) => t.id === trackId);
@@ -1973,7 +2000,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // Use loose != null consistently: treats both null and undefined as "not MIDI"
     // for both clipEl.midiNotes (DawClipElement defaults to null) and oldClip.midiNotes.
     // A clip with a src is an audio clip even if notes are set on it, as at
-    // load (_isMidiDescriptor: "treating as audio, notes will be ignored").
+    // load (isMidiDescriptor: "treating as audio, notes will be ignored").
     const isMidiNow = clipEl.midiNotes != null && !clipEl.src;
     const wasMidi = oldClip.midiNotes != null;
     if (isMidiNow && trackKind(t) !== 'midi') {
@@ -2162,8 +2189,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    */
   _flushTrackEntries(): void {
     if (this._entryQueue.length === 0) return;
-    // Without an engine the queue waits, silently (maintainer, #917: play()
-    // throws the no-adapter error).
+    // Without an engine the queue waits, silently (maintainer, #917; play()
+    // without an adapter warns and fires daw-error with the no-adapter error).
     if (!this._engine) return;
     // M1: during a drag the arrangement has the drag's transaction open; an
     // add would join it (an abort would drop the track, a commit merge it
@@ -2748,42 +2775,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return this._ensureEngine();
   }
   /**
-   * Wait for either `readyEvent` or `errorEvent` to fire on this editor for
-   * the entity matching `matchesId`. Listeners are wired synchronously, then
-   * `setup` is called (typical: appendChild). Resolves with `resolveValue`
-   * on ready; rejects with a normalized Error on error. Used by addTrack and
-   * addClip to share their Promise-with-listener-cleanup machinery.
-   */
-  private _awaitId<T>(
-    readyEvent: string,
-    errorEvent: string,
-    matchesId: (detail: { trackId?: string; clipId?: string }) => boolean,
-    resolveValue: T,
-    setup: () => void
-  ): Promise<T> {
-    return new Promise<T>((resolve, reject) => {
-      const onReady = (e: Event) => {
-        if (!matchesId((e as CustomEvent).detail)) return;
-        cleanup();
-        resolve(resolveValue);
-      };
-      const onError = (e: Event) => {
-        const detail = (e as CustomEvent).detail as { error?: unknown };
-        if (!matchesId((e as CustomEvent).detail)) return;
-        cleanup();
-        const err = detail.error;
-        reject(err instanceof Error ? err : new Error(String(err)));
-      };
-      const cleanup = () => {
-        this.removeEventListener(readyEvent, onReady);
-        this.removeEventListener(errorEvent, onError);
-      };
-      this.addEventListener(readyEvent, onReady);
-      this.addEventListener(errorEvent, onError);
-      setup();
-    });
-  }
-  /**
    * Append a `<daw-track>` element built from `config` and resolve with its
    * track id once the track has entered the arrangement (#848), before its
    * audio has loaded. To follow loading, add the `daw-track-ready` /
@@ -2961,40 +2952,54 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         )
       );
     }
+    // A track an Undo took out (it has an element but is neither in the
+    // arrangement nor waiting to enter) would never take the clip (#917).
+    if (!this._isEntered(trackId) && !this._entryQueue.includes(trackId)) {
+      return Promise.reject(
+        new Error('addClip: track "' + trackId + '" is not in the editor (an Undo took it out)')
+      );
+    }
     const clipEl = this._buildClipElement(config);
-    const settled = this._awaitId(
-      'daw-clip-ready',
-      'daw-clip-error',
-      (d) => d.clipId === clipEl.clipId,
-      clipEl.clipId,
-      () => trackEl.appendChild(clipEl)
-    );
-    // A clip that leaves the arrangement before its audio loads (a removal,
-    // an Undo, its track removed) is never announced: once it has been in
-    // the arrangement and is gone, reject (#917).
+    const clipId = clipEl.clipId;
+    // Settled by daw-clip-ready / daw-clip-error for this clip; and, since a
+    // clip that leaves the arrangement before its audio loads (a removal, an
+    // Undo, its track removed) is never announced, rejected once it has been
+    // in the arrangement and is gone (#917). Every way out removes all three
+    // listeners.
     return new Promise<string>((resolve, reject) => {
       let seen = false;
+      const onReady = (e: Event) => {
+        if ((e as CustomEvent<DawClipIdDetail>).detail.clipId !== clipId) return;
+        cleanup();
+        resolve(clipId);
+      };
+      const onError = (e: Event) => {
+        const detail = (e as CustomEvent<DawClipErrorDetail>).detail;
+        if (detail.clipId !== clipId) return;
+        cleanup();
+        reject(detail.error instanceof Error ? detail.error : new Error(String(detail.error)));
+      };
       const stopWatching = this._arrangement.subscribe(() => {
         const present = this._arrangement
           .getTracks()
-          .some((t) => t.clips.some((c) => c.id === clipEl.clipId));
+          .some((t) => t.clips.some((c) => c.id === clipId));
         if (present) {
           seen = true;
         } else if (seen) {
-          stopWatching();
-          reject(new Error('clip "' + clipEl.clipId + '" was removed before its audio loaded'));
+          cleanup();
+          reject(new Error('clip "' + clipId + '" was removed before its audio loaded'));
         }
       });
-      settled.then(
-        (clipId) => {
-          stopWatching();
-          resolve(clipId);
-        },
-        (err) => {
-          stopWatching();
-          reject(err);
-        }
-      );
+      const cleanup = () => {
+        this.removeEventListener('daw-clip-ready', onReady);
+        this.removeEventListener('daw-clip-error', onError);
+        stopWatching();
+        this._awaitedClips.delete(clipId);
+      };
+      this.addEventListener('daw-clip-ready', onReady);
+      this.addEventListener('daw-clip-error', onError);
+      this._awaitedClips.add(clipId);
+      trackEl.appendChild(clipEl);
     });
   }
   /**

@@ -1576,7 +1576,7 @@ The editor's `daw-track-connected` handler reads all `<daw-clip>` children synch
 For consumers who can't or won't go through declarative DOM (Vue/Svelte/Angular templates, MIDI sources without a `src` URL, dynamic clip generation):
 
 ```typescript
-editor.addTrack(config: TrackConfig): Promise<string>         
+editor.addTrack(config: TrackConfig): Promise<string>
 editor.removeTrack(trackId: string): void
 editor.updateTrack(trackId: string, partial: Partial<TrackConfig>): void
 editor.addClip(trackId: string, config: ClipConfig): Promise<string>      // returns clipId
