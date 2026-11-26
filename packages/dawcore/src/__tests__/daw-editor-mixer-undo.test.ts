@@ -319,6 +319,65 @@ describe('<daw-editor> track updates and undo steps (#843)', () => {
     expect(engine.canUndo).toBe(false);
   });
 
+  // The element already holds the value an Undo took back, so setting its
+  // property fires no Lit update: updateTrack writes the mix itself.
+  it('editor.updateTrack applies a value again after an undo took it back, with an element', async () => {
+    const { editor } = await makeEditor();
+    const trackEl = await editor.addTrack(midiTrackConfig('A', 1));
+    const id: string = trackEl.trackId;
+    const engine = editor.engine;
+
+    editor.updateTrack(id, { volume: 0.5 });
+    await trackEl.updateComplete;
+    expect(volumeOf(editor, id)).toBe(0.5);
+    engine.undo();
+    expect(volumeOf(editor, id)).toBe(1);
+
+    editor.updateTrack(id, { volume: 0.5 });
+    await trackEl.updateComplete;
+    expect(volumeOf(editor, id)).toBe(0.5);
+
+    engine.undo();
+    expect(volumeOf(editor, id)).toBe(1);
+    expect(engine.canUndo).toBe(false);
+  });
+
+  it('editor.updateTrack applies a mute again after an undo took it back, with an element', async () => {
+    const { editor } = await makeEditor();
+    const trackEl = await editor.addTrack(midiTrackConfig('A'));
+    const id: string = trackEl.trackId;
+    const engine = editor.engine;
+    const mutedOf = () => engine.getState().tracks.find((t: any) => t.id === id).muted;
+
+    editor.updateTrack(id, { muted: true });
+    await trackEl.updateComplete;
+    engine.undo();
+    expect(mutedOf()).toBe(false);
+
+    editor.updateTrack(id, { muted: true });
+    await trackEl.updateComplete;
+    expect(mutedOf()).toBe(true);
+    engine.undo();
+    expect(engine.canUndo).toBe(false);
+  });
+
+  it("editor.updateTrack to the element's value after a control drag applies it", async () => {
+    const { editor } = await makeEditor();
+    const trackEl = await editor.addTrack(midiTrackConfig('A', 1));
+    const id: string = trackEl.trackId;
+    const engine = editor.engine;
+
+    moveControl(editor, id, 'volume', 0.3);
+    expect(volumeOf(editor, id)).toBe(0.3);
+
+    editor.updateTrack(id, { volume: 1 }); // the element still says 1
+    await trackEl.updateComplete;
+    expect(volumeOf(editor, id)).toBe(1);
+
+    engine.undo();
+    expect(volumeOf(editor, id)).toBe(0.3);
+  });
+
   it('editor.updateTrack(id, { volume, pan }) is one step, without an element', async () => {
     const { editor } = await makeEditor();
     const trackEl = await editor.addTrack(midiTrackConfig('A', 0.8));

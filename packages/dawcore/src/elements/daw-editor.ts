@@ -3009,19 +3009,25 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   };
 
   /**
-   * Update reflected attributes on a track. For DOM-element tracks the changes
-   * are written to the `<daw-track>` element (which fires one
-   * `daw-track-update`); for tracks without a DOM element (file drops) the
-   * descriptor is updated in place and the mix goes to the engine. Either
-   * way, the mixer fields of one call are one undo step (#843); while the
-   * track is loading they change the values it will enter with, which is not
-   * a step.
+   * Update reflected attributes on a track. The mixer fields go to their
+   * owner as one undo step (#843): the engine, or while the track is loading
+   * the values it will enter with (not a step). For DOM-element tracks the
+   * changes are also written to the `<daw-track>` element; for tracks
+   * without a DOM element (file drops) the descriptor is updated in place.
    */
   updateTrack(trackId: string, partial: Partial<TrackConfig>): void {
+    const mix: Partial<TrackMixerValues> = {
+      volume: partial.volume,
+      pan: partial.pan,
+      muted: partial.muted,
+      soloed: partial.soloed,
+    };
     const trackEl = this._trackElements.get(trackId);
     if (trackEl) {
-      // Mutating reflected props triggers daw-track-update which propagates
-      // to engine via _onTrackUpdate.
+      // Written directly as well: an element that already holds a value (the
+      // one an Undo took back) fires no update for it. The update the
+      // element does fire sends the same values, which changes nothing.
+      this._writeMixFields(trackId, mix);
       if (partial.name !== undefined) trackEl.setAttribute('name', partial.name);
       if (partial.volume !== undefined) trackEl.volume = partial.volume;
       if (partial.pan !== undefined) trackEl.pan = partial.pan;
@@ -3055,14 +3061,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       }),
     };
     this._tracks = new Map(this._tracks).set(trackId, newDesc);
-    // The mix goes to its owner as one step: the seed while loading, else
-    // the engine.
-    this._writeMixFields(trackId, {
-      volume: partial.volume,
-      pan: partial.pan,
-      muted: partial.muted,
-      soloed: partial.soloed,
-    });
+    this._writeMixFields(trackId, mix);
   }
   /**
    * Append a clip to an existing track. Builds a `<daw-clip>` from `config`
