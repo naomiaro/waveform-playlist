@@ -27,14 +27,18 @@ test.describe('dawcore track kinds', () => {
   test('addTrack({ midi }) makes a kind="midi" track drawn as a piano roll', async ({ page }) => {
     const result = await page.evaluate(async (notes) => {
       const editor = document.getElementById('editor') as any;
-      const track = await editor.addTrack({ name: 'Keys', midi: { notes } });
+      // addTrack resolves with the track id once it has entered (#848).
+      const trackId = await editor.addTrack({ name: 'Keys', midi: { notes } });
       await editor.updateComplete;
-      const entry = editor.tracks.find((t: any) => t.trackId === track.trackId);
+      const track = [...editor.querySelectorAll('daw-track')].find(
+        (el: any) => el.trackId === trackId
+      ) as HTMLElement;
+      const entry = editor.tracks.find((t: any) => t.trackId === trackId);
       return {
         attribute: track.getAttribute('kind'),
         kind: entry.kind,
         renderMode: entry.renderMode,
-        engineKind: editor.engine.getState().tracks.find((t: any) => t.id === track.trackId).kind,
+        engineKind: editor.engine.getState().tracks.find((t: any) => t.id === trackId).kind,
       };
     }, NOTES);
 
@@ -54,20 +58,19 @@ test.describe('dawcore track kinds', () => {
       editor.addEventListener('daw-clip-error', (e: CustomEvent) =>
         clipErrors.push(String(e.detail.error?.message ?? e.detail.error))
       );
-      let rejected = false;
-      try {
-        await editor.addTrack({
-          name: 'Lead',
-          renderMode: 'piano-roll',
-          clips: [{ midiNotes: notes }],
-        });
-      } catch {
-        rejected = true;
-      }
+      const trackErrors: string[] = [];
+      editor.addEventListener('daw-track-error', (e: CustomEvent) =>
+        trackErrors.push(e.detail.trackId)
+      );
+      // The track enters with no clip and stays, like a broken <img> (#848).
+      const trackId = await editor.addTrack({
+        name: 'Lead',
+        renderMode: 'piano-roll',
+        clips: [{ midiNotes: notes }],
+      });
       return {
-        rejected,
+        trackErrors: trackErrors.filter((id) => id === trackId).length,
         clipErrors,
-        // No track loaded, so the engine may not have been built at all.
         engineClips: (editor.engine?.getState().tracks ?? []).reduce(
           (n: number, t: any) => n + t.clips.length,
           0
@@ -75,7 +78,7 @@ test.describe('dawcore track kinds', () => {
       };
     }, NOTES);
 
-    expect(result.rejected).toBe(true);
+    expect(result.trackErrors).toBe(1);
     expect(result.clipErrors).toHaveLength(1);
     expect(result.clipErrors[0]).toContain('kind="midi"');
     expect(result.engineClips).toBe(0);
@@ -90,14 +93,14 @@ test.describe('dawcore track kinds', () => {
 
     const result = await page.evaluate(async (notes) => {
       const editor = document.getElementById('editor') as any;
-      const track = await editor.addTrack({ name: 'Keys', midi: { notes } });
+      const trackId = await editor.addTrack({ name: 'Keys', midi: { notes } });
       let message = 'resolved';
       try {
-        await editor.addClip(track.trackId, { src: '/media/audio/refused-take.opus' });
+        await editor.addClip(trackId, { src: '/media/audio/refused-take.opus' });
       } catch (err) {
         message = String((err as Error)?.message ?? err);
       }
-      const engineTrack = editor.engine.getState().tracks.find((t: any) => t.id === track.trackId);
+      const engineTrack = editor.engine.getState().tracks.find((t: any) => t.id === trackId);
       return { message, clipCount: engineTrack.clips.length };
     }, NOTES);
 
