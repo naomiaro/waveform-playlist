@@ -190,11 +190,16 @@ export const SmartScale: FunctionComponent<SmartScaleProps> = ({
     const { marker, bigStep, smallStep } = config;
     const canvasInfo = new Map<number, number>();
     const labels: TickLabel[] = [];
-    const pixPerSec = sampleRate / samplesPerPixel;
 
-    let counter = 0;
-    for (let i = 0; i < widthX; i += (pixPerSec * smallStep) / 1000) {
-      const pix = Math.floor(i);
+    // Each tick's pixel comes from its own time, in one division of integers
+    // (#722): the floor of samples / samplesPerPixel, as for a clip at that
+    // time. Adding a fractional pixel step per tick accumulated rounding error,
+    // and `(counter / 1000) * pixPerSec` rounds twice; both put ticks one pixel
+    // early at common zooms (48000 Hz, 1000 samples per pixel: 0:02 at 95).
+    for (let counter = 0; ; counter += smallStep) {
+      const pix = Math.floor((counter * sampleRate) / (1000 * samplesPerPixel));
+      // Written as `!(<)` so a NaN width or pixel ends the loop too.
+      if (!(pix < widthX)) break;
 
       if (counter % marker === 0) {
         labels.push({
@@ -209,8 +214,6 @@ export const SmartScale: FunctionComponent<SmartScaleProps> = ({
       } else if (counter % smallStep === 0) {
         canvasInfo.set(pix, Math.floor(timeScaleHeight / 5));
       }
-
-      counter += smallStep;
     }
 
     return { widthX, canvasInfo, labels };

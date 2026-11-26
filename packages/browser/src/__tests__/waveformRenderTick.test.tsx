@@ -121,13 +121,11 @@ describe('<WaveformTimescale> label callbacks', () => {
     expect(calls.has('1:00')).toBe(true);
     expect(calls.has('2:20')).toBe(true);
 
-    // The label parses to the real time, and the pixel position agrees with it.
-    // Exact only because 48000 / 4096 makes SmartScale's accumulated step a
-    // dyadic fraction; other sample rates or zoom levels can be a pixel off.
-    const pixelsPerSecond = SAMPLE_RATE / SAMPLES_PER_PIXEL;
+    // The label parses to the real time, and the pixel position agrees with it:
+    // the floor of the time's samples / samplesPerPixel (#722).
     for (const [label, pixelPosition] of calls) {
       const ms = labelToMs(label);
-      expect(pixelPosition).toBe(Math.floor((ms / 1000) * pixelsPerSecond));
+      expect(pixelPosition).toBe(Math.floor((ms * SAMPLE_RATE) / (1000 * SAMPLES_PER_PIXEL)));
     }
     expect(labelToMs('1:00')).toBe(60000);
     expect(labelToMs('2:20')).toBe(140000);
