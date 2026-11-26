@@ -186,6 +186,14 @@ export function keyBelongsToFocusedControl(event: KeyboardEvent): boolean {
 }
 
 /**
+ * Events whose default a shortcut prevented (here, in `handleKeyboardEvent`).
+ * An Escape prevented by anything else (dnd-kit's pointer sensor and
+ * `<daw-editor>` prevent it when they cancel a drag) is not a shortcut; one a
+ * shortcut list prevented still reaches the next list (#848, review of #915).
+ */
+const preventedByShortcut = new WeakSet<Event>();
+
+/**
  * Handle a keyboard event against a list of shortcuts.
  * Pure function, no framework dependency.
  *
@@ -194,14 +202,6 @@ export function keyBelongsToFocusedControl(event: KeyboardEvent): boolean {
  * other than a shortcut already prevented (a drag cancelled it): an Escape that
  * cancelled a drag does nothing else.
  */
-/**
- * Events whose default a shortcut prevented (here, in `handleKeyboardEvent`).
- * An Escape prevented by anything else (dnd-kit's pointer sensor and
- * `<daw-editor>` prevent it when they cancel a drag) is not a shortcut; one a
- * shortcut list prevented still reaches the next list (#848, review of #915).
- */
-const preventedByShortcut = new WeakSet<Event>();
-
 export function handleKeyboardEvent(
   event: KeyboardEvent,
   shortcuts: KeyboardShortcut[],
