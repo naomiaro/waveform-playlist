@@ -1615,15 +1615,20 @@ loadMidi(source: string | File, options?: MidiLoadOptions): Promise<MidiLoadResu
 
 interface MidiLoadOptions {
   startTime?: number;                          // Timeline position in seconds applied to every created clip (default 0). Throws RangeError on NaN/negative.
-  signal?: AbortSignal;                        // Forwarded to fetch() only. Aborts during the addTrack phase are a no-op.
+  signal?: AbortSignal;                        // Cancels the fetch, the parse and the addTrack waits (a swap of editor.arrangement aborts too); rejects with its reason, the tracks added are taken out, no undo step
 }
 
 interface MidiLoadResult {
-  readonly trackIds: readonly string[];        // IDs of created <daw-track> elements, in MIDI track order
+  readonly trackIds: readonly string[];        // IDs of the tracks added (no <daw-track> element, #848), in MIDI track order
   readonly bpm: number;                        // Tempo from MIDI header (defaults 120)
   readonly timeSignature: readonly [number, number]; // Defaults [4, 4]
   readonly duration: number;                   // Max across tracks; 0 for empty files
   readonly name: string;                       // Song name; empty string when not set
+}
+
+// addTrack(config, options?), addClip(trackId, config, options?) and loadFiles(files, options?) take:
+interface EditorCallOptions {
+  signal?: AbortSignal;                        // Cancels the call: rejects with its reason; what it added is taken out, no undo step
 }
 ```
 
@@ -3108,10 +3113,13 @@ export type { SpectrogramIntegration } from '@waveform-playlist/browser';
 
 ```typescript
 // Waveform data (BBC audiowaveform)
-loadWaveformData(src: string): Promise<WaveformData>;
-waveformDataToPeaks(data: WaveformData, samplesPerPixel: number): PeakData;
-loadPeaksFromWaveformData(src: string, samplesPerPixel: number): Promise<PeakData>;
-getWaveformDataMetadata(data: WaveformData): { sampleRate: number; duration: number; channels: number };
+interface WaveformDataLoadOptions {
+  signal?: AbortSignal;                        // aborts the fetch; rejects with its reason, as fetch() does
+}
+loadWaveformData(src: string, options?: WaveformDataLoadOptions): Promise<WaveformData>;
+waveformDataToPeaks(waveformData: WaveformData, channelIndex?: number): { data: Int8Array | Int16Array; bits: 8 | 16; length: number; sampleRate: number };
+loadPeaksFromWaveformData(src: string, channelIndex?: number, options?: WaveformDataLoadOptions): Promise<{ data: Int8Array | Int16Array; bits: 8 | 16; length: number; sampleRate: number }>;
+getWaveformDataMetadata(src: string, options?: WaveformDataLoadOptions): Promise<{ sampleRate: number; channels: number; duration: number; samplesPerPixel: number; length: number; bits: 8 | 16 }>;
 
 // Effects (from `@waveform-playlist/browser/tone`; built-in Tone.js effects only)
 effectDefinitions: EffectDefinition[];

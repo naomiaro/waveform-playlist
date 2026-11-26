@@ -196,3 +196,4 @@ export {
   loadPeaksFromWaveformData,
   getWaveformDataMetadata,
 } from './waveformDataLoader';
+export type { WaveformDataLoadOptions } from './waveformDataLoader';

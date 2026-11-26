@@ -24,6 +24,7 @@ import type {
   DomClipDescriptor,
   DropClipDescriptor,
   TrackConfig,
+  EditorCallOptions,
   ClipConfig,
 } from '../types';
 import { isDomClip, normalizeRenderMode, trackDescriptorRenderMode } from '../types';
@@ -116,6 +117,7 @@ import { clipSeconds, loadedTrack, mixOf } from '../interactions/arrangement-vie
 import { normalizeHandedIn, swapArrangement } from '../interactions/arrangement-swap';
 import { clipDragChanged, trackDragChanged } from '../interactions/drag-watch';
 import { moveClipToTrack, trackHoldingClip } from '../interactions/clip-rehome';
+import { abortError, isAbortError, PlaySignals, reasonOf } from '../interactions/abort';
 import {
   refreshLinkStates,
   detachedWarning,
@@ -619,9 +621,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   }
   /** @internal */
   _playArrangement(next: Arrangement | null): void {
-    // A loadFiles() waiting for a track of the arrangement played until now
-    // would wait for a swap back: it ends as loaded, as at a disconnect.
-    for (const end of [...this._loadWaitEnds]) end();
+    // The waits on the arrangement played until now end (D2): an addClip()
+    // rejects, a loadFiles() wait ends as loaded, a peaks fetch is aborted.
+    this._playSignals.swappedOut(
+      this._arrangement,
+      abortError('the arrangement was swapped out (editor.arrangement) before it finished')
+    );
     this._handedIn = next;
     // A new load cycle: every track of the arrangement now played is announced.
     this._announcer = new LoadAnnouncer((event) => this.dispatchEvent(event));
@@ -1621,6 +1626,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   // --- Lifecycle ---
   connectedCallback() {
     super.connectedCallback();
+    if (this._connection.signal.aborted) this._connection = new AbortController();
     // Follow the arrangement played again (a disconnect let it go, #848),
     // and show what changed meanwhile (an Undo made while out of the page).
     this._follow(this._arrangement);
@@ -1764,7 +1770,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // engine). A dropped file whose track has entered is kept and counts as
     // loaded: it loads after a reparent, like the page's tracks (maintainer,
     // #917). One not entered yet is not added.
-    for (const end of [...this._loadWaitEnds]) end();
+    this._connection.abort(abortError('<daw-editor> was disconnected'));
     for (const trackId of this._entryQueue) {
       const pending = this._pending.get(trackId);
       if (!pending || 'element' in pending || !this._entryWaiters.has(trackId)) continue;
@@ -2428,6 +2434,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       );
       return null;
     } catch (err) {
+      if (isAbortError(err)) return null; // a swap: nothing failed
       console.warn(
         '[dawcore] Failed to load peaks from ' +
           peaksSrc +
@@ -2614,7 +2621,39 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }));
   }
   /** Remove a clip (loaded or still loading) from a track of the arrangement: an undo step. */
-  private _removeClipFromTrack(trackId: string, clipId: string) {
+  /**
+   * An aborted addClip (D3): its clip leaves for good, from the track it
+   * entered or from what a waiting track will enter with.
+   */
+  private _discardAddedClip(trackId: string, clipId: string): void {
+    const pending = this._pending.get(trackId);
+    if (pending) {
+      this._pending = new Map(this._pending).set(
+        trackId,
+        'element' in pending
+          ? { ...pending, extraClips: pending.extraClips.filter((c) => c.clipId !== clipId) }
+          : {
+              ...pending,
+              descriptor: {
+                ...pending.descriptor,
+                clips: pending.descriptor.clips.filter((c) => c.clipId !== clipId),
+              },
+            }
+      );
+      return;
+    }
+    const holder = this._arrangementOf(trackId)
+      .getTracks()
+      .find((t) => t.id === trackId);
+    if (holder?.clips.some((c) => c.id === clipId)) {
+      this._removeClipFromTrack(trackId, clipId, { undoable: false });
+    }
+  }
+  private _removeClipFromTrack(
+    trackId: string,
+    clipId: string,
+    options: { undoable?: boolean } = {}
+  ) {
     const arrangement = this._arrangementOf(trackId);
     const track = arrangement.getTracks().find((t) => t.id === trackId);
     if (!track) {
@@ -2636,10 +2675,14 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
     this._forgetClip(trackId, clipId);
     const wasLoading = track.clips.some((c) => c.id === clipId && isLoadingClip(c));
-    arrangement.updateTrack(trackId, (current) => ({
-      ...current,
-      clips: current.clips.filter((c) => c.id !== clipId),
-    }));
+    // `undoable: false`: out of every undo and redo state too (an aborted
+    // addClip leaves nothing behind, D3).
+    if (options.undoable === false) arrangement.removeClip(trackId, clipId, { undoable: false });
+    else
+      arrangement.updateTrack(trackId, (current) => ({
+        ...current,
+        clips: current.clips.filter((c) => c.id !== clipId),
+      }));
     // Its load will never be announced (an addClip() waiting for it watches
     // the arrangement and rejects).
     if (wasLoading) this._announcer.forgetClip(clipId);
@@ -3014,8 +3057,18 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._arrangement.removeTrack(trackId, { undoable: false });
     this._onTrackRemoved(trackId);
   }
-  /** Ends the waits of `_whenTrackLoaded` (as loaded) when the editor is disconnected. */
-  private _loadWaitEnds = new Set<() => void>();
+  /** One AbortController per arrangement while it is played (D2, interactions/abort.ts). */
+  private _playSignals = new PlaySignals();
+  /** The signal of the arrangement played now: aborted when it is swapped out. */
+  private get _playSignal(): AbortSignal {
+    return this._playSignals.signalOf(this._arrangement);
+  }
+  /** @internal A caller's signal combined with the arrangement played now (loadMidi, D6). */
+  _operationSignal(signal?: AbortSignal): AbortSignal {
+    return signal ? AbortSignal.any([signal, this._playSignal]) : this._playSignal;
+  }
+  /** One AbortController per connection: aborted in disconnectedCallback (D8). */
+  private _connection = new AbortController();
   /**
    * Resolves once the track has loaded (`daw-track-ready`), or when the
    * editor is disconnected meanwhile (the track is kept and loads after a
@@ -3025,30 +3078,33 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const state = this._announcer.stateOf(trackId);
     if (state === 'ready') return Promise.resolve();
     if (state === 'failed') return Promise.reject(this._announcer.errorOf(trackId));
+    // Ends as loaded when the arrangement is swapped out or the editor is
+    // disconnected meanwhile (the track is kept and loads after a reparent).
+    const ended = AbortSignal.any([this._playSignal, this._connection.signal]);
+    if (ended.aborted) return Promise.resolve();
     return new Promise<void>((resolve, reject) => {
-      const cleanup = () => {
-        this.removeEventListener('daw-track-ready', onReady);
-        this.removeEventListener('daw-track-error', onError);
-        this._loadWaitEnds.delete(end);
-      };
-      const onReady = (e: Event) => {
-        if ((e as CustomEvent<DawTrackIdDetail>).detail.trackId !== trackId) return;
-        cleanup();
-        resolve();
-      };
-      const onError = (e: Event) => {
-        const detail = (e as CustomEvent<DawTrackErrorDetail>).detail;
-        if (detail.trackId !== trackId) return;
-        cleanup();
-        reject(detail.error instanceof Error ? detail.error : new Error(String(detail.error)));
-      };
-      const end = () => {
-        cleanup();
-        resolve();
-      };
-      this.addEventListener('daw-track-ready', onReady);
-      this.addEventListener('daw-track-error', onError);
-      this._loadWaitEnds.add(end);
+      const done = new AbortController();
+      const signal = AbortSignal.any([ended, done.signal]);
+      this.addEventListener(
+        'daw-track-ready',
+        (e: Event) => {
+          if ((e as CustomEvent<DawTrackIdDetail>).detail.trackId !== trackId) return;
+          done.abort();
+          resolve();
+        },
+        { signal }
+      );
+      this.addEventListener(
+        'daw-track-error',
+        (e: Event) => {
+          const detail = (e as CustomEvent<DawTrackErrorDetail>).detail;
+          if (detail.trackId !== trackId) return;
+          done.abort();
+          reject(detail.error instanceof Error ? detail.error : new Error(String(detail.error)));
+        },
+        { signal }
+      );
+      ended.addEventListener('abort', () => resolve(), { signal: done.signal });
     });
   }
   /**
@@ -3074,7 +3130,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   private _fetchPeaks(src: string): Promise<import('waveform-data').default> {
     const cached = this._peaksCache.get(src);
     if (cached) return cached;
-    const promise = loadWaveformDataFromUrl(src).catch((err) => {
+    // The fetch belongs to the arrangement played now: a swap aborts it (D2),
+    // and an aborted one is dropped from the cache so a later request fetches again.
+    const promise = loadWaveformDataFromUrl(src, this._playSignal).catch((err) => {
       this._peaksCache.delete(src);
       throw err;
     });
@@ -3339,8 +3397,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       );
     }
   };
-  async loadFiles(files: FileList | File[]): Promise<LoadFilesResult> {
-    return loadFilesImpl(this, files);
+  async loadFiles(
+    files: FileList | File[],
+    options: EditorCallOptions = {}
+  ): Promise<LoadFilesResult> {
+    return loadFilesImpl(this, files, options);
   }
   /**
    * Imperatively load a `.mid` file (URL or File) and add N tracks (no
@@ -3377,8 +3438,15 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * resolves. Without `editor.adapter` it waits for one. Rejects when the
    * arrangement refuses the track, when it is removed before it enters, or
    * when the engine cannot be built.
+   *
+   * `options.signal` (#848): aborting it before the track has entered takes
+   * it out of the queue (it never enters) and rejects with its `reason`;
+   * after that it changes nothing (the audio goes on loading). A signal
+   * already aborted rejects at once and queues nothing.
    */
-  addTrack(config: TrackConfig = {}): Promise<string> {
+  addTrack(config: TrackConfig = {}, options: EditorCallOptions = {}): Promise<string> {
+    const signal = options.signal;
+    if (signal?.aborted) return Promise.reject(reasonOf(signal));
     const trackId = crypto.randomUUID();
     let kind: TrackKind = config.kind ?? (config.midi ? 'midi' : 'audio');
     if (kind !== 'audio' && kind !== 'midi') {
@@ -3421,7 +3489,22 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._pending = new Map(this._pending).set(trackId, { descriptor, mix });
     const entered = this._waitForEntry(trackId);
     this._queueEntry(trackId);
-    return entered;
+    if (!signal) return entered;
+    const settled = new AbortController();
+    signal.addEventListener('abort', () => this._abortEntry(trackId, reasonOf(signal)), {
+      signal: settled.signal,
+    });
+    return entered.finally(() => settled.abort());
+  }
+  /** A track that has not entered leaves the queue and its wait rejects with `reason` (D4). */
+  private _abortEntry(trackId: string, reason: Error): void {
+    if (!this._pending.has(trackId) || this._isEntered(trackId)) return;
+    // Out of what is waiting; its id left in the queue enters nothing.
+    const nextPending = new Map(this._pending);
+    nextPending.delete(trackId);
+    this._pending = nextPending;
+    this._settleEntry(trackId, reason);
+    this.requestUpdate();
   }
   /**
    * Remove a track by id: its `<daw-track>` element is removed (the
@@ -3570,8 +3653,16 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * is refused (its kind), or leaves the arrangement before it loads (a
    * removal, an Undo). A clip added while the editor is detached loads once
    * a fresh adapter is set.
+   *
+   * `options.signal` (#848): aborting it before the clip has loaded rejects
+   * with its `reason` and removes the clip for good (no undo step); after it
+   * has loaded it changes nothing. A signal already aborted rejects at once
+   * and adds nothing. A swap of `editor.arrangement` rejects the call with an
+   * `AbortError`; its loading clip stays in the arrangement swapped out.
    */
-  addClip(trackId: string, config: ClipConfig): Promise<string> {
+  addClip(trackId: string, config: ClipConfig, options: EditorCallOptions = {}): Promise<string> {
+    const callerSignal = options.signal;
+    if (callerSignal?.aborted) return Promise.reject(reasonOf(callerSignal));
     if (!config.src) {
       return Promise.reject(
         new Error(
@@ -3600,17 +3691,31 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // listeners.
     return new Promise<string>((resolve, reject) => {
       let seen = false;
-      const onReady = (e: Event) => {
-        if ((e as CustomEvent<DawClipIdDetail>).detail.clipId !== clipId) return;
-        cleanup();
-        resolve(clipId);
+      // One controller for this call: its abort removes every listener.
+      const call = new AbortController();
+      const cleanup = () => {
+        call.abort();
+        this._awaitedClips.delete(clipId);
       };
-      const onError = (e: Event) => {
-        const detail = (e as CustomEvent<DawClipErrorDetail>).detail;
-        if (detail.clipId !== clipId) return;
-        cleanup();
-        reject(detail.error instanceof Error ? detail.error : new Error(String(detail.error)));
-      };
+      this.addEventListener(
+        'daw-clip-ready',
+        (e: Event) => {
+          if ((e as CustomEvent<DawClipIdDetail>).detail.clipId !== clipId) return;
+          cleanup();
+          resolve(clipId);
+        },
+        { signal: call.signal }
+      );
+      this.addEventListener(
+        'daw-clip-error',
+        (e: Event) => {
+          const detail = (e as CustomEvent<DawClipErrorDetail>).detail;
+          if (detail.clipId !== clipId) return;
+          cleanup();
+          reject(detail.error instanceof Error ? detail.error : new Error(String(detail.error)));
+        },
+        { signal: call.signal }
+      );
       // One arrangement, the one the clip goes into, subscribed to and read.
       const watched =
         pending && 'element' in pending && !this._isEntered(trackId)
@@ -3625,14 +3730,26 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           reject(new Error('clip "' + clipId + '" was removed before its audio loaded'));
         }
       });
-      const cleanup = () => {
-        this.removeEventListener('daw-clip-ready', onReady);
-        this.removeEventListener('daw-clip-error', onError);
-        stopWatching();
-        this._awaitedClips.delete(clipId);
-      };
-      this.addEventListener('daw-clip-ready', onReady);
-      this.addEventListener('daw-clip-error', onError);
+      call.signal.addEventListener('abort', stopWatching);
+      // That arrangement swapped out (D2): the call ends; the clip stays there.
+      this._playSignals.signalOf(watched).addEventListener(
+        'abort',
+        (e) => {
+          cleanup();
+          reject(reasonOf(e.target as AbortSignal));
+        },
+        { signal: call.signal }
+      );
+      // The caller's abort (D3): the clip goes for good, and the call rejects.
+      callerSignal?.addEventListener(
+        'abort',
+        () => {
+          cleanup();
+          this._discardAddedClip(trackId, clipId);
+          reject(reasonOf(callerSignal));
+        },
+        { signal: call.signal }
+      );
       this._awaitedClips.set(clipId, {
         trackId,
         reject: (error) => {

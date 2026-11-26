@@ -5,10 +5,14 @@
 import WaveformData from 'waveform-data';
 
 /**
- * Fetch and parse a waveform data file (.dat binary or .json).
+ * Fetch and parse a waveform data file (.dat binary or .json). An aborted
+ * `signal` rejects with its reason (an `AbortError`), as `fetch()` does.
  */
-export async function loadWaveformDataFromUrl(src: string): Promise<WaveformData> {
-  const response = await fetch(src);
+export async function loadWaveformDataFromUrl(
+  src: string,
+  signal?: AbortSignal
+): Promise<WaveformData> {
+  const response = await fetch(src, signal ? { signal } : undefined);
 
   if (!response.ok) {
     throw new Error('[dawcore] Failed to fetch peaks data: ' + response.statusText);

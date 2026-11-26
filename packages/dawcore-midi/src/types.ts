@@ -8,12 +8,12 @@ export interface MidiLoadOptions {
    */
   startTime?: number;
   /**
-   * AbortSignal forwarded to `fetch()` when the source is a URL.
-   *
-   * Scope is **fetch-only**: aborting after parsing has finished does NOT
-   * cancel the in-flight `addTrack` calls (a documented v1 limitation —
-   * `addTrack` itself doesn't yet accept a signal). For a URL source,
-   * pre-parse abort propagates as a `DOMException` named `AbortError`.
+   * Cancels the call: the fetch of a URL source, the parse, and the
+   * `addTrack` waits of the tracks it adds (`<daw-editor>` combines it with
+   * the arrangement it plays, so a swap of `editor.arrangement` aborts too).
+   * The call rejects with the signal's `reason` (a `DOMException` named
+   * `AbortError` by default), and the tracks it added are taken out for
+   * good, with no undo step.
    */
   signal?: AbortSignal;
 }

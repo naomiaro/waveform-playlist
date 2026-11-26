@@ -232,7 +232,7 @@ Here the MIDI tracks may arrive after the playlist's first ready (which waits fo
 
 ## Web Components
 
-For consumers of `<daw-editor>` (the dawcore Web Components layer), call `editor.loadMidi(source, options)`. This creates one `<daw-track>` element per note-bearing MIDI track, each a MIDI track (`kind="midi"`), drawn as a piano roll.
+For consumers of `<daw-editor>` (the dawcore Web Components layer), call `editor.loadMidi(source, options)`. This adds one track per note-bearing MIDI track (no `<daw-track>` element since #848), each a MIDI track (`kind: 'midi'`), drawn as a piano roll.
 
 ### Installation
 
@@ -299,7 +299,7 @@ interface MidiLoadResult {
 
 ### Cleanup-on-Failure
 
-If any per-track creation fails, every track the call added is removed (`addTrack` creates no `<daw-track>` element since #848; a track whose `addTrack` rejected never entered). No orphan tracks are left on partial failure. Each removal is an undo step, so the undo history is not rewound to before the call.
+If any per-track creation fails, every track the call added is removed (`addTrack` creates no `<daw-track>` element since #848; a track whose `addTrack` rejected never entered). No orphan tracks are left on partial failure. The removals make no undo step, so the editor is as it was before the call. `options.signal` cancels the call (the fetch, the parse and the tracks waiting to enter) the same way, rejecting with the signal's `reason`.
 
 ### AbortSignal Scope
 

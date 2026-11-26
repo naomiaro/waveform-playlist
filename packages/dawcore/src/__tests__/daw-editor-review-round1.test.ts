@@ -134,7 +134,9 @@ describe('review round 1 of #848 PR 3', () => {
     expect(spy).toHaveBeenCalled();
   });
 
-  it("addClip's removal watch reads the arrangement it subscribed to, across a swap", async () => {
+  it("addClip's removal watch is not ended by a change to another track; a swap ends it with an AbortError", async () => {
+    // Since the maintainer's D2 (#848) a swap ends the call; before it, a
+    // change elsewhere in the arrangement must not reject it (round-1 M2).
     const fake = makeFakeAdapter();
     const ed = await setup(
       '<daw-track name="P"><daw-clip src="/a.wav"></daw-clip></daw-track><daw-track name="Q"></daw-track>',
@@ -142,18 +144,16 @@ describe('review round 1 of #848 PR 3', () => {
     );
     const own: Arrangement = ed.arrangement;
     const p = own.getTracks()[0].id;
-    const hold = fake.holdDecode('/b.wav');
+    fake.holdDecode('/b.wav');
     const o = outcomeOf(ed.addClip(p, { src: '/b.wav', start: 5 }));
     await tick(2);
-    ed.arrangement = other();
     ed.querySelectorAll('daw-track')[1].remove(); // a change to the own arrangement
     await tick(3);
     expect(o.value).toBe('pending');
-    hold.resolve();
-    ed.arrangement = null;
-    await settle(ed);
+    ed.arrangement = other();
     await tick(2);
-    expect(o.value).toBe('resolved');
+    expect(o.value).toMatch(/^rejected: .*swapped out/);
+    expect(own.getTracks()[0].clips.map((c) => c.id)).toHaveLength(2); // the clip stays
   });
 
   it('a slider held across a swap does not write into the other arrangement (rows are keyed by track)', async () => {

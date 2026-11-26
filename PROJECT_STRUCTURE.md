@@ -485,10 +485,10 @@ The browser package includes utilities for loading pre-computed waveform data in
 **Location:** `packages/browser/src/waveformDataLoader.ts`
 
 **Functions:**
-- `loadWaveformData(src)` - Load .dat or .json waveform file, returns WaveformData instance
+- `loadWaveformData(src, options?)` - Load .dat or .json waveform file, returns WaveformData instance (`options.signal` aborts the fetch)
 - `waveformDataToPeaks(waveformData, channelIndex)` - Convert to our Peaks format (Int8Array/Int16Array)
-- `loadPeaksFromWaveformData(src, channelIndex)` - Combined load + convert
-- `getWaveformDataMetadata(src)` - Get metadata without full conversion
+- `loadPeaksFromWaveformData(src, channelIndex, options?)` - Combined load + convert
+- `getWaveformDataMetadata(src, options?)` - Get metadata without full conversion
 
 **Generating BBC Peaks:**
 ```bash

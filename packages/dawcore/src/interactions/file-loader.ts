@@ -7,6 +7,8 @@
  */
 
 import type { DawFilesLoadErrorDetail, LoadFilesResult } from '../events';
+import { reasonOf, untilAborted } from './abort';
+import type { EditorCallOptions } from '../types';
 
 export interface FileLoaderHost {
   readonly isConnected: boolean;
@@ -19,10 +21,18 @@ export interface FileLoaderHost {
   dispatchEvent(event: Event): boolean;
 }
 
+/**
+ * `options.signal` (#848, D5): an abort rejects with its reason; the files
+ * not started are skipped, and every track this call added is removed for
+ * good (no undo step). A signal already aborted rejects at once.
+ */
 export async function loadFiles(
   host: FileLoaderHost,
-  files: FileList | File[]
+  files: FileList | File[],
+  options: EditorCallOptions = {}
 ): Promise<LoadFilesResult> {
+  const signal = options.signal;
+  if (signal?.aborted) throw reasonOf(signal);
   if (!files) {
     console.warn('[dawcore] loadFiles called with null/undefined');
     return { loaded: [], failed: [] };
@@ -63,10 +73,25 @@ export async function loadFiles(
     let trackId: string | null = null;
     try {
       // Sequential on purpose: preserves drop order as track order.
-      trackId = await host._addDroppedFile(file);
-      await host._whenTrackLoaded(trackId);
+      const adding = host._addDroppedFile(file);
+      trackId = await untilAborted(adding, signal).catch((err: unknown) => {
+        // Aborted while it entered: it is taken out once it has.
+        if (signal?.aborted)
+          void adding.then(
+            (id) => host._discardTrack(id),
+            () => {}
+          );
+        throw err;
+      });
+      await untilAborted(host._whenTrackLoaded(trackId), signal);
       loaded.push(trackId);
     } catch (err) {
+      if (signal?.aborted) {
+        // The caller's abort: everything this call added goes, and it rejects.
+        for (const id of [...loaded, ...(trackId !== null ? [trackId] : [])])
+          host._discardTrack(id);
+        throw reasonOf(signal);
+      }
       console.warn('[dawcore] Failed to load file: ' + file.name + ' — ' + String(err));
       if (trackId !== null) host._discardTrack(trackId);
       dispatchLoadError(file, err);

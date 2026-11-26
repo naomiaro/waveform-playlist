@@ -380,11 +380,11 @@ editor.zoomOut(): void
 editor.setMasterVolume(volume: number): void
 // Programmatic track/clip mutation (see "Programmatic Track Mutation" section)
 editor.ready(): Promise<PlaylistEngine>                                  // Ensure engine is built; resolves with it
-editor.addTrack(config: TrackConfig): Promise<string>                    // Add a track to the arrangement played (no element, #848); resolves with its id once it has entered (before its audio loads)
+editor.addTrack(config: TrackConfig, options?: EditorCallOptions): Promise<string> // Add a track to the arrangement played (no element, #848); resolves with its id once it has entered (before its audio loads)
 editor.retryTrack(trackId: string): void                                 // Load the track's failed sources again
 editor.removeTrack(trackId: string): void                                // Remove track by ID
 editor.updateTrack(trackId: string, partial: Partial<TrackConfig>): void
-editor.addClip(trackId: string, config: ClipConfig): Promise<string>     // Returns clipId
+editor.addClip(trackId: string, config: ClipConfig, options?: EditorCallOptions): Promise<string> // Returns clipId; options.signal cancels
 editor.removeClip(trackId: string, clipId: string): void
 editor.updateClip(trackId: string, clipId: string, partial: Partial<ClipConfig>): void
 editor.setTimeFormat(format: string): void             // 'hh:mm:ss.sss' | 'hh:mm:ss' | 'seconds'
@@ -415,7 +415,7 @@ editor.undo(): void
 editor.redo(): void
 editor.clearHistory(): void
 // File loading (audio + MIDI auto-detection)
-editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<LoadFilesResult>
+editor.loadFiles(files: File[] | FileList, options?: EditorCallOptions): Promise<LoadFilesResult>
 ```
 
 **Events:**
@@ -1627,10 +1627,10 @@ A track's `<daw-clip>` children are read when the track enters the arrangement (
 For consumers who can't or won't go through declarative DOM (Vue/Svelte/Angular templates, MIDI sources without a `src` URL, dynamic clip generation):
 
 ```typescript
-editor.addTrack(config: TrackConfig): Promise<string>
+editor.addTrack(config: TrackConfig, options?: EditorCallOptions): Promise<string>
 editor.removeTrack(trackId: string): void
 editor.updateTrack(trackId: string, partial: Partial<TrackConfig>): void
-editor.addClip(trackId: string, config: ClipConfig): Promise<string>      // returns clipId
+editor.addClip(trackId: string, config: ClipConfig, options?: EditorCallOptions): Promise<string> // returns clipId
 editor.removeClip(trackId: string, clipId: string): void
 editor.updateClip(trackId: string, clipId: string, partial: Partial<ClipConfig>): void
 
@@ -1714,7 +1714,7 @@ Dropping audio files (`.mp3`, `.wav`, `.ogg`, `.flac`, etc.) creates one new tra
 For custom drop zones, file pickers, or other UIs:
 
 ```typescript
-editor.loadFiles(files: File[] | FileList): Promise<LoadFilesResult>
+editor.loadFiles(files: File[] | FileList, options?: EditorCallOptions): Promise<LoadFilesResult>
 
 interface LoadFilesResult {
   loaded: string[];                                 // Successfully-loaded track IDs (audio only today)

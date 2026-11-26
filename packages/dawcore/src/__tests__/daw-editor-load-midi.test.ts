@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 import type { Mock } from 'vitest';
 import type { DawEditorElement } from '../elements/daw-editor';
+import { createTrack } from '@waveform-playlist/core';
 
 // Mock @dawcore/midi so we don't need a real binary fixture.
 vi.mock('@dawcore/midi', () => ({
@@ -96,7 +97,13 @@ describe('<daw-editor>.loadMidi', () => {
     const ctrl = new AbortController();
     mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 1 }));
     await editor.loadMidi('/midi/test.mid', { signal: ctrl.signal });
-    expect(mockParseMidiUrl).toHaveBeenCalledWith('/midi/test.mid', undefined, ctrl.signal);
+    // The caller's signal combined with the arrangement played (#848, D6):
+    // another object, aborted when the caller's is.
+    const passed = mockParseMidiUrl.mock.lastCall?.[2] as AbortSignal;
+    expect(mockParseMidiUrl.mock.lastCall?.[0]).toBe('/midi/test.mid');
+    expect(passed.aborted).toBe(false);
+    ctrl.abort();
+    expect(passed.aborted).toBe(true);
   });
 
   it('parses a File source via parseMidiFile', async () => {
@@ -266,5 +273,45 @@ describe('<daw-editor>.loadMidi', () => {
     expect(result.timeSignature).toEqual([6, 8]);
     expect(result.duration).toBe(12.5);
     expect(result.name).toBe('Song');
+  });
+
+  describe('cancellation and cleanup (#848, D6)', () => {
+    it('an abort while its tracks wait to enter rejects with AbortError; none of them enters', async () => {
+      mockParseMidiFile.mockReturnValueOnce(makeParsedMidi({ tracks: 2 }));
+      const waiting = document.createElement('daw-editor') as DawEditorElement; // no adapter
+      document.body.appendChild(waiting);
+      const file = new File([new Uint8Array(4)], 'song.mid');
+      (file as unknown as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer = async () =>
+        new ArrayBuffer(4);
+      const c = new AbortController();
+      const p = waiting.loadMidi(file, { signal: c.signal });
+      await new Promise((r) => setTimeout(r, 0));
+      expect(waiting.tracks).toHaveLength(2);
+      c.abort();
+      const error = await p.catch((e) => e);
+      expect(error).toBeInstanceOf(DOMException);
+      expect((error as DOMException).name).toBe('AbortError');
+      expect(waiting.tracks).toHaveLength(0);
+      waiting.adapter = makeMockAdapter() as any;
+      await new Promise((r) => setTimeout(r, 0));
+      expect(waiting.arrangement!.getTracks()).toHaveLength(0);
+      waiting.remove();
+    });
+
+    it('the cleanup after a failure leaves no undo step: an Undo does not bring a track back', async () => {
+      mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 2 }));
+      editor.arrangement!.addTrack({ ...createTrack({ name: 'Before', clips: [] }), id: 'before' });
+      const originalAddTrack = editor.addTrack.bind(editor);
+      let calls = 0;
+      editor.addTrack = vi.fn(async (config) => {
+        calls += 1;
+        if (calls === 2) throw new Error('synthetic — track 1 fails');
+        return originalAddTrack(config);
+      });
+      await expect(editor.loadMidi('/midi/partial.mid')).rejects.toThrow(/track 1 fails/);
+      expect(editor.arrangement!.getTracks().map((t) => t.name)).toEqual(['Before']);
+      editor.undo(); // the arrival of Before; the cleanup made no step to undo
+      expect(editor.arrangement!.getTracks()).toHaveLength(0);
+    });
   });
 });

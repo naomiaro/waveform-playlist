@@ -1,28 +1,32 @@
 /**
  * MIDI loading logic extracted from daw-editor. Operates on the editor via a
- * narrow host interface (`addTrack` + `removeTrack`) — `<daw-editor>`
- * satisfies it without any new public surface.
+ * narrow host interface (`addTrack`, `_discardTrack`, `_operationSignal`) —
+ * `<daw-editor>` satisfies it.
  *
  * Numbered steps below match the Data Flow diagram in
  * `docs/specs/2026-05-23-dawcore-load-midi-design.md`.
  */
 
 import type { MidiLoadOptions, MidiLoadResult } from '@dawcore/midi';
-import type { TrackConfig } from '../types';
+import type { EditorCallOptions, TrackConfig } from '../types';
 import { installCommand } from '../utils/install-command';
+import { reasonOf } from './abort';
 
 export type { MidiLoadOptions, MidiLoadResult };
 
 /**
  * Minimal host surface needed by `loadMidiImpl`. `<daw-editor>` satisfies this
- * structurally. A track `addTrack` added is removed by its id on a failure; a
- * track whose entry was refused never entered, so there is nothing to remove
- * (#848: `addTrack` makes no element).
+ * structurally. A track `addTrack` added is taken out for good on a failure
+ * or an abort; a track whose entry was refused never entered, so there is
+ * nothing to remove (#848: `addTrack` makes no element).
  */
 export interface MidiLoaderHost {
   /** Resolves with the track id once the track has entered (#848). */
-  addTrack(config: TrackConfig): Promise<string>;
-  removeTrack(trackId: string): void;
+  addTrack(config: TrackConfig, options?: EditorCallOptions): Promise<string>;
+  /** Take a track out for good: no undo step, and no undo brings it back. */
+  _discardTrack(trackId: string): void;
+  /** The caller's signal combined with the arrangement played (D6). */
+  _operationSignal(signal?: AbortSignal): AbortSignal;
 }
 
 // Built when thrown, so a bundler can drop it with the code that throws it.
@@ -31,11 +35,12 @@ const installHint = (): string =>
 
 /**
  * Loads a `.mid` file (URL or `File`) and adds N tracks, one per note-bearing
- * MIDI track. On any per-track failure, every track added during this call is
- * removed (cleanup-on-failure; each removal is an undo step).
+ * MIDI track. On any per-track failure or an abort, every track added during
+ * this call is removed for good (no undo step), so the editor is as before
+ * the call.
  *
- * AbortSignal is forwarded to the fetch phase only. Aborting after parsing
- * does not cancel in-flight `addTrack` calls (documented limitation).
+ * `options.signal` reaches the fetch and the parse and, combined with the
+ * arrangement played (a swap aborts it too), the `addTrack` waits (#848, D6).
  */
 export async function loadMidiImpl(
   host: MidiLoaderHost,
@@ -58,6 +63,8 @@ export async function loadMidiImpl(
   // "not installed" (broken exports map, 404 chunk, CSP, etc.). Targeting
   // ES2020 means we can't use Error.cause yet; console.warn carries the
   // diagnostic detail.
+  const signal = host._operationSignal(options.signal);
+  if (signal.aborted) throw reasonOf(signal);
   let midiModule: typeof import('@dawcore/midi');
   try {
     midiModule = await import('@dawcore/midi');
@@ -71,7 +78,7 @@ export async function loadMidiImpl(
   // surfaces with file context instead of a bare DOMException.
   let parsed;
   if (typeof source === 'string') {
-    parsed = await parseMidiUrl(source, undefined, options.signal);
+    parsed = await parseMidiUrl(source, undefined, signal);
   } else {
     let buffer: ArrayBuffer;
     try {
@@ -88,24 +95,28 @@ export async function loadMidiImpl(
     }
     parsed = parseMidiFile(buffer);
   }
+  if (signal.aborted) throw reasonOf(signal);
 
   // (4) Concurrent addTrack with allSettled so we can wait for every settlement
   // before deciding. Promise.all would early-reject while other addTrack calls
   // keep running, leaving orphan tracks after cleanup.
   const settlements = await Promise.allSettled(
     parsed.tracks.map((t) =>
-      host.addTrack({
-        name: t.name,
-        kind: 'midi',
-        clips: [
-          {
-            midiNotes: t.notes,
-            midiChannel: t.channel,
-            midiProgram: t.programNumber,
-            start: startTime,
-          },
-        ],
-      })
+      host.addTrack(
+        {
+          name: t.name,
+          kind: 'midi',
+          clips: [
+            {
+              midiNotes: t.notes,
+              midiChannel: t.channel,
+              midiProgram: t.programNumber,
+              start: startTime,
+            },
+          ],
+        },
+        { signal }
+      )
     )
   );
 
@@ -127,11 +138,13 @@ export async function loadMidiImpl(
   if (rejections.length > 0) {
     for (const trackId of succeeded) {
       try {
-        host.removeTrack(trackId);
+        host._discardTrack(trackId);
       } catch (cleanupErr) {
         console.warn('[dawcore] loadMidi cleanup failed for a track: ' + String(cleanupErr));
       }
     }
+    // Aborted: the abort is the outcome, not the per-track rejections it caused.
+    if (signal.aborted) throw reasonOf(signal);
 
     // Log every rejection beyond the first so multi-track failure modes are
     // diagnosable (the thrown Error only carries the first). AggregateError

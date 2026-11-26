@@ -152,6 +152,16 @@ export function isDomClip(desc: ClipDescriptor): desc is DomClipDescriptor {
  * Public input shape for `editor.addTrack(config)`. All fields optional —
  * defaults match the declarative `<daw-track>` defaults.
  */
+/**
+ * Options of `addTrack`, `addClip` and `loadFiles` (#848). `signal` cancels
+ * the call: it rejects with the signal's `reason`, and what it added is
+ * taken out for good (see each method). A signal already aborted rejects at
+ * once and adds nothing.
+ */
+export interface EditorCallOptions {
+  signal?: AbortSignal;
+}
+
 export interface TrackConfig {
   name?: string;
   volume?: number;

@@ -503,9 +503,9 @@ JS properties: `adapter` (required `PlayoutAdapter`), `arrangement` (the arrange
 Methods:
 
 - Playback: `play(startTime?)`, `pause()`, `stop()`, `togglePlayPause()`, `seekTo(time)`
-- Loading: `loadFiles(files)`, `loadMidi(urlOrFile, options?)`, `ready()`
+- Loading: `loadFiles(files, options?)`, `loadMidi(urlOrFile, options?)`, `ready()`. `options.signal` cancels the call (an `AbortError`; what it added is taken out, with no undo step)
 - Display: `setTimeFormat(format)` — sugar over the `timeFormat` property, fires `daw-time-format-change`
-- Tracks & clips: `addTrack(config)`, `removeTrack(id)`, `updateTrack(id, partial)`, `reorderTrack(id, toIndex)`, `addClip(trackId, config)`, `removeClip(trackId, clipId)`, `updateClip(trackId, clipId, partial)`. They are calls on `editor.arrangement`: `addTrack` and `addClip` create no element, `updateTrack` / `updateClip` / `reorderTrack` write and move no element, and `removeTrack` / `removeClip` remove the element when there is one
+- Tracks & clips: `addTrack(config, options?)`, `removeTrack(id)`, `updateTrack(id, partial)`, `reorderTrack(id, toIndex)`, `addClip(trackId, config, options?)`, `removeClip(trackId, clipId)`, `updateClip(trackId, clipId, partial)`. They are calls on `editor.arrangement`: `addTrack` and `addClip` create no element, `updateTrack` / `updateClip` / `reorderTrack` write and move no element, and `removeTrack` / `removeClip` remove the element when there is one
 - Editing: `splitAtPlayhead()`, `undo()`, `redo()`, `setSelection(start, end)`
 - Recording: `startRecording(stream?, options?)`, `stopRecording()`, `pauseRecording()`, `resumeRecording()`, `togglePauseRecording()`. Options include `overdub` (start playback with the take), `latencyOffset` (seconds), and `clipName` (live-preview header + finalized clip name, default `"Recording"`)
 - Effects & export: the master-chain effects API (see [Effects](#effects)), `getEffectsState()` / `setEffectsState(entries)`, `openEffectGui()` / `closeEffectGui()`, `exportAudio(options?)`
