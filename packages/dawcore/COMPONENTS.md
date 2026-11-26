@@ -35,7 +35,7 @@ The central orchestrator. Manages the audio engine, loads tracks, renders wavefo
 | `adapter`         | `PlayoutAdapter \| null` | The audio backend (`NativePlayoutAdapter` from `@dawcore/transport`, or `createToneAdapter()` from `@waveform-playlist/playout`). The engine is built as soon as the editor is connected with one; tracks wait for it. `null` after the editor is removed from the document (the engine disposed it): set a fresh one when the editor is inserted again. |
 | `audioContext`    | `AudioContext`         | Read-only: the adapter's AudioContext, used for decoding and recording. Throws when no adapter is set.                                                   |
 | `recordingStream` | `MediaStream \| null`  | Mic stream for recording. Consumer provides via `getUserMedia`.                                                                                                          |
-| `tracks`          | `TrackWithId[]`        | Read-only. Every track's id, descriptor and mix. The mix is the arrangement's, so it follows Undo and Redo; a track waiting for `editor.adapter` reports the values its element declares. |
+| `tracks`          | `TrackWithId[]`        | Read-only. Every track's id, descriptor and mix: the tracks of the arrangement, in its order, then those waiting for `editor.adapter` (with the values their elements declare). The mix is the arrangement's, so it follows Undo and Redo, and a track an Undo took out is not listed until a Redo brings it back. |
 | `samplesPerPixel` | number                 | Zoom level (same as attribute, but with validation and clamping)                                                                                                         |
 
 **Methods:**
