@@ -308,7 +308,7 @@ class PlaylistEngine {
   on<K extends keyof EngineEvents>(event: K, listener: EngineEvents[K]): void;
   off<K extends keyof EngineEvents>(event: K, listener: EngineEvents[K]): void; // 'statechange' | 'play' | 'pause' | 'stop'
 
-  dispose(): void;
+  dispose(options?: { keepAdapter?: boolean }): void; // keepAdapter: stop, leave the adapter undisposed
 }
 ```
 
@@ -344,7 +344,7 @@ interface Arrangement {
   // clips (a clip that is still loading cannot be edited)
   moveClip(trackId: string, clipId: string, deltaSamples: number): number;
   trimClip(trackId: string, clipId: string, boundary: 'left' | 'right', deltaSamples: number): void;
-  splitClip(trackId: string, clipId: string, atSample: number): void;
+  splitClip(trackId: string, clipId: string, atSample: number): void; // the left half keeps clipId
   getClipBounds(trackId: string, clipId: string): ClipBounds | null;
   constrainTrimDelta(trackId: string, clipId: string, boundary: 'left' | 'right', deltaSamples: number): number;
 

@@ -86,7 +86,7 @@ function canSplitAtTime(host: SplitHost, time: number): boolean {
   return true;
 }
 
-/** Core split logic — finds clip at position, calls engine, diffs state for new IDs. */
+/** Core split logic — finds clip at position, calls engine, diffs state for the right half's new id. */
 function performSplit(host: SplitHost, time: number): boolean {
   const { engine } = host;
   if (!engine) return false;
@@ -118,21 +118,21 @@ function performSplit(host: SplitHost, time: number): boolean {
     return false;
   }
 
-  // Engine replaces the original clip with two halves; both get new IDs
+  // The left half keeps the original's id (#848); the right half is the one new id.
+  const leftClip = trackAfter.clips.find((c) => c.id === originalClipId);
   const newClips = trackAfter.clips.filter((c) => !clipIdsBefore.has(c.id));
-  if (newClips.length !== 2) {
+  if (!leftClip || newClips.length !== 1) {
     if (newClips.length > 0) {
       console.warn(
-        '[dawcore] splitAtPlayhead: expected 2 new clips after split but got ' + newClips.length
+        '[dawcore] splitAtPlayhead: expected the original clip and 1 new clip after split but got ' +
+          newClips.length +
+          ' new'
       );
     }
     return false;
   }
-
-  // Sort by startSample: lower = left, higher = right
-  const sorted = [...newClips].sort((a, b) => a.startSample - b.startSample);
-  const leftClipId = sorted[0].id;
-  const rightClipId = sorted[1].id;
+  const leftClipId = leftClip.id;
+  const rightClipId = newClips[0].id;
 
   host.dispatchEvent(
     new CustomEvent<DawClipSplitDetail>('daw-clip-split', {

@@ -1679,7 +1679,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
     // Element-less clips that carry their engine id (recorded takes, #659)
     // have no <daw-clip> to re-read them, and the engine changes them on its
-    // own: undo removes a take, a split replaces it with two new ids, a
+    // own: undo removes a take, a split shortens it to its left half (the
+    // right half is a new id, #848), a
     // punch-in carves it away, a drag moves or trims it. Follow the engine —
     // a descriptor whose id is gone would otherwise be a ghost that even
     // removeClip() cannot reach.

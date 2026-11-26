@@ -133,6 +133,7 @@ export function calculateSplitPoint(splitSample: number, samplesPerPixel: number
  *
  * The left clip retains the original fadeIn; the right clip retains the original fadeOut.
  * Both clips share the same waveformData reference and the same `src`.
+ * The left clip keeps the original's `id`; the right clip gets a new one.
  * If the clip has a name, suffixes " (1)" and " (2)" are appended.
  *
  * @param clip - The clip to split
@@ -149,20 +150,25 @@ export function splitClip(
   const leftName = clip.name ? `${clip.name} (1)` : undefined;
   const rightName = clip.name ? `${clip.name} (2)` : undefined;
 
-  const left = createClip({
-    startSample: clip.startSample,
-    durationSamples: leftDuration,
-    offsetSamples: clip.offsetSamples,
-    sampleRate: clip.sampleRate,
-    sourceDurationSamples: clip.sourceDurationSamples,
-    gain: clip.gain,
-    name: leftName,
-    color: clip.color,
-    fadeIn: clip.fadeIn,
-    audioBuffer: clip.audioBuffer,
-    waveformData: clip.waveformData,
-    src: clip.src,
-  });
+  // The left half keeps the clip's id (#848): whatever names the clip (an
+  // element, a selection) follows it; the right half is the new clip.
+  const left: AudioClip = {
+    ...createClip({
+      startSample: clip.startSample,
+      durationSamples: leftDuration,
+      offsetSamples: clip.offsetSamples,
+      sampleRate: clip.sampleRate,
+      sourceDurationSamples: clip.sourceDurationSamples,
+      gain: clip.gain,
+      name: leftName,
+      color: clip.color,
+      fadeIn: clip.fadeIn,
+      audioBuffer: clip.audioBuffer,
+      waveformData: clip.waveformData,
+      src: clip.src,
+    }),
+    id: clip.id,
+  };
 
   const right = createClip({
     startSample: splitSample,

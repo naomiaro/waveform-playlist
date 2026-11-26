@@ -219,6 +219,8 @@ engine.trimClip(
 engine.splitClip(trackId: string, clipId: string, atSample: number): void;
 ```
 
+A split keeps the clip's `id` on the left half and gives the right half a new one, so whatever names the clip (a selection, an element, a cache keyed by id) follows its left half. An undo brings the whole clip back under the same id.
+
 All three methods:
 - Validate track and clip IDs (warn to console if not found)
 - Apply collision constraints automatically (no overlaps)
@@ -363,10 +365,12 @@ The `statechange` event fires on every change (tracks, mix, undo history, select
 ### Cleanup
 
 ```typescript
-engine.dispose(): void;
+engine.dispose(options?: { keepAdapter?: boolean }): void;
 ```
 
 Disposes the adapter, clears all event listeners, stops following the arrangement and takes back the audio context it gave the arrangement to decode with (loads in flight are aborted and stay pending). Safe to call multiple times. An arrangement you passed in is not cleared: see [The Arrangement](#the-arrangement).
+
+With `{ keepAdapter: true }` the adapter is not disposed: playback is stopped first (as `stop()` does, with its `stop` event), and the engine lets go of the adapter's `onPlaybackEnded`. A new engine can then be built with the same adapter on another arrangement; its constructor sends that arrangement's tracks to the adapter. `<daw-editor>` does this when `editor.arrangement` is set.
 
 ## The Arrangement
 
@@ -731,7 +735,7 @@ const safeTrim = constrainBoundaryTrim(clip, delta, 'left', sortedClips, index, 
 
 // Check if a split is valid, then split
 if (canSplitAt(clip, samplePosition, minDuration)) {
-  const { left, right } = splitClip(clip, samplePosition);
+  const { left, right } = splitClip(clip, samplePosition); // left.id === clip.id
 }
 
 // Snap split point to pixel boundary

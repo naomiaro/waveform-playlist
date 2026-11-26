@@ -1777,7 +1777,7 @@ interface Arrangement {
   // getClipBounds is null, constrainTrimDelta is 0, and loaded clips do not collide with it
   moveClip(trackId: string, clipId: string, deltaSamples: number): number;  // Returns the delta actually applied
   trimClip(trackId: string, clipId: string, boundary: 'left' | 'right', deltaSamples: number): void;
-  splitClip(trackId: string, clipId: string, atSample: number): void;
+  splitClip(trackId: string, clipId: string, atSample: number): void; // the left half keeps clipId, the right half gets a new id
   getClipBounds(trackId: string, clipId: string): ClipBounds | null;
   constrainTrimDelta(
     trackId: string,
@@ -1877,7 +1877,8 @@ interface EngineState {
 // State: setSelection(), setLoopRegion(), setLoopEnabled(), setMasterVolume(), setTempo()
 // Zoom: zoomIn(), zoomOut(), setZoomLevel()
 // Events: on(event, listener), off(event, listener)
-// Lifecycle: dispose()
+// Lifecycle: dispose(options?: { keepAdapter?: boolean }) — keepAdapter: stop playback, let go of the
+//   arrangement and onPlaybackEnded, leave the adapter undisposed for a new engine on another arrangement
 
 // Pure operations (also exported for use without PlaylistEngine):
 import { constrainClipDrag, constrainBoundaryTrim, canSplitAt, splitClip, calculateSplitPoint } from '@waveform-playlist/engine';

@@ -390,7 +390,7 @@ const result = await editor.loadFiles(fileList);
 </script>
 ```
 
-A recorded take has no `<daw-clip>` element; its engine clip id is the `clipId` in `daw-recording-clip-add`, and it is also on the take's entry in `editor.tracks[n].clips` (`kind: 'drop'`, `clipId`). That entry follows the engine: `updateClip()`, drags and trims refresh it, and it is dropped when the clip goes away (`removeClip()`, undo, a later punch-in over it). Splitting a take replaces it with two new clips, which have no entry of their own.
+A recorded take has no `<daw-clip>` element; its engine clip id is the `clipId` in `daw-recording-clip-add`, and it is also on the take's entry in `editor.tracks[n].clips` (`kind: 'drop'`, `clipId`). That entry follows the engine: `updateClip()`, drags and trims refresh it, and it is dropped when the clip goes away (`removeClip()`, undo, a later punch-in over it). Splitting a take keeps its entry on the left half, which keeps the take's id (#848); the right half is a new clip with no entry of its own.
 
 `daw-recording-clip-add` is not guaranteed after every `daw-recording-complete`: it is skipped when you cancel the complete event, when peak generation for the take fails (`daw-error` with `operation: 'recording-peaks'`), and when the track was removed in the meantime.
 

@@ -1762,6 +1762,77 @@ describe('PlaylistEngine', () => {
       engine.dispose();
       expect(adapter.dispose).toHaveBeenCalledTimes(1);
     });
+
+    it('dispose({ keepAdapter: true }) leaves the adapter undisposed and stops it (#848)', () => {
+      const adapter = { ...createMockAdapter(), onPlaybackEnded: vi.fn() };
+      const arrangement = createArrangement();
+      arrangement.addTrack(
+        makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 48000 })])
+      );
+      const engine = new PlaylistEngine({ adapter, arrangement, sampleRate: 48000 });
+      engine.play(0);
+      engine.dispose({ keepAdapter: true });
+      expect(adapter.dispose).not.toHaveBeenCalled();
+      expect(adapter.stop).toHaveBeenCalled();
+      expect(adapter.onPlaybackEnded).toHaveBeenLastCalledWith(null);
+      vi.clearAllMocks();
+      arrangement.addTrack(
+        makeTrack('t2', [makeClip({ id: 'c2', startSample: 0, durationSamples: 48000 })])
+      );
+      const called = Object.entries(adapter).filter(
+        ([, fn]) => vi.isMockFunction(fn) && fn.mock.calls.length > 0
+      );
+      expect(called.map(([name]) => name)).toEqual([]);
+    });
+
+    it('a second engine on the same adapter after keepAdapter plays its own arrangement (#848)', async () => {
+      let ended: (() => void) | null = null;
+      const adapter = {
+        ...createMockAdapter(),
+        onPlaybackEnded: vi.fn((cb: (() => void) | null) => {
+          ended = cb;
+        }),
+      };
+      const first = createArrangement();
+      first.addTrack(
+        makeTrack('a', [makeClip({ id: 'ca', startSample: 0, durationSamples: 48000 })])
+      );
+      const engineA = new PlaylistEngine({ adapter, arrangement: first, sampleRate: 48000 });
+      engineA.dispose({ keepAdapter: true });
+      const second = createArrangement();
+      second.addTrack(
+        makeTrack('b', [makeClip({ id: 'cb', startSample: 0, durationSamples: 48000 })])
+      );
+      vi.mocked(adapter.setTracks).mockClear();
+      const engineB = new PlaylistEngine({ adapter, arrangement: second, sampleRate: 48000 });
+      const sent = vi.mocked(adapter.setTracks).mock.lastCall?.[0] ?? [];
+      expect(sent.map((t) => t.id)).toEqual(['b']);
+      engineB.play(0);
+      expect(engineB.getState().isPlaying).toBe(true);
+      expect(ended).not.toBeNull();
+      ended!();
+      await Promise.resolve();
+      expect(engineB.getState().isPlaying).toBe(false);
+    });
+  });
+
+  describe('split ids (#848)', () => {
+    it('a split keeps the original id on the left half; undo brings the whole clip back under it', () => {
+      const engine = new PlaylistEngine({ sampleRate: 48000 });
+      engine.setTracks([
+        makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 48000 })]),
+      ]);
+      engine.splitClip('t1', 'c1', 24000);
+      const clips = engine.getState().tracks[0].clips;
+      expect(clips.map((c) => [c.id === 'c1', c.startSample, c.durationSamples])).toEqual([
+        [true, 0, 24000],
+        [false, 24000, 24000],
+      ]);
+      engine.undo();
+      const back = engine.getState().tracks[0].clips;
+      expect(back).toHaveLength(1);
+      expect(back[0]).toMatchObject({ id: 'c1', startSample: 0, durationSamples: 48000 });
+    });
   });
 
   // ---------------------------------------------------------------------------
