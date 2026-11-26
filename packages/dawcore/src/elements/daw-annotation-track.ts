@@ -426,6 +426,9 @@ export class DawAnnotationTrackElement extends LitElement {
     return this;
   }
 
+  /** The listeners of this connection, aborted in disconnectedCallback. */
+  private _listeners: AbortController | null = null;
+
   connectedCallback() {
     super.connectedCallback();
     // Data element — its light-DOM text must not render through a host's
@@ -439,7 +442,12 @@ export class DawAnnotationTrackElement extends LitElement {
       delete (this as Record<string, unknown>)['annotationShortcuts'];
       this.annotationShortcuts = value as AnnotationShortcutMap | null;
     }
-    document.addEventListener('keydown', this._onKeyDownCapture, true); // capture phase
+    this._listeners?.abort();
+    this._listeners = new AbortController();
+    document.addEventListener('keydown', this._onKeyDownCapture, {
+      capture: true, // capture phase
+      signal: this._listeners.signal,
+    });
     setTimeout(() => {
       this.dispatchEvent(
         new CustomEvent('daw-annotation-track-connected', {
@@ -463,7 +471,8 @@ export class DawAnnotationTrackElement extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    document.removeEventListener('keydown', this._onKeyDownCapture, true);
+    this._listeners?.abort();
+    this._listeners = null;
     this._childObserver?.disconnect();
     this._childObserver = null;
   }

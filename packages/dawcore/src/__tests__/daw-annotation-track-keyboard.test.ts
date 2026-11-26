@@ -30,6 +30,17 @@ describe('<daw-annotation-track> keyboard controls', () => {
     expect(track.activeAnnotationId).toBe('a');
   });
 
+  it('listens in the capture phase: a listener at the target that stops propagation does not hide the key', () => {
+    const stop = (e: Event) => e.stopPropagation();
+    document.body.addEventListener('keydown', stop);
+    try {
+      document.body.dispatchEvent(key('ArrowDown'));
+      expect(track.activeAnnotationId).toBe('a');
+    } finally {
+      document.body.removeEventListener('keydown', stop);
+    }
+  });
+
   it('navigation and consumption: matched keys stopPropagation before bubble listeners', () => {
     track.activeAnnotationId = 'a';
     const bubbleSpy = vi.fn();

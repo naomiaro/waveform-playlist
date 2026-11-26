@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { probeListeners } from './helpers/listener-probe';
 import '../elements/daw-annotation';
 import { applyBoundaryResults } from '../elements/daw-annotation-track';
 import type { DawAnnotationTrackElement } from '../elements/daw-annotation-track';
@@ -290,5 +291,26 @@ describe('<daw-annotation-track>', () => {
     const bEl = track2.querySelector('#b') as HTMLElement & { end: number };
     expect(bEl.end).toBe(2); // written — id-resolved diff sees live 4 !== 2
     track2.remove();
+  });
+});
+
+describe('<daw-annotation-track>: listeners of a connection (D8, #848)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  it('its listeners go when it disconnects and come back on a reconnect', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const el = document.createElement('daw-annotation-track');
+    const onDocument = probeListeners(document);
+    document.body.appendChild(el);
+    expect(onDocument.live()).toBe(1);
+    el.remove();
+    expect(onDocument.live()).toBe(0);
+    document.body.appendChild(el);
+    expect(onDocument.live()).toBe(1);
+    el.remove();
+    expect(onDocument.live()).toBe(0);
   });
 });

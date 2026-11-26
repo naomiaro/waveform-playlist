@@ -112,6 +112,9 @@ export class DawKeyboardShortcutsElement extends LitElement {
 
   // --- Lifecycle ---
 
+  /** The listeners of this connection, aborted in disconnectedCallback. */
+  private _listeners: AbortController | null = null;
+
   override connectedCallback(): void {
     super.connectedCallback();
     // Upgrade-property dance: a remap assigned BEFORE this element was
@@ -137,12 +140,16 @@ export class DawKeyboardShortcutsElement extends LitElement {
           'Preset shortcuts (playback, splitting, undo) will be inactive; only customShortcuts will fire.'
       );
     }
-    document.addEventListener('keydown', this._onKeyDown);
+    this._listeners?.abort();
+    this._listeners = new AbortController();
+    const { signal } = this._listeners;
+    document.addEventListener('keydown', this._onKeyDown, { signal });
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback();
-    document.removeEventListener('keydown', this._onKeyDown);
+    this._listeners?.abort();
+    this._listeners = null;
     this._editor = null;
   }
 

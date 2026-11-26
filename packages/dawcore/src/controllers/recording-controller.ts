@@ -62,7 +62,8 @@ export interface RecordingSession {
   /** Display name for the take (preview header + finalized clip name). */
   readonly clipName?: string;
   readonly wasOverdub: boolean;
-  /** Stored so it can be removed on stop/cleanup — not just when stream ends. */
+  /** The mic-unplug handler and its track. Its listener goes on stop/cleanup, not just when
+   * the stream ends (through a signal the controller keeps, D8). */
   readonly _onTrackEnded: (() => void) | null;
   readonly _audioTrack: MediaStreamTrack | null;
   /** Set during stopRecording, cleared by the done message from the worklet. */
@@ -154,6 +155,8 @@ interface StartingEntry {
 export class RecordingController implements ReactiveController {
   private _host: RecordingHost & HTMLElement;
   private _sessions = new Map<string, RecordingSession>();
+  /** Each session's mic-unplug listener, aborted when the session ends. */
+  private _trackEndedListeners = new WeakMap<RecordingSession, AbortController>();
   /** Track IDs with a startRecording in flight (session not yet in _sessions).
    * The session is only set after several awaits — without this, two rapid
    * start calls both pass the _sessions guard and build two capture
@@ -362,7 +365,9 @@ export class RecordingController implements ReactiveController {
 
       // Attach mic-unplug listener (stored in session for cleanup)
       if (audioTrack && onTrackEnded) {
-        audioTrack.addEventListener('ended', onTrackEnded);
+        const listener = new AbortController();
+        this._trackEndedListeners.set(session, listener);
+        audioTrack.addEventListener('ended', onTrackEnded, { signal: listener.signal });
       }
 
       // Mute the track the take is recording onto — punch-in replaces
@@ -752,9 +757,8 @@ export class RecordingController implements ReactiveController {
   }
 
   private _removeTrackEndedListener(session: RecordingSession) {
-    if (session._audioTrack && session._onTrackEnded) {
-      session._audioTrack.removeEventListener('ended', session._onTrackEnded);
-    }
+    this._trackEndedListeners.get(session)?.abort();
+    this._trackEndedListeners.delete(session);
   }
 
   private _dispatchRecordingError(trackId: string, error: unknown) {

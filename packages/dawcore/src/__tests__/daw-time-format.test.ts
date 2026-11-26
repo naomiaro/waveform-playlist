@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { probeListeners } from './helpers/listener-probe';
 import '../index';
 import type { DawTimeFormatElement } from '../elements/daw-time-format';
 
@@ -137,5 +138,31 @@ describe('daw-time-format', () => {
     el.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain('setTimeFormat');
+  });
+});
+
+describe('<daw-time-format>: listeners of a connection (D8, #848)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  it('its listeners go when it disconnects and come back on a reconnect', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const el = document.createElement('daw-time-format');
+    const onDocument = probeListeners(document);
+    const onHost = probeListeners(el);
+    document.body.appendChild(el);
+    expect(onDocument.live()).toBe(1);
+    expect(onHost.live()).toBe(2);
+    el.remove();
+    expect(onDocument.live()).toBe(0);
+    expect(onHost.live()).toBe(0);
+    document.body.appendChild(el);
+    expect(onDocument.live()).toBe(1);
+    expect(onHost.live()).toBe(2);
+    el.remove();
+    expect(onDocument.live()).toBe(0);
+    expect(onHost.live()).toBe(0);
   });
 });

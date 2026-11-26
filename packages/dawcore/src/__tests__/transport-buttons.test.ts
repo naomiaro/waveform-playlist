@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
+import { probeListeners } from './helpers/listener-probe';
 
 beforeAll(async () => {
   await import('../elements/daw-transport');
@@ -391,5 +392,69 @@ describe('late-upgrading target wiring (audit wave 4)', () => {
     expect(editor.togglePauseRecording).toHaveBeenCalled();
     expect(editor.pause).not.toHaveBeenCalled();
     cleanup(editor, transport);
+  });
+});
+
+describe('listener lifetimes (D8, #848)', () => {
+  const wait = () => new Promise((r) => setTimeout(r, 20));
+  const made: HTMLElement[] = [];
+
+  afterEach(() => {
+    cleanup(...made.splice(0));
+  });
+
+  function editorWithId(id: string) {
+    const editor = document.createElement('div');
+    editor.id = id;
+    document.body.appendChild(editor);
+    made.push(editor);
+    return editor;
+  }
+
+  it.each(['daw-play-button', 'daw-pause-button', 'daw-record-button'])(
+    '%s: its listeners on the target go when the target changes and when it disconnects',
+    async (tag) => {
+      const a = editorWithId(tag + '-a');
+      const b = editorWithId(tag + '-b');
+      const onA = probeListeners(a);
+      const onB = probeListeners(b);
+      const transport = document.createElement('daw-transport');
+      transport.setAttribute('for', tag + '-a');
+      document.body.appendChild(transport);
+      made.push(transport);
+      const button = document.createElement(tag) as HTMLElement & {
+        requestUpdate(): void;
+        updateComplete: Promise<boolean>;
+      };
+      transport.appendChild(button);
+      await wait();
+      const count = onA.live();
+      expect(count).toBeGreaterThanOrEqual(3);
+
+      transport.setAttribute('for', tag + '-b');
+      button.requestUpdate();
+      await button.updateComplete;
+      expect(onA.live()).toBe(0);
+      expect(onB.live()).toBe(count);
+
+      button.remove();
+      expect(onB.live()).toBe(0);
+    }
+  );
+
+  it('the capability listeners on a button go when it disconnects and come back on a reconnect', async () => {
+    const transport = document.createElement('daw-transport');
+    document.body.appendChild(transport);
+    made.push(transport);
+    const button = document.createElement('daw-stop-button');
+    const probe = probeListeners(button);
+    transport.appendChild(button);
+    expect(probe.live()).toBe(2);
+    button.remove();
+    expect(probe.live()).toBe(0);
+    transport.appendChild(button);
+    expect(probe.live()).toBe(2);
+    button.remove();
+    expect(probe.live()).toBe(0);
   });
 });

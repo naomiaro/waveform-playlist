@@ -1631,20 +1631,33 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // and show what changed meanwhile (an Undo made while out of the page).
     this._follow(this._arrangement);
     this._refreshLinkStates();
+    // Every listener of this connection goes with its signal (D8).
+    const { signal } = this._connection;
     // Capture on window: runs before <daw-keyboard-shortcuts>' document listener.
-    window.addEventListener('keydown', this._onDragEscape, { capture: true });
-    this.addEventListener('daw-track-connected', this._onTrackConnected as EventListener);
-    this.addEventListener('daw-track-update', this._onTrackUpdate as EventListener);
-    this.addEventListener('daw-track-control', this._onTrackControl as EventListener);
-    this.addEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener);
-    this.addEventListener('daw-clip-connected', this._onClipConnected as EventListener);
+    window.addEventListener('keydown', this._onDragEscape, { capture: true, signal });
+    this.addEventListener('daw-track-connected', this._onTrackConnected as EventListener, {
+      signal,
+    });
+    this.addEventListener('daw-track-update', this._onTrackUpdate as EventListener, { signal });
+    this.addEventListener('daw-track-control', this._onTrackControl as EventListener, { signal });
+    this.addEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener, {
+      signal,
+    });
+    this.addEventListener('daw-clip-connected', this._onClipConnected as EventListener, {
+      signal,
+    });
     this.addEventListener(
       'daw-annotation-track-connected',
-      this._onAnnotationTrackConnected as EventListener
+      this._onAnnotationTrackConnected as EventListener,
+      { signal }
     );
-    this.addEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
-    this.addEventListener('daw-track-reorder', this._onTrackReorder as EventListener);
-    this.addEventListener('daw-track-reorder-grab', this._onTrackReorderGrab as EventListener);
+    this.addEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener, {
+      signal,
+    });
+    this.addEventListener('daw-track-reorder', this._onTrackReorder as EventListener, { signal });
+    this.addEventListener('daw-track-reorder-grab', this._onTrackReorderGrab as EventListener, {
+      signal,
+    });
     // Detect track + clip removal via MutationObserver (detached elements can't
     // bubble events). A node present in BOTH removedNodes and addedNodes within
     // one batch is a MOVE (insertBefore fires remove+insert) — treated as a
@@ -1749,28 +1762,18 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // keep it alive and run its listeners (review of #919).
     this._unfollow();
     this._unfollow = () => {};
-    window.removeEventListener('keydown', this._onDragEscape, { capture: true });
+    // The listeners of this connection go, and its waits end: a track's
+    // load wait resolves (the track is kept and loads after a reparent).
+    this._connection.abort(abortError('<daw-editor> was disconnected'));
     this._effectsManager?.disposeAll();
     this._effectsManager = null;
-    this.removeEventListener('daw-track-connected', this._onTrackConnected as EventListener);
-    this.removeEventListener('daw-track-update', this._onTrackUpdate as EventListener);
-    this.removeEventListener('daw-track-control', this._onTrackControl as EventListener);
-    this.removeEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener);
-    this.removeEventListener('daw-clip-connected', this._onClipConnected as EventListener);
-    this.removeEventListener(
-      'daw-annotation-track-connected',
-      this._onAnnotationTrackConnected as EventListener
-    );
-    this.removeEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
-    this.removeEventListener('daw-track-reorder', this._onTrackReorder as EventListener);
-    this.removeEventListener('daw-track-reorder-grab', this._onTrackReorderGrab as EventListener);
     // Before the engine is disposed: every pointer interaction ends here.
     this._cancelDrags(true);
     // No audio loads while detached (the decode context goes with the
     // engine). A dropped file whose track has entered is kept and counts as
-    // loaded: it loads after a reparent, like the page's tracks (maintainer,
-    // #917). One not entered yet is not added.
-    this._connection.abort(abortError('<daw-editor> was disconnected'));
+    // loaded (the connection's abort above ended its wait): it loads after a
+    // reparent, like the page's tracks (maintainer, #917). One not entered
+    // yet is not added.
     for (const trackId of this._entryQueue) {
       const pending = this._pending.get(trackId);
       if (!pending || 'element' in pending || !this._entryWaiters.has(trackId)) continue;

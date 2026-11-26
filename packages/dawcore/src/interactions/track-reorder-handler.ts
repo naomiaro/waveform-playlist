@@ -32,6 +32,8 @@ export class TrackReorderHandler {
   private _fromIndex = 0;
   private _targetIndex = 0;
   private _gripEl: HTMLElement | null = null;
+  /** The grip's listeners of the drag in progress: one controller per drag. */
+  private _gesture: AbortController | null = null;
 
   constructor(host: TrackReorderHost) {
     this._host = host;
@@ -101,9 +103,11 @@ export class TrackReorderHandler {
     } catch {
       // Fabricated pointerIds (tests) can't be captured — listeners still work.
     }
-    gripEl.addEventListener('pointermove', this._onPointerMove);
-    gripEl.addEventListener('pointerup', this._onPointerUp);
-    gripEl.addEventListener('pointercancel', this._onPointerCancel);
+    this._gesture = new AbortController();
+    const { signal } = this._gesture;
+    gripEl.addEventListener('pointermove', this._onPointerMove, { signal });
+    gripEl.addEventListener('pointerup', this._onPointerUp, { signal });
+    gripEl.addEventListener('pointercancel', this._onPointerCancel, { signal });
   };
 
   /** The dragged track and the order of the rows at the grab (#848), or null. */
@@ -217,9 +221,8 @@ export class TrackReorderHandler {
     this._lanes = [];
     const grip = this._gripEl;
     if (grip) {
-      grip.removeEventListener('pointermove', this._onPointerMove);
-      grip.removeEventListener('pointerup', this._onPointerUp);
-      grip.removeEventListener('pointercancel', this._onPointerCancel);
+      this._gesture?.abort();
+      this._gesture = null;
       try {
         grip.releasePointerCapture(this._pointerId);
       } catch {

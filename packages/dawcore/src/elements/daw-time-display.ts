@@ -59,10 +59,16 @@ export class DawTimeDisplayElement extends LitElement {
     }
   };
 
+  /** The listeners of this connection, aborted in disconnectedCallback. */
+  private _listeners: AbortController | null = null;
+
   connectedCallback() {
     super.connectedCallback();
-    document.addEventListener('daw-timeupdate', this._onTimeUpdate);
-    document.addEventListener('daw-time-format-change', this._onFormatChange);
+    this._listeners?.abort();
+    this._listeners = new AbortController();
+    const { signal } = this._listeners;
+    document.addEventListener('daw-timeupdate', this._onTimeUpdate, { signal });
+    document.addEventListener('daw-time-format-change', this._onFormatChange, { signal });
     // Defer the initial read until <daw-transport for> and the target have
     // upgraded (same pattern as the transport buttons).
     requestAnimationFrame(() => this._syncFromTarget());
@@ -70,8 +76,8 @@ export class DawTimeDisplayElement extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    document.removeEventListener('daw-timeupdate', this._onTimeUpdate);
-    document.removeEventListener('daw-time-format-change', this._onFormatChange);
+    this._listeners?.abort();
+    this._listeners = null;
   }
 
   private _syncFromTarget() {

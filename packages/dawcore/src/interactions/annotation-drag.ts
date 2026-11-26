@@ -29,6 +29,8 @@ export interface AnnotationDragHost {
 interface DragState {
   track: DawAnnotationTrackElement;
   captureEl: HTMLElement;
+  /** The listeners on `captureEl`: aborted when this drag ends. */
+  listeners: AbortController;
   pointerId: number;
   startClientX: number;
   moved: boolean;
@@ -87,9 +89,14 @@ export class AnnotationDragHandler {
     const edge = isBoundary ? (boundary.getAttribute('data-edge') as 'start' | 'end') : null;
     const captureEl = isBoundary ? boundary : box;
 
+    // A press while another drag is in progress (a second touch) replaces
+    // it: its listeners go, as they did when the same element was pressed.
+    this._drag?.listeners.abort();
+    const listeners = new AbortController();
     this._drag = {
       track,
       captureEl,
+      listeners,
       pointerId: e.pointerId,
       startClientX: e.clientX,
       moved: false,
@@ -106,9 +113,10 @@ export class AnnotationDragHandler {
     } catch {
       // Fabricated pointerIds (tests) or detached elements — capture is best-effort.
     }
-    captureEl.addEventListener('pointermove', this._onPointerMove as EventListener);
-    captureEl.addEventListener('pointerup', this._onPointerUp as EventListener);
-    captureEl.addEventListener('pointercancel', this._onPointerCancel as EventListener);
+    const { signal } = listeners;
+    captureEl.addEventListener('pointermove', this._onPointerMove as EventListener, { signal });
+    captureEl.addEventListener('pointerup', this._onPointerUp as EventListener, { signal });
+    captureEl.addEventListener('pointercancel', this._onPointerCancel as EventListener, { signal });
   };
 
   /** Non-private (underscore convention) so tests can drive moves directly. */
@@ -232,9 +240,7 @@ export class AnnotationDragHandler {
     } catch {
       // Already released or never captured.
     }
-    drag.captureEl.removeEventListener('pointermove', this._onPointerMove as EventListener);
-    drag.captureEl.removeEventListener('pointerup', this._onPointerUp as EventListener);
-    drag.captureEl.removeEventListener('pointercancel', this._onPointerCancel as EventListener);
+    drag.listeners.abort();
     this._drag = null;
   }
 }

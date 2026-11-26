@@ -3,6 +3,7 @@ import '../elements/daw-annotation';
 import '../elements/daw-annotation-track';
 import { AnnotationController, ANNOTATION_LANE_HEIGHT } from '../controllers/annotation-controller';
 import type { DawAnnotationTrackElement } from '../elements/daw-annotation-track';
+import { probeListeners } from './helpers/listener-probe';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
@@ -200,5 +201,30 @@ describe('AnnotationController', () => {
       dispatchStop();
       expect(host.requestUpdate).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('AnnotationController: its host listeners (D8, #848)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+    vi.restoreAllMocks();
+  });
+
+  it('go on hostDisconnected and come back on a reconnect', () => {
+    const host = makeHost();
+    const probe = probeListeners(host);
+    const controller = new AnnotationController(host as never);
+    controller.hostConnected();
+    expect(probe.live()).toBe(5);
+    controller.hostDisconnected();
+    expect(probe.live()).toBe(0);
+    host.dispatchEvent(new CustomEvent('daw-annotation-update'));
+    expect(host.requestUpdate).not.toHaveBeenCalled();
+    controller.hostConnected();
+    expect(probe.live()).toBe(5);
+    host.dispatchEvent(new CustomEvent('daw-annotation-update'));
+    expect(host.requestUpdate).toHaveBeenCalledTimes(1);
+    controller.hostDisconnected();
+    expect(probe.live()).toBe(0);
   });
 });

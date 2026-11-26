@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
+import { probeListeners } from './helpers/listener-probe';
 
 beforeAll(async () => {
   await import('../elements/daw-editor');
@@ -234,5 +235,28 @@ describe('remap property cache invalidation (audit wave 4)', () => {
     const active = s.shortcuts as Array<{ key?: string }>;
     expect(active.some((sc) => sc.key === 'd')).toBe(true);
     document.body.removeChild(editor);
+  });
+});
+
+describe('<daw-keyboard-shortcuts>: listeners of a connection (D8, #848)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  it('its listeners go when it disconnects and come back on a reconnect', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const parent = document.createElement('daw-editor');
+    document.body.appendChild(parent);
+    const el = document.createElement('daw-keyboard-shortcuts');
+    const onDocument = probeListeners(document);
+    parent.appendChild(el);
+    expect(onDocument.live()).toBe(1);
+    el.remove();
+    expect(onDocument.live()).toBe(0);
+    parent.appendChild(el);
+    expect(onDocument.live()).toBe(1);
+    el.remove();
+    expect(onDocument.live()).toBe(0);
   });
 });

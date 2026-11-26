@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TrackReorderHandler, type TrackReorderHost } from '../interactions/track-reorder-handler';
+import { probeListeners } from './helpers/listener-probe';
 
 function makeRow(trackId: string, top: number, height: number): HTMLElement {
   const el = document.createElement('daw-track-controls');
@@ -177,5 +178,36 @@ describe('TrackReorderHandler.isActive (#848)', () => {
     expect(handler.isActive).toBe(false);
     expect(host.reorderTrack).not.toHaveBeenCalled();
     expect(rows.map((r) => r.style.transform)).toEqual(['', '']);
+  });
+});
+
+describe('TrackReorderHandler: the grip listeners of a drag (D8, #848)', () => {
+  function grab() {
+    const rows = [makeRow('a', 0, 80), makeRow('b', 80, 80)];
+    const handler = new TrackReorderHandler(makeHost(rows));
+    const grip = document.createElement('button');
+    rows[0].appendChild(grip);
+    const probe = probeListeners(grip);
+    handler.onGrab('a', new PointerEvent('pointerdown', { pointerId: 1, clientY: 40 }), grip);
+    expect(probe.live()).toBe(3);
+    return { handler, grip, probe };
+  }
+
+  it('are removed on pointerup', () => {
+    const { grip, probe } = grab();
+    grip.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, clientY: 40 }));
+    expect(probe.live()).toBe(0);
+  });
+
+  it('are removed on pointercancel', () => {
+    const { grip, probe } = grab();
+    grip.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 1 }));
+    expect(probe.live()).toBe(0);
+  });
+
+  it('are removed by cancel() (Escape, the editor disconnected)', () => {
+    const { handler, probe } = grab();
+    handler.cancel();
+    expect(probe.live()).toBe(0);
   });
 });

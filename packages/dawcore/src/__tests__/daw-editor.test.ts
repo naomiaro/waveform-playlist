@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { installSpecs } from '../../../../scripts/build/install-specs.mjs';
 import { makeFakeAdapter, mountEditor } from './helpers/editor-harness';
+import { probeListeners, type ListenerProbe } from './helpers/listener-probe';
 
 // What each dawcore hint names (#884): a caret on the version in the manifests
 // where dawcore's peer floor admits it, else the peer range; playout (no peer) a caret.
@@ -194,5 +195,65 @@ describe('DawEditorElement', () => {
 
     document.body.removeChild(el);
     docSpy.mockRestore();
+  });
+});
+
+describe('DawEditorElement: the listeners of a connection (D8, #848)', () => {
+  const TYPES = [
+    'daw-track-connected',
+    'daw-track-update',
+    'daw-track-control',
+    'daw-track-remove',
+    'daw-clip-connected',
+    'daw-annotation-track-connected',
+    'daw-annotation-select',
+    'daw-track-reorder',
+    'daw-track-reorder-grab',
+  ];
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+    vi.restoreAllMocks();
+  });
+
+  it('go when it disconnects and come back on a reconnect', async () => {
+    const onWindow = probeListeners(window);
+    let onEditor: ListenerProbe | null = null;
+    const editor = await mountEditor({
+      before: (e) => {
+        onEditor = probeListeners(e);
+      },
+    });
+    const live = () => [onWindow.live('keydown'), ...TYPES.map((t) => onEditor!.live(t))];
+    const connected = live();
+    expect(connected.every((n) => n >= 1)).toBe(true);
+    editor.remove();
+    expect(live()).toEqual(connected.map(() => 0));
+    document.body.appendChild(editor);
+    expect(live()).toEqual(connected);
+    editor.remove();
+    expect(live()).toEqual(connected.map(() => 0));
+  });
+
+  it('a removed editor does not answer a reorder request or an Escape; a reconnected one does', async () => {
+    const editor = await mountEditor();
+    const reorder = vi.spyOn(editor, 'reorderTrack').mockImplementation(() => {});
+    const cancel = vi.spyOn(editor, '_cancelDrags');
+    const request = () =>
+      editor.dispatchEvent(
+        new CustomEvent('daw-track-reorder', { detail: { trackId: 't', fromIndex: 0, toIndex: 1 } })
+      );
+    const escape = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    editor.remove();
+    cancel.mockClear(); // the disconnect cancels the drags itself
+    request();
+    escape();
+    expect(reorder).not.toHaveBeenCalled();
+    expect(cancel).not.toHaveBeenCalled();
+    document.body.appendChild(editor);
+    request();
+    escape();
+    expect(reorder).toHaveBeenCalledTimes(1);
+    expect(cancel).toHaveBeenCalledTimes(1);
   });
 });
