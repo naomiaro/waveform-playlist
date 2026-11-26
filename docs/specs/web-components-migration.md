@@ -380,7 +380,8 @@ editor.zoomOut(): void
 editor.setMasterVolume(volume: number): void
 // Programmatic track/clip mutation (see "Programmatic Track Mutation" section)
 editor.ready(): Promise<PlaylistEngine>                                  // Ensure engine is built; resolves with it
-editor.addTrack(config: TrackConfig): Promise<DawTrackElement>           // Append a <daw-track>
+editor.addTrack(config: TrackConfig): Promise<string>                    // Append a <daw-track>; resolves with its id once it has entered (before its audio loads)
+editor.retryTrack(trackId: string): void                                 // Load the track's failed sources again
 editor.removeTrack(trackId: string): void                                // Remove track by ID
 editor.updateTrack(trackId: string, partial: Partial<TrackConfig>): void
 editor.addClip(trackId: string, config: ClipConfig): Promise<string>     // Returns clipId
@@ -1305,7 +1306,7 @@ Created tracks are MIDI tracks (`kind="midi"`), drawn as piano rolls. Each track
 For programmatic MIDI (no file), set `clip.midiNotes` directly:
 
 ```javascript
-const track = await editor.addTrack({
+const trackId = await editor.addTrack({
   name: 'Synth Lead',
   midi: {
     notes: [
@@ -1535,23 +1536,17 @@ Two consumer-facing ways to mutate tracks at runtime exist by design: **declarat
 
 ### Engine Lifecycle
 
-`<daw-editor>` builds its `PlaylistEngine` lazily on the first track load. With no children declared and no programmatic load issued, `editor.engine` is `null`. Consumers that need engine access before the first track must:
-
-- Call `editor.loadFiles([...])` (recommended — populates descriptors, peaks, and engine in one shot), **or**
-- Append a `<daw-track>` element (any path that triggers `_loadTrack` ensures the engine), **or**
-- Use `await editor.ready()` (returns a promise that resolves once the engine is built — used to await engine availability without forcing a track load). When called before any track exists, `ready()` builds an empty engine eagerly.
+`<daw-editor>` owns an arrangement from the moment it is created and builds its `PlaylistEngine` on it as soon as it is connected with an `editor.adapter` (#848). Before that, `editor.engine` is `null` and `<daw-track>` elements wait to enter. `await editor.ready()` resolves with the engine (it rejects without an adapter).
 
 ```javascript
-// Engine is null until something loads
-console.log(editor.engine); // null
-
-await editor.ready(); // builds engine if needed
+console.log(editor.engine); // null: no adapter yet
+editor.adapter = new NativePlayoutAdapter(new AudioContext());
 console.log(editor.engine); // PlaylistEngine
 ```
 
 ### Declarative DOM Mutation
 
-Appending a `<daw-track>` element to a connected `<daw-editor>` is fully supported. The track element fires a `daw-track-connected` event on `connectedCallback` (deferred via `setTimeout(0)`); the editor reads the descriptor and runs the standard load pipeline.
+Appending a `<daw-track>` element to a connected `<daw-editor>` is fully supported. The track element fires a `daw-track-connected` event on `connectedCallback` (deferred via `setTimeout(0)`); the editor reads the descriptor and enters the track into its arrangement at its DOM position, where its audio loads.
 
 ```javascript
 const t = document.createElement('daw-track');
@@ -1614,14 +1609,14 @@ interface ClipConfig {
 }
 ```
 
-Behavior contract — all methods MUST go through the same path as `_loadTrack` so that:
+Behavior contract — all methods go through the same path as a declared `<daw-track>` (#848): the track enters the editor's arrangement, which loads its audio, so that:
 
-1. `<daw-track-controls>` shows the correct name/volume/pan/mute/solo (the descriptor map `_tracks` is populated).
-2. The waveform renders (peaks generated and cached in `_peaksData`).
-3. Drag/trim/split work (audio buffer cached in `_clipBuffers`).
-4. The engine lifecycle is honoured (engine built lazily on first call; `daw-track-ready` event fires).
+1. `<daw-track-controls>` shows the correct name/volume/pan/mute/solo (the descriptor map `_tracks` is populated; the mix is the arrangement's).
+2. The waveform renders (peaks generated and cached in `_peaksData` as each clip loads).
+3. Drag/trim/split work once a clip has loaded.
+4. `daw-track-ready` / `daw-track-error` fire as the audio loads or fails.
 
-`addTrack` returns a real `<daw-track>` element appended to the editor's light DOM so subsequent declarative mutations work uniformly. The element's `src`/`name`/etc. attributes are reflected from the config.
+`addTrack` appends a real `<daw-track>` element to the editor's light DOM so subsequent declarative mutations work uniformly, and resolves with its track id once the track has entered. The element's `src`/`name`/etc. attributes are reflected from the config.
 
 ```javascript
 // Plain audio

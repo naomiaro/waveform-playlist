@@ -69,6 +69,8 @@ The editor loads audio, generates waveforms, and handles playback.
 
 This is intentional — it lets consumers choose their audio backend (native Web Audio or Tone.js) and keeps `AudioContext` lifecycle in your hands.
 
+The `<daw-track>` elements wait for the adapter: once it is set, they enter the editor in document order and their audio loads. A track whose audio cannot be loaded stays in the editor, drawn failed, and fires `daw-track-error`; `editor.retryTrack(trackId)` loads it again.
+
 ## Try it on this site
 
 Runnable examples — rendered with `@dawcore/components` directly, no React in the audio path:

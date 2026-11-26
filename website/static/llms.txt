@@ -103,6 +103,8 @@ No React and no build step — drop `<daw-editor>` into any HTML page and assign
 
 `<daw-editor>` does not create an `AudioContext` — you own it and assign a `PlayoutAdapter`: `NativePlayoutAdapter` (from `@dawcore/transport`) for native Web Audio, or a Tone.js adapter (from `@waveform-playlist/playout`) when you need MIDI playback.
 
+`<daw-editor>` owns an arrangement (`createArrangement()` from `@waveform-playlist/engine`) and builds its engine on it once the adapter is set; `<daw-track>` elements wait for the adapter, then enter in DOM order and their audio loads through the arrangement. Loading never clears the undo history, and the page's own tracks are not undo steps. `editor.addTrack(config)` resolves with the track id once the track has entered (before its audio loads; follow `daw-track-ready` / `daw-track-error`). A track whose audio failed stays, drawn failed, until `editor.retryTrack(trackId)` loads it or the app removes it.
+
 ## Architecture
 
 Both providers use React Context with small contexts for performance (22 public hooks: 11 that both providers serve, 9 that only WaveformPlaylistProvider serves, 2 that only MediaElementPlaylistProvider serves). Each hook returns one group of fields that change together, and a component re-renders only for the hooks it calls. A hook reads the NEAREST playlist provider.

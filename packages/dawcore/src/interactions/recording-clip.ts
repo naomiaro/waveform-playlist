@@ -83,7 +83,7 @@ export function addRecordedClip(
         return;
       }
       host._peaksData = new Map(host._peaksData).set(clip.id, pd);
-      // Same floor policy as _finalizeAudioClip: the worker cached this
+      // The same floor policy as every loaded clip (_clipPeaksReady): the worker cached this
       // buffer's WaveformData at the base scale — zooming finer than it
       // would render the recorded waveform squeezed in its container.
       host._raiseZoomFloor(host._peakPipeline.getCachedScale(trimmedBuf));

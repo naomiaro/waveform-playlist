@@ -202,12 +202,12 @@
     // --- Tracks (imperative) ----------------------------------------------
     document.getElementById('add-track-src').addEventListener('click', async () => {
       try {
-        const t = await editor.addTrack({
+        const trackId = await editor.addTrack({
           name: 'Kick (addTrack)',
           volume: 0.8,
           clips: [{ src: '/media/audio/AlbertKader_Whiptails/03_Kick.opus' }],
         });
-        addLog('addTrack({src}) → ' + t.trackId.slice(0, 8), 'ok');
+        addLog('addTrack({src}) → ' + trackId.slice(0, 8), 'ok');
       } catch (err) {
         addLog('addTrack rejected: ' + String(err), 'err');
       }
@@ -215,14 +215,14 @@
 
     document.getElementById('add-track-multiclip').addEventListener('click', async () => {
       try {
-        const t = await editor.addTrack({
+        const trackId = await editor.addTrack({
           name: 'Snare 2-clip',
           clips: [
             { src: '/media/audio/AlbertKader_Whiptails/04_Snare.opus', start: 0, duration: 4, offset: 0 },
             { src: '/media/audio/AlbertKader_Whiptails/04_Snare.opus', start: 6, duration: 4, offset: 4 },
           ],
         });
-        addLog('addTrack(multi-clip) → ' + t.trackId.slice(0, 8), 'ok');
+        addLog('addTrack(multi-clip) → ' + trackId.slice(0, 8), 'ok');
       } catch (err) {
         addLog('addTrack rejected: ' + String(err), 'err');
       }
@@ -230,8 +230,8 @@
 
     document.getElementById('add-track-empty').addEventListener('click', async () => {
       try {
-        const t = await editor.addTrack({ name: 'Empty track' });
-        addLog('addTrack({}) → ' + t.trackId.slice(0, 8), 'ok');
+        const trackId = await editor.addTrack({ name: 'Empty track' });
+        addLog('addTrack({}) → ' + trackId.slice(0, 8), 'ok');
       } catch (err) {
         addLog('addTrack rejected: ' + String(err), 'err');
       }

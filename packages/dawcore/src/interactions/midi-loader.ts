@@ -17,9 +17,9 @@ export type { MidiLoadOptions, MidiLoadResult };
  * Minimal host surface needed by `loadMidiImpl`. `<daw-editor>` satisfies this
  * structurally. `querySelectorAll` is needed for cleanup-on-failure so the
  * loader can identify `<daw-track>` elements appended during this call (both
- * those whose `addTrack` resolved and those that rejected after `_loadTrack`
- * fired `daw-track-error` — the latter aren't in the `addTrack` resolution
- * value, so we need DOM observation to find them).
+ * those whose `addTrack` resolved and those whose entry was refused — the
+ * latter aren't in the `addTrack` resolution value, so we need DOM
+ * observation to find them).
  */
 export interface MidiLoaderHost {
   /** Resolves with the track id once the track has entered (#848). */

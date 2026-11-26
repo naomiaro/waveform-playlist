@@ -167,8 +167,8 @@ Custom properties on `<daw-editor>` or any ancestor, inherited through Shadow DO
 
 ## Sample Rate
 
-- `sampleRate` is a derived getter reading from `adapter.audioContext.sampleRate` (fallback 48000). `_resolvedSampleRate` is set from decoded audio.
-- **Always use `effectiveSampleRate`** in internal calculations — returns `_resolvedSampleRate ?? sampleRate`.
+- `sampleRate` is a derived getter: the adapter's `audioContext.sampleRate`; without an adapter (after a disconnect) the rate of a loaded clip in the arrangement, else 48000 (#848: decoded audio is at the context's rate, so the two agree).
+- **Always use `effectiveSampleRate`** in internal calculations (it is `sampleRate`; kept as the one name the helpers read).
 - `PointerHandlerHost` uses `effectiveSampleRate`, not `sampleRate`.
 
 ## File Drop
