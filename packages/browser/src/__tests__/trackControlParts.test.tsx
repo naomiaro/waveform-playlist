@@ -1112,6 +1112,26 @@ describe('a slider gesture is one undo step (#843)', () => {
     expect(volumeOf()).toBe(1);
   });
 
+  // A held key repeats keydown, and each repeat moves the slider: an `input`
+  // and a native `change`. The gesture ends only on the keyup.
+  it('a held arrow key is one step', async () => {
+    mount({ tracks: [A], controls: SLIDERS });
+    await ready();
+    const el = slider('Volume');
+    fireEvent.keyDown(el, { key: 'ArrowLeft' });
+    move(el, '0.9');
+    release(el);
+    for (const value of ['0.8', '0.7', '0.6']) {
+      fireEvent.keyDown(el, { key: 'ArrowLeft', repeat: true });
+      move(el, value);
+      release(el);
+    }
+    fireEvent.keyUp(el, { key: 'ArrowLeft' });
+    expect(volumeOf()).toBe(0.6);
+    act(() => probe.controls.undo());
+    expect(volumeOf()).toBe(1);
+  });
+
   it('volume then pan are two steps', async () => {
     mount({ tracks: [A], controls: SLIDERS });
     await ready();
