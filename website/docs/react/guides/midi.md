@@ -232,7 +232,7 @@ Here the MIDI tracks may arrive after the playlist's first ready (which waits fo
 
 ## Web Components
 
-For consumers of `<daw-editor>` (the dawcore Web Components layer), call `editor.loadMidi(source, options)`. This creates one `<daw-track>` element per note-bearing MIDI track, each a MIDI track (`kind="midi"`), drawn as a piano roll.
+For consumers of `<daw-editor>` (the dawcore Web Components layer), call `editor.loadMidi(source, options)`. This adds one track per note-bearing MIDI track (no `<daw-track>` element since #848), each a MIDI track (`kind: 'midi'`), drawn as a piano roll.
 
 ### Installation
 
@@ -271,7 +271,7 @@ editor.loadMidi(source: string | File, options?: MidiLoadOptions): Promise<MidiL
 
 interface MidiLoadOptions {
   startTime?: number;       // Timeline position in seconds (default 0)
-  signal?: AbortSignal;     // Forwarded to fetch only — see "AbortSignal scope" below
+  signal?: AbortSignal;     // Cancels the fetch, the parse and the tracks waiting to enter — see "AbortSignal Scope" below
 }
 
 interface MidiLoadResult {
@@ -299,11 +299,11 @@ interface MidiLoadResult {
 
 ### Cleanup-on-Failure
 
-If any per-track creation fails, every `<daw-track>` appended during the call is removed — including elements that `addTrack` left in the DOM before its promise rejected. The editor returns to its pre-call state. Don't worry about orphan tracks on partial failure.
+If any per-track creation fails, every track the call added is removed (`addTrack` creates no `<daw-track>` element since #848; a track whose `addTrack` rejected never entered). No orphan tracks are left on partial failure. The removals make no undo step, so the editor is as it was before the call. `options.signal` cancels the call (the fetch, the parse and the tracks waiting to enter) the same way, rejecting with the signal's `reason`.
 
 ### AbortSignal Scope
 
-`options.signal` is forwarded to `fetch()` for URL sources only. Aborting after parsing has finished does NOT cancel the in-flight `addTrack` calls (a documented v1 limitation). Cancellation typically surfaces as a `DOMException` named `AbortError` — distinguish it from a real failure:
+`options.signal` cancels the whole call: the fetch of a URL source, the parse, and the tracks still waiting to enter (`<daw-editor>` combines it with the arrangement it plays, so a swap of `editor.arrangement` cancels it too). The call rejects with the signal's `reason` (a `DOMException` named `AbortError` when `abort()` is called without one), and the tracks it added are taken out with no undo step. Distinguish it from a real failure:
 
 ```javascript
 try {

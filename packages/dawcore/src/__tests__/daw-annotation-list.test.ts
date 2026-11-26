@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { probeListeners } from './helpers/listener-probe';
 import '../elements/daw-annotation';
 import '../elements/daw-annotation-track';
 import '../elements/daw-annotation-list';
@@ -356,5 +357,26 @@ describe('<daw-annotation-list>', () => {
       orphanList.remove();
       warn.mockRestore();
     });
+  });
+});
+
+describe('<daw-annotation-list>: listeners of a connection (D8, #848)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  it('its listeners go when it disconnects and come back on a reconnect', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const el = document.createElement('daw-annotation-list');
+    const onDocument = probeListeners(document);
+    document.body.appendChild(el);
+    expect(onDocument.live()).toBe(3);
+    el.remove();
+    expect(onDocument.live()).toBe(0);
+    document.body.appendChild(el);
+    expect(onDocument.live()).toBe(3);
+    el.remove();
+    expect(onDocument.live()).toBe(0);
   });
 });

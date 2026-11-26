@@ -1,8 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import WaveformData from 'waveform-data';
 import {
   extractPeaksFromWaveformData,
   extractPeaksFromWaveformDataFull,
+  getWaveformDataMetadata,
+  loadPeaksFromWaveformData,
+  loadWaveformData,
 } from '../waveformDataLoader';
 
 /**
@@ -297,5 +300,46 @@ describe('extractPeaksFromWaveformDataFull', () => {
         expect(Number.isFinite(result.data[ch][i])).toBe(true);
       }
     }
+  });
+});
+
+describe('loadWaveformData and its siblings take a signal (#848, D7)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+  const stubAbortableFetch = () => {
+    const seen: Array<AbortSignal | undefined> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) => {
+        seen.push(init?.signal ?? undefined);
+        return new Promise((_, reject) => {
+          if (init?.signal?.aborted) reject(init.signal.reason);
+          init?.signal?.addEventListener('abort', () => reject(init.signal!.reason));
+        });
+      })
+    );
+    return seen;
+  };
+
+  it('loadWaveformData passes the signal to fetch and rejects with its reason', async () => {
+    const seen = stubAbortableFetch();
+    const c = new AbortController();
+    const p = loadWaveformData('/x.dat', { signal: c.signal });
+    expect(seen[0]).toBe(c.signal);
+    const reason = new DOMException('stop', 'AbortError');
+    c.abort(reason);
+    await expect(p).rejects.toBe(reason);
+  });
+
+  it('loadPeaksFromWaveformData and getWaveformDataMetadata pass it on', async () => {
+    const seen = stubAbortableFetch();
+    const c = new AbortController();
+    const a = loadPeaksFromWaveformData('/x.dat', 0, { signal: c.signal });
+    const b = getWaveformDataMetadata('/x.dat', { signal: c.signal });
+    expect(seen).toEqual([c.signal, c.signal]);
+    c.abort();
+    await expect(a).rejects.toMatchObject({ name: 'AbortError' });
+    await expect(b).rejects.toMatchObject({ name: 'AbortError' });
   });
 });

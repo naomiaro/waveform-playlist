@@ -137,6 +137,14 @@ describe('calculateSplitPoint', () => {
 });
 
 describe('splitClip', () => {
+  it('keeps the original id on the left half; the right half gets a new id (#848)', () => {
+    const clip = makeClip({ id: 'c1', startSample: 0, durationSamples: 10000 });
+    const { left, right } = splitClip(clip, 4000);
+    expect(left.id).toBe('c1');
+    expect(right.id).not.toBe('c1');
+    expect(right.id).not.toBe(left.id);
+  });
+
   it('creates two clips covering original range', () => {
     const clip = makeClip({
       id: 'c1',

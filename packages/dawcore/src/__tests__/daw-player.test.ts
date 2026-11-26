@@ -649,4 +649,44 @@ describe('DawPlayerElement — wave 4 review hardening', () => {
 
     expect(times).toEqual([42]);
   });
+
+  describe('peaks fetch cancellation (#848, D7)', () => {
+    it('aborts the previous peaks fetch on a new peaks-src, and the current one on disconnect', async () => {
+      const signals: Array<AbortSignal | undefined> = [];
+      vi.spyOn(peaksLoader, 'loadWaveformDataFromUrl').mockImplementation(
+        (_src: string, signal?: AbortSignal) => {
+          signals.push(signal);
+          return new Promise(() => {}) as never;
+        }
+      );
+      const el = makePlayer();
+      el.peaksSrc = 'a.dat';
+      await el.updateComplete;
+      expect(signals).toHaveLength(1);
+      expect(signals[0]?.aborted).toBe(false);
+      el.peaksSrc = 'b.dat';
+      await el.updateComplete;
+      expect(signals).toHaveLength(2);
+      expect(signals[0]?.aborted).toBe(true);
+      expect(signals[1]?.aborted).toBe(false);
+      el.remove();
+      expect(signals[1]?.aborted).toBe(true);
+    });
+
+    it('a reparent while the peaks fetch is in flight fetches them again', async () => {
+      const calls: string[] = [];
+      vi.spyOn(peaksLoader, 'loadWaveformDataFromUrl').mockImplementation((src: string) => {
+        calls.push(src);
+        return new Promise(() => {}) as never;
+      });
+      const el = makePlayer();
+      el.peaksSrc = 'a.dat';
+      await el.updateComplete;
+      const parent = el.parentElement!;
+      el.remove();
+      parent.appendChild(el);
+      await el.updateComplete;
+      expect(calls).toEqual(['a.dat', 'a.dat']);
+    });
+  });
 });

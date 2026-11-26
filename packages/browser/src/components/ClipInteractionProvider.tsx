@@ -20,6 +20,7 @@ import {
   useDragGuardOptional,
 } from '../contexts/playlistContexts';
 import { useClipDragHandlers } from '../hooks/useClipDragHandlers';
+import { DragWatch } from '../providerInternals/DragWatch';
 import { useDragSensors } from '../hooks/useDragSensors';
 import { ClipCollisionModifier } from '../modifiers/ClipCollisionModifier';
 import { SnapToGridModifier } from '../modifiers/SnapToGridModifier';
@@ -227,6 +228,8 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
         onDragEnd={handleDragEnd}
         modifiers={modifiers}
       >
+        {/* An outside change to what is dragged cancels the drag (#848). */}
+        <DragWatch />
         {children}
       </DragDropProvider>
     </ClipInteractionOptions>

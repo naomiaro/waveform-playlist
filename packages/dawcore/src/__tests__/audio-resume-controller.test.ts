@@ -71,6 +71,20 @@ describe('AudioResumeController', () => {
     expect(host.audioContext.resume).toHaveBeenCalledOnce();
   });
 
+  it('listens in the capture phase: a child that stops propagation still resumes', () => {
+    const controller = new AudioResumeController(host);
+    controller.target = '';
+    controller.hostConnected();
+    flushRaf();
+    const child = document.createElement('button');
+    child.addEventListener('pointerdown', (e) => e.stopPropagation());
+    host.appendChild(child);
+
+    child.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+
+    expect(host.audioContext.resume).toHaveBeenCalledOnce();
+  });
+
   it('resumes suspended AudioContext on first keydown', () => {
     const controller = new AudioResumeController(host);
     controller.target = '';
@@ -108,18 +122,15 @@ describe('AudioResumeController', () => {
   });
 
   it('removes listeners on hostDisconnected before any event fires', () => {
-    const removeSpy = vi.spyOn(host, 'removeEventListener');
     const controller = new AudioResumeController(host);
     controller.target = '';
     controller.hostConnected();
     flushRaf();
 
     controller.hostDisconnected();
+    host.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    host.dispatchEvent(new Event('keydown', { bubbles: true }));
 
-    const captureRemovals = removeSpy.mock.calls.filter(
-      ([, , opts]) => (opts as any)?.capture === true
-    );
-    expect(captureRemovals.length).toBe(2);
     expect(host.audioContext.resume).not.toHaveBeenCalled();
   });
 
@@ -228,12 +239,13 @@ describe('AudioResumeController', () => {
       updateComplete: { value: Promise.resolve(true) },
       audioContext: {
         get() {
+          reads++;
           throw new Error('No PlayoutAdapter set on <daw-editor>.');
         },
       },
     });
+    let reads = 0;
     const throwHost = el as any;
-    const removeSpy = vi.spyOn(throwHost, 'removeEventListener');
 
     const controller = new AudioResumeController(throwHost);
     controller.target = '';
@@ -241,11 +253,10 @@ describe('AudioResumeController', () => {
     flushRaf();
 
     throwHost.dispatchEvent(new Event('pointerdown', { bubbles: true }));
-
-    const captureRemovals = removeSpy.mock.calls.filter(
-      ([, , opts]) => (opts as any)?.capture === true
-    );
-    expect(captureRemovals.length).toBeGreaterThanOrEqual(1);
+    expect(reads).toBe(1);
+    // The other gesture's listener went too: a key press reads nothing.
+    throwHost.dispatchEvent(new Event('keydown', { bubbles: true }));
+    expect(reads).toBe(1);
     throwHost.remove();
   });
 

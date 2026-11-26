@@ -97,6 +97,9 @@ export class PointerHandler {
     return (time * h.effectiveSampleRate) / h.samplesPerPixel;
   }
 
+  /** The timeline's listeners of the seek / selection press in progress. */
+  private _seekGesture: AbortController | null = null;
+
   /** Cancels the armed clip drag; set while one is armed (#848). */
   private _cancelArmedClipDrag: (() => void) | null = null;
 
@@ -129,11 +132,11 @@ export class PointerHandler {
             console.warn('[dawcore] setPointerCapture failed: ' + String(err));
           }
           const onMove = (me: Event) => clipHandler.onPointerMove(me as PointerEvent);
+          // This clip drag's listeners: aborted on every way it ends.
+          const gesture = new AbortController();
           const detach = (pointerId: number) => {
             this._cancelArmedClipDrag = null;
-            this._timeline?.removeEventListener('pointermove', onMove);
-            this._timeline?.removeEventListener('pointerup', onUp);
-            this._timeline?.removeEventListener('pointercancel', onCancel);
+            gesture.abort();
             try {
               this._timeline?.releasePointerCapture(pointerId);
             } catch (err) {
@@ -165,9 +168,10 @@ export class PointerHandler {
             );
             detach(downPointerId);
           };
-          this._timeline.addEventListener('pointermove', onMove);
-          this._timeline.addEventListener('pointerup', onUp);
-          this._timeline.addEventListener('pointercancel', onCancel);
+          const { signal } = gesture;
+          this._timeline.addEventListener('pointermove', onMove, { signal });
+          this._timeline.addEventListener('pointerup', onUp, { signal });
+          this._timeline.addEventListener('pointercancel', onCancel, { signal });
         }
         return;
       }
@@ -193,9 +197,14 @@ export class PointerHandler {
     } catch (err) {
       console.warn('[dawcore] setPointerCapture failed: ' + String(err));
     }
-    this._timeline.addEventListener('pointermove', this._onPointerMove);
-    this._timeline.addEventListener('pointerup', this._onPointerUp);
-    this._timeline.addEventListener('pointercancel', this._onPointerCancel);
+    // A press while one is in progress (a second touch) keeps one set of
+    // listeners, as adding the same listeners again did.
+    this._seekGesture?.abort();
+    this._seekGesture = new AbortController();
+    const { signal } = this._seekGesture;
+    this._timeline.addEventListener('pointermove', this._onPointerMove, { signal });
+    this._timeline.addEventListener('pointerup', this._onPointerUp, { signal });
+    this._timeline.addEventListener('pointercancel', this._onPointerCancel, { signal });
   };
 
   private _onPointerMove = (e: PointerEvent) => {
@@ -239,9 +248,8 @@ export class PointerHandler {
         '[dawcore] releasePointerCapture failed (may already be released): ' + String(err)
       );
     }
-    this._timeline.removeEventListener('pointermove', this._onPointerMove);
-    this._timeline.removeEventListener('pointerup', this._onPointerUp);
-    this._timeline.removeEventListener('pointercancel', this._onPointerCancel);
+    this._seekGesture?.abort();
+    this._seekGesture = null;
   }
 
   private _resetInteractionState() {

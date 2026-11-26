@@ -63,15 +63,21 @@ export class AnnotationController implements ReactiveController {
     );
   }
 
+  /** The host listeners of this connection, aborted in hostDisconnected. */
+  private _listeners: AbortController | null = null;
+
   hostConnected(): void {
-    this._host.addEventListener('daw-annotation-update', this._onDataChange);
-    this._host.addEventListener('daw-annotation-select', this._onDataChange);
-    this._host.addEventListener('daw-annotation-connected', this._onDataChange);
+    this._listeners?.abort();
+    this._listeners = new AbortController();
+    const { signal } = this._listeners;
+    this._host.addEventListener('daw-annotation-update', this._onDataChange, { signal });
+    this._host.addEventListener('daw-annotation-select', this._onDataChange, { signal });
+    this._host.addEventListener('daw-annotation-connected', this._onDataChange, { signal });
     // The host IS the editor and daw-timeupdate/daw-stop are dispatched on
     // it directly (see playback-animation-controller.ts) — no document-level
     // listening or target filtering needed, unlike <daw-annotation-list>.
-    this._host.addEventListener('daw-timeupdate', this._onTimeUpdate as EventListener);
-    this._host.addEventListener('daw-stop', this._onStop);
+    this._host.addEventListener('daw-timeupdate', this._onTimeUpdate as EventListener, { signal });
+    this._host.addEventListener('daw-stop', this._onStop, { signal });
     // Removals can't bubble — observe childList like the editor's track observer.
     this._removalObserver = new MutationObserver((mutations) => {
       let changed = false;
@@ -106,11 +112,8 @@ export class AnnotationController implements ReactiveController {
   }
 
   hostDisconnected(): void {
-    this._host.removeEventListener('daw-annotation-update', this._onDataChange);
-    this._host.removeEventListener('daw-annotation-select', this._onDataChange);
-    this._host.removeEventListener('daw-annotation-connected', this._onDataChange);
-    this._host.removeEventListener('daw-timeupdate', this._onTimeUpdate as EventListener);
-    this._host.removeEventListener('daw-stop', this._onStop);
+    this._listeners?.abort();
+    this._listeners = null;
     this._removalObserver?.disconnect();
     this._removalObserver = null;
     this._tracks = [];

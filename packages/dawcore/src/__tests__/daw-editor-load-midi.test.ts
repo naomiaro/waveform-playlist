@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 import type { Mock } from 'vitest';
 import type { DawEditorElement } from '../elements/daw-editor';
-import type { DawClipElement } from '../elements/daw-clip';
+import { createTrack } from '@waveform-playlist/core';
 
 // Mock @dawcore/midi so we don't need a real binary fixture.
 vi.mock('@dawcore/midi', () => ({
@@ -97,7 +97,13 @@ describe('<daw-editor>.loadMidi', () => {
     const ctrl = new AbortController();
     mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 1 }));
     await editor.loadMidi('/midi/test.mid', { signal: ctrl.signal });
-    expect(mockParseMidiUrl).toHaveBeenCalledWith('/midi/test.mid', undefined, ctrl.signal);
+    // The caller's signal combined with the arrangement played (#848, D6):
+    // another object, aborted when the caller's is.
+    const passed = mockParseMidiUrl.mock.lastCall?.[2] as AbortSignal;
+    expect(mockParseMidiUrl.mock.lastCall?.[0]).toBe('/midi/test.mid');
+    expect(passed.aborted).toBe(false);
+    ctrl.abort();
+    expect(passed.aborted).toBe(true);
   });
 
   it('parses a File source via parseMidiFile', async () => {
@@ -111,11 +117,12 @@ describe('<daw-editor>.loadMidi', () => {
     expect(mockParseMidiFile).toHaveBeenCalledWith(buf);
   });
 
-  it('creates N <daw-track> elements for a multi-track file', async () => {
+  it('adds N tracks for a multi-track file (no element, #848)', async () => {
     mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 3 }));
     const result = await editor.loadMidi('/midi/multi.mid');
     expect(result.trackIds).toHaveLength(3);
-    expect(editor.querySelectorAll('daw-track')).toHaveLength(3);
+    expect(editor.tracks).toHaveLength(3);
+    expect(editor.querySelectorAll('daw-track')).toHaveLength(0);
   });
 
   it('returns header bpm / timeSignature / duration / name even for empty files', async () => {
@@ -127,32 +134,31 @@ describe('<daw-editor>.loadMidi', () => {
     expect(result.bpm).toBe(140);
     expect(result.timeSignature).toEqual([3, 4]);
     expect(result.name).toBe('Empty');
-    expect(editor.querySelectorAll('daw-track')).toHaveLength(0);
+    expect(editor.tracks).toHaveLength(0);
   });
 
   it('applies startTime to every created clip', async () => {
     mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 2 }));
     await editor.loadMidi('/midi/test.mid', { startTime: 30 });
-    const clips = editor.querySelectorAll('daw-clip');
+    const clips = editor.tracks.flatMap((t) => t.clips);
     expect(clips.length).toBe(2);
     clips.forEach((c) => {
-      expect((c as unknown as DawClipElement).start).toBe(30);
+      expect(c.start).toBe(30);
     });
   });
 
   it('uses MIDI track names', async () => {
     mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 2 }));
     await editor.loadMidi('/midi/named.mid');
-    const tracks = Array.from(editor.querySelectorAll('daw-track'));
-    expect(tracks.map((t) => t.getAttribute('name'))).toEqual(['Track 1', 'Track 2']);
+    expect(editor.tracks.map((t) => t.name)).toEqual(['Track 1', 'Track 2']);
   });
 
   it('makes every created track a MIDI track (kind="midi")', async () => {
     mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 3 }));
     await editor.loadMidi('/midi/x.mid');
-    const tracks = Array.from(editor.querySelectorAll('daw-track'));
-    tracks.forEach((t) => {
-      expect(t.getAttribute('kind')).toBe('midi');
+    expect(editor.tracks).toHaveLength(3);
+    editor.tracks.forEach((t) => {
+      expect(t.kind).toBe('midi');
     });
   });
 
@@ -208,13 +214,13 @@ describe('<daw-editor>.loadMidi', () => {
 
     await expect(editor.loadMidi('/midi/partial.mid')).rejects.toThrow(/track 2 failed/);
     // Track 1 was successfully created — verify it has been removed (cleanup ran).
-    expect(editor.querySelectorAll('daw-track')).toHaveLength(0);
+    expect(editor.tracks).toHaveLength(0);
   });
 
   it('cleanup waits for late settlements (allSettled, not all)', async () => {
     mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 2 }));
     const originalAddTrack = editor.addTrack.bind(editor);
-    let lateResolveTrack: HTMLElement | null = null;
+    let lateId: string | null = null;
     let callCount = 0;
     editor.addTrack = vi.fn(async (config) => {
       callCount += 1;
@@ -224,43 +230,13 @@ describe('<daw-editor>.loadMidi', () => {
       }
       // Second resolves after a microtask tick — proving cleanup waits.
       const id = await originalAddTrack(config);
-      lateResolveTrack =
-        Array.from(editor.querySelectorAll('daw-track')).find(
-          (t) => (t as unknown as { trackId: string }).trackId === id
-        ) ?? null;
+      lateId = id;
       return id;
     });
 
     await expect(editor.loadMidi('/midi/race.mid')).rejects.toThrow(/track 0 fails fast/);
-    expect(editor.querySelectorAll('daw-track')).toHaveLength(0);
-    expect(lateResolveTrack).not.toBeNull();
-    expect((lateResolveTrack as HTMLElement | null)?.isConnected).toBe(false);
-  });
-
-  it('cleans up a track element that addTrack appended before rejecting', async () => {
-    // Realistic failure mode: addTrack appends the <daw-track> synchronously
-    // and THEN rejects (e.g., _loadTrack fires daw-track-error after the
-    // element is in the DOM). The cleanup must remove that orphan too —
-    // not just the elements from the succeeded[] array.
-    mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 2 }));
-    const originalAddTrack = editor.addTrack.bind(editor);
-    let callCount = 0;
-    editor.addTrack = vi.fn(async (config) => {
-      callCount += 1;
-      if (callCount === 1) {
-        // Append the element first, then reject — mirrors the real
-        // _loadTrack-fails-after-append path.
-        const trackEl = document.createElement('daw-track');
-        editor.appendChild(trackEl);
-        throw new Error('synthetic — appended then rejected');
-      }
-      return originalAddTrack(config);
-    });
-
-    await expect(editor.loadMidi('/midi/orphan.mid')).rejects.toThrow(/appended then rejected/);
-    // Both the failed (orphan-appended) track AND the succeeded second track
-    // must be gone — editor returns to pre-call state.
-    expect(editor.querySelectorAll('daw-track')).toHaveLength(0);
+    expect(lateId).not.toBeNull();
+    expect(editor.tracks.map((t) => t.trackId)).not.toContain(lateId);
   });
 
   it('summarizes multi-track failures and warns each subsequent rejection', async () => {
@@ -297,5 +273,73 @@ describe('<daw-editor>.loadMidi', () => {
     expect(result.timeSignature).toEqual([6, 8]);
     expect(result.duration).toBe(12.5);
     expect(result.name).toBe('Song');
+  });
+
+  describe('cancellation and cleanup (#848, D6)', () => {
+    it('an abort while its tracks wait to enter rejects with AbortError; none of them enters', async () => {
+      mockParseMidiFile.mockReturnValueOnce(makeParsedMidi({ tracks: 2 }));
+      const waiting = document.createElement('daw-editor') as DawEditorElement; // no adapter
+      document.body.appendChild(waiting);
+      const file = new File([new Uint8Array(4)], 'song.mid');
+      (file as unknown as { arrayBuffer: () => Promise<ArrayBuffer> }).arrayBuffer = async () =>
+        new ArrayBuffer(4);
+      const c = new AbortController();
+      const p = waiting.loadMidi(file, { signal: c.signal });
+      await new Promise((r) => setTimeout(r, 0));
+      expect(waiting.tracks).toHaveLength(2);
+      c.abort();
+      const error = await p.catch((e) => e);
+      expect(error).toBeInstanceOf(DOMException);
+      expect((error as DOMException).name).toBe('AbortError');
+      expect(waiting.tracks).toHaveLength(0);
+      waiting.adapter = makeMockAdapter() as any;
+      await new Promise((r) => setTimeout(r, 0));
+      expect(waiting.arrangement!.getTracks()).toHaveLength(0);
+      waiting.remove();
+    });
+
+    it('the cleanup after a failure leaves no undo step: an Undo does not bring a track back', async () => {
+      mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 2 }));
+      editor.arrangement!.addTrack({ ...createTrack({ name: 'Before', clips: [] }), id: 'before' });
+      const originalAddTrack = editor.addTrack.bind(editor);
+      let calls = 0;
+      editor.addTrack = vi.fn(async (config) => {
+        calls += 1;
+        if (calls === 2) throw new Error('synthetic — track 1 fails');
+        return originalAddTrack(config);
+      });
+      await expect(editor.loadMidi('/midi/partial.mid')).rejects.toThrow(/track 1 fails/);
+      expect(editor.arrangement!.getTracks().map((t) => t.name)).toEqual(['Before']);
+      editor.undo(); // the arrival of Before; the cleanup made no step to undo
+      expect(editor.arrangement!.getTracks()).toHaveLength(0);
+    });
+  });
+
+  it('an abort after a swap takes the tracks out of the arrangement they entered (review round 3)', async () => {
+    mockParseMidiUrl.mockResolvedValueOnce(makeParsedMidi({ tracks: 2 }));
+    const { createArrangement } = await import('@waveform-playlist/engine');
+    const x = createArrangement();
+    editor.arrangement = x;
+    await new Promise((r) => setTimeout(r, 0));
+    const original = editor.addTrack.bind(editor);
+    let calls = 0;
+    editor.addTrack = vi.fn((config, options) => {
+      calls += 1;
+      if (calls === 1) return original(config, options);
+      // The second never enters: it ends with the signal.
+      return new Promise<string>((_, reject) =>
+        options?.signal?.addEventListener('abort', () => reject(options.signal!.reason))
+      );
+    });
+    const p = editor.loadMidi('/midi/swap.mid');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(x.getTracks().map((t) => t.name)).toEqual(['Track 1']);
+    const removed: unknown[] = [];
+    editor.addEventListener('daw-track-removed', (e) => removed.push(e));
+    editor.arrangement = null; // x is swapped out: the call aborts
+    await expect(p).rejects.toMatchObject({ name: 'AbortError' });
+    expect(x.getTracks()).toHaveLength(0);
+    // A track of an arrangement not played: the editor announces nothing for it.
+    expect(removed).toEqual([]);
   });
 });

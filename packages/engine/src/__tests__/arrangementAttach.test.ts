@@ -458,3 +458,12 @@ describe('an arrangement made by another copy of the package', () => {
     );
   });
 });
+
+describe('isArrangement is public (#848)', () => {
+  it('is true for an arrangement and false for anything else', async () => {
+    const engine = await import('../index');
+    expect(engine.isArrangement(engine.createArrangement())).toBe(true);
+    expect(engine.isArrangement({ getTracks: () => [] })).toBe(false);
+    expect(engine.isArrangement(null)).toBe(false);
+  });
+});

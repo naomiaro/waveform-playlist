@@ -8,14 +8,24 @@
 import WaveformData from 'waveform-data';
 import type { PeakData, Peaks } from '@waveform-playlist/core';
 
+/** Options of the loaders below. */
+export interface WaveformDataLoadOptions {
+  /** Aborts the fetch; the call rejects with the signal's `reason`, as `fetch()` does. */
+  signal?: AbortSignal;
+}
+
 /**
  * Load waveform data from a .dat or .json file
  *
  * @param src - URL to waveform data file (.dat or .json)
+ * @param options - `signal` to abort the fetch
  * @returns WaveformData instance
  */
-export async function loadWaveformData(src: string): Promise<WaveformData> {
-  const response = await fetch(src);
+export async function loadWaveformData(
+  src: string,
+  options: WaveformDataLoadOptions = {}
+): Promise<WaveformData> {
+  const response = await fetch(src, options.signal ? { signal: options.signal } : undefined);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch waveform data: ${response.statusText}`);
@@ -77,13 +87,15 @@ export function waveformDataToPeaks(
  *
  * @param src - URL to waveform data file (.dat or .json)
  * @param channelIndex - Channel index (default: 0)
+ * @param options - `signal` to abort the fetch
  * @returns Peaks data ready for rendering
  */
 export async function loadPeaksFromWaveformData(
   src: string,
-  channelIndex: number = 0
+  channelIndex: number = 0,
+  options: WaveformDataLoadOptions = {}
 ): Promise<{ data: Int8Array | Int16Array; bits: 8 | 16; length: number; sampleRate: number }> {
-  const waveformData = await loadWaveformData(src);
+  const waveformData = await loadWaveformData(src, options);
   return waveformDataToPeaks(waveformData, channelIndex);
 }
 
@@ -91,9 +103,13 @@ export async function loadPeaksFromWaveformData(
  * Get metadata from waveform data file without converting to peaks
  *
  * @param src - URL to waveform data file
+ * @param options - `signal` to abort the fetch
  * @returns Metadata (sample rate, channels, duration, bits, etc.)
  */
-export async function getWaveformDataMetadata(src: string): Promise<{
+export async function getWaveformDataMetadata(
+  src: string,
+  options: WaveformDataLoadOptions = {}
+): Promise<{
   sampleRate: number;
   channels: number;
   duration: number;
@@ -101,7 +117,7 @@ export async function getWaveformDataMetadata(src: string): Promise<{
   length: number;
   bits: 8 | 16;
 }> {
-  const waveformData = await loadWaveformData(src);
+  const waveformData = await loadWaveformData(src, options);
 
   return {
     sampleRate: waveformData.sample_rate,

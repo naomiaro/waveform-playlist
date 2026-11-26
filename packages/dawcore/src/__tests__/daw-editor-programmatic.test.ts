@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import { createClip, createTrack } from '@waveform-playlist/core';
 import {
+  appendTrackElement,
   makeAudioBuffer as makeDecodedBuffer,
   makeAudioFile,
   makeFakeAdapter,
@@ -13,6 +14,10 @@ import {
   tick,
 } from './helpers/editor-harness';
 import type { FakeAdapter } from './helpers/editor-harness';
+
+/** A track as it is played (loaded clips, current mix), read from the arrangement (#848). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const played = (editor: any, id: string) => editor._loadedTracks().find((t: any) => t.id === id);
 
 beforeAll(async () => {
   await import('../elements/daw-clip');
@@ -119,6 +124,11 @@ function mockOf(fake: FakeAdapter, method: string): Mock {
 }
 
 /** The `<daw-track>` element of a track id (`editor.addTrack()` resolves with the id). */
+/** A track declared by a <daw-track> (addTrack makes no element since #848); resolves with its id. */
+function addElementTrack(editor: any, config: object = {}): Promise<string> {
+  return appendTrackElement(editor, config).then((el: any) => el.trackId as string);
+}
+
 function trackElement(editor: any, trackId: string): any {
   return [...editor.querySelectorAll('daw-track')].find((t: any) => t.trackId === trackId);
 }
@@ -150,35 +160,31 @@ describe('editor.ready()', () => {
 });
 
 describe('editor.addTrack()', () => {
-  it('appends a <daw-track> element to the editor', async () => {
+  it('makes no element; the track is listed with its name and volume (#848)', async () => {
     const { editor } = await setupLoadingEditor();
-
-    const promise = editor.addTrack({ name: 'Test', volume: 0.7 });
-    // Element is appended synchronously; the promise resolves with its id once it has entered
-    expect(editor.querySelectorAll('daw-track').length).toBe(1);
-
-    const trackEl = editor.querySelector('daw-track');
-    const id = await promise;
-    expect(id).toBe(trackEl.trackId);
-    expect(trackEl.name).toBe('Test');
-    expect(trackEl.volume).toBe(0.7);
+    const id = await editor.addTrack({ name: 'Test', volume: 0.7 });
+    expect(editor.querySelectorAll('daw-track').length).toBe(0);
+    expect(editor.tracks.find((t: { trackId: string }) => t.trackId === id)).toMatchObject({
+      name: 'Test',
+      volume: 0.7,
+    });
     editor.remove();
   });
-
-  it('builds <daw-clip> children from config.clips', async () => {
+  it('config.clips enter the arrangement with the track, with no <daw-clip> (#848)', async () => {
     const editor = setupEditor();
-    editor.addTrack({
+    const id = await editor.addTrack({
       name: 'Multi',
       clips: [
         { src: '/a.opus', start: 0, duration: 4 },
         { src: '/b.opus', start: 4, duration: 4 },
       ],
     });
-    await new Promise((r) => setTimeout(r, 60));
-    const clips = editor.querySelectorAll('daw-clip');
-    expect(clips.length).toBe(2);
-    expect((clips[0] as any).src).toBe('/a.opus');
-    expect((clips[1] as any).start).toBe(4);
+    expect(editor.querySelectorAll('daw-clip').length).toBe(0);
+    const clips = editor.tracks.find((t: { trackId: string }) => t.trackId === id).clips;
+    expect(clips.map((c: { src: string; start: number }) => [c.src, c.start])).toEqual([
+      ['/a.opus', 0],
+      ['/b.opus', 4],
+    ]);
     editor.remove();
   });
 });
@@ -186,7 +192,7 @@ describe('editor.addTrack()', () => {
 describe('editor.removeTrack()', () => {
   it('removes the matching <daw-track> element from the DOM', async () => {
     const editor = setupEditor();
-    editor.addTrack({ name: 'Test' });
+    addElementTrack(editor, { name: 'Test' });
     await new Promise((r) => setTimeout(r, 60));
     const trackEl = editor.querySelector('daw-track') as any;
     expect(editor.querySelectorAll('daw-track').length).toBe(1);
@@ -200,9 +206,9 @@ describe('editor.removeTrack()', () => {
     // A file-dropped track: in the arrangement, with no <daw-track>
     const { loaded } = await editor.loadFiles([makeAudioFile('drop.wav')]);
     expect(editor.querySelectorAll('daw-track').length).toBe(0);
-    expect(editor._engineTracks.size).toBe(1);
+    expect(editor._loadedTracks().length).toBe(1);
     editor.removeTrack(loaded[0]);
-    expect(editor._engineTracks.size).toBe(0);
+    expect(editor._loadedTracks().length).toBe(0);
     expect(editor._arrangement.getTracks()).toEqual([]);
     editor.remove();
   });
@@ -218,21 +224,21 @@ describe('editor.removeTrack()', () => {
 });
 
 describe('editor.updateTrack()', () => {
-  it('mutates reflected attributes on the <daw-track> element', async () => {
+  it("changes the arrangement; the <daw-track>'s properties show it, not its attributes (#848)", async () => {
     const { editor } = await setupLoadingEditor();
-    const id = await editor.addTrack({ name: 'Original', volume: 1, pan: 0 });
-    const trackEl = trackElement(editor, id);
-    editor.updateTrack(id, {
+    const trackEl = await appendTrackElement(editor, { name: 'Original', volume: 1, pan: 0 });
+    editor.updateTrack(trackEl.trackId, {
       name: 'Updated',
       volume: 0.3,
       muted: true,
     });
-    expect(trackEl.getAttribute('name')).toBe('Updated');
+    expect(trackEl.name).toBe('Updated');
     expect(trackEl.volume).toBe(0.3);
-    expect(trackEl.hasAttribute('muted')).toBe(true);
+    expect(trackEl.muted).toBe(true);
+    expect(trackEl.getAttribute('name')).toBe('Original');
+    expect(trackEl.hasAttribute('muted')).toBe(false);
     editor.remove();
   });
-
   it('applies directly to the arrangement for non-DOM tracks (file drops)', async () => {
     const { editor } = await setupLoadingEditor();
     const { loaded } = await editor.loadFiles([makeAudioFile('file.wav')]);
@@ -249,43 +255,34 @@ describe('editor.updateTrack()', () => {
     expect(setVolume.mock.calls[0][2]).toEqual(setMute.mock.calls[0][2]);
     expect(setPan).not.toHaveBeenCalled();
     expect(editor._arrangement.getMixer().get(id)).toMatchObject({ volume: 0.5, muted: true });
-    // The mix is the arrangement's (#843): the descriptor holds no copy.
-    expect(editor._tracks.get(id)).not.toHaveProperty('volume');
-    expect(editor._tracks.get(id)).not.toHaveProperty('muted');
+    // The mix is the arrangement's (#843): the editor holds no copy.
+    expect(editor._extras.get(id)).not.toHaveProperty('volume');
+    expect(editor._extras.get(id)).not.toHaveProperty('muted');
     editor.remove();
   });
 });
 
 describe('editor.addClip() / removeClip() / updateClip()', () => {
-  it('addClip rejects when the track has no DOM element', async () => {
+  it('addClip rejects for an id no track has', async () => {
     const editor = setupEditor();
     await expect(editor.addClip('not-a-track', { src: '/a.opus' })).rejects.toThrow(
-      /no <daw-track> element/
+      /not in the editor/
     );
     editor.remove();
   });
-
-  it('addClip appends a <daw-clip> to the matching track', async () => {
+  it('addClip adds the clip to the arrangement and makes no <daw-clip> (#848)', async () => {
     const editor = setupEditor();
-    const t = await (async () => {
-      editor.addTrack({ name: 'T' });
-      await new Promise((r) => setTimeout(r, 60));
-      return editor.querySelector('daw-track') as any;
-    })();
-
+    const t = await appendTrackElement(editor, { name: 'T' });
+    editor.addClip(t.trackId, { src: '/a.opus', start: 5 }).catch(() => {});
     expect(t.querySelectorAll('daw-clip').length).toBe(0);
-    editor.addClip(t.trackId, { src: '/a.opus', start: 5 });
-    // appendChild is synchronous
-    expect(t.querySelectorAll('daw-clip').length).toBe(1);
-    const clipEl = t.querySelector('daw-clip') as any;
-    expect(clipEl.src).toBe('/a.opus');
-    expect(clipEl.start).toBe(5);
+    const clips = editor.tracks.find((x: { trackId: string }) => x.trackId === t.trackId).clips;
+    expect(clips).toHaveLength(1);
+    expect(clips[0]).toMatchObject({ src: '/a.opus', start: 5, kind: 'drop' });
     editor.remove();
   });
-
   it('removeClip removes the matching <daw-clip> element', async () => {
     const editor = setupEditor();
-    editor.addTrack({ name: 'T', clips: [{ src: '/a.opus', start: 0 }] });
+    addElementTrack(editor, { name: 'T', clips: [{ src: '/a.opus', start: 0 }] });
     await new Promise((r) => setTimeout(r, 60));
     const trackEl = editor.querySelector('daw-track') as any;
     const clipEl = trackEl.querySelector('daw-clip') as any;
@@ -295,11 +292,13 @@ describe('editor.addClip() / removeClip() / updateClip()', () => {
     editor.remove();
   });
 
-  it('updateClip writes properties on the <daw-clip>', async () => {
-    const editor = setupEditor();
-    editor.addTrack({ name: 'T', clips: [{ src: '/a.opus', start: 0, duration: 4 }] });
-    await new Promise((r) => setTimeout(r, 60));
-    const trackEl = editor.querySelector('daw-track') as any;
+  it('updateClip changes the arrangement; the <daw-clip> properties show it, not its attributes (#848)', async () => {
+    const { editor } = await setupLoadingEditor();
+    const trackEl = await appendTrackElement(editor, {
+      name: 'T',
+      clips: [{ src: '/a.opus', start: 0, duration: 4, name: 'Clip' }],
+    });
+    await settle(editor);
     const clipEl = trackEl.querySelector('daw-clip') as any;
     editor.updateClip(trackEl.trackId, clipEl.clipId, {
       start: 2,
@@ -308,19 +307,20 @@ describe('editor.addClip() / removeClip() / updateClip()', () => {
     });
     expect(clipEl.start).toBe(2);
     expect(clipEl.gain).toBe(0.5);
-    expect(clipEl.getAttribute('name')).toBe('Renamed');
+    expect(clipEl.name).toBe('Renamed');
+    expect(clipEl.getAttribute('name')).toBe('Clip');
+    expect(clipEl.getAttribute('start')).toBe('0');
     editor.remove();
   });
-
   it('updateClip applies directly to engine for non-DOM clips', async () => {
     const { editor, fake } = await setupLoadingEditor();
     // A file-dropped track's clip has no <daw-clip> element
     const { loaded } = await editor.loadFiles([makeAudioFile('take.wav')]);
     const trackId = loaded[0];
-    const clipId = editor._engineTracks.get(trackId).clips[0].id;
+    const clipId = played(editor, trackId).clips[0].id;
     mockOf(fake, 'updateTrack').mockClear();
     editor.updateClip(trackId, clipId, { start: 1.5, gain: 0.25 });
-    const updated = editor._engineTracks.get(trackId).clips[0];
+    const updated = played(editor, trackId).clips[0];
     expect(updated.startSample).toBe(72000); // 1.5s * 48000
     expect(updated.gain).toBe(0.25);
     expect(fake.adapter.updateTrack).toHaveBeenCalled();
@@ -329,39 +329,12 @@ describe('editor.addClip() / removeClip() / updateClip()', () => {
 });
 
 // #659: element-less clips that carry an engine clip id on their descriptor
-// (recorded takes) must stay in sync with editor.tracks when edited by id.
-describe('descriptor sync for element-less clips addressed by id (#659)', () => {
+// (recorded takes) are listed by editor.tracks as the arrangement holds them
+// (#848: read from it, no descriptor to keep in step).
+describe('element-less clips addressed by id (#659)', () => {
   function seedRecordedTake(editor: ReturnType<typeof setupEditor>) {
     const trackId = 'rec-track';
-    const clip = {
-      id: 'take-1',
-      startSample: 0,
-      durationSamples: 96000,
-      offsetSamples: 0,
-      gain: 1,
-      name: 'Recording',
-      sampleRate: 48000,
-    };
-    const other = { ...clip, id: 'take-2', startSample: 96000 };
-    const desc = (clipId: string, start: number) => ({
-      kind: 'drop',
-      clipId,
-      src: '',
-      peaksSrc: '',
-      start,
-      duration: 2,
-      offset: 0,
-      gain: 1,
-      name: 'Recording',
-      fadeIn: 0,
-      fadeOut: 0,
-      fadeType: 'linear',
-      midiNotes: null,
-      midiChannel: null,
-      midiProgram: null,
-    });
-    // editor.tracks lists the tracks of the arrangement (#848): the take's
-    // track is there too, before the hand-set engine cache and descriptors.
+    // editor.tracks lists the tracks of the arrangement (#848).
     const arrangementClip = (id: string, startSample: number) => ({
       ...createClip({
         startSample,
@@ -378,22 +351,6 @@ describe('descriptor sync for element-less clips addressed by id (#659)', () => 
       id: trackId,
       clips: [arrangementClip('take-1', 0), arrangementClip('take-2', 96000)],
     });
-    editor._engineTracks = new Map([[trackId, { id: trackId, clips: [clip, other], name: 'T' }]]);
-    editor._tracks = new Map([
-      [
-        trackId,
-        {
-          name: 'T',
-          src: '',
-          volume: 1,
-          pan: 0,
-          muted: false,
-          soloed: false,
-          renderMode: 'waveform',
-          clips: [desc('take-1', 0), desc('take-2', 2)],
-        },
-      ],
-    ]);
     return trackId;
   }
 
@@ -418,95 +375,46 @@ describe('descriptor sync for element-less clips addressed by id (#659)', () => 
 
     const clips = editor.tracks.find((t: { trackId: string }) => t.trackId === trackId).clips;
     expect(clips.map((c: { clipId?: string }) => c.clipId)).toEqual(['take-2']);
-    expect(editor._engineTracks.get(trackId).clips.map((c: { id: string }) => c.id)).toEqual([
-      'take-2',
-    ]);
+    expect(played(editor, trackId).clips.map((c: { id: string }) => c.id)).toEqual(['take-2']);
     editor.remove();
   });
-  it('a take the engine dropped on its own (undo, covering punch-in) loses its descriptor', () => {
+  it('a take the arrangement dropped (undo, covering punch-in) is not listed', () => {
     const editor = setupEditor();
     const trackId = seedRecordedTake(editor);
-    const engineTrack = editor._engineTracks.get(trackId);
 
-    // Engine state after undoing take-1: only take-2 remains.
-    editor._reconcileDescriptorsWithEngineTracks([
-      { ...engineTrack, clips: engineTrack.clips.filter((c: { id: string }) => c.id !== 'take-1') },
-    ]);
+    editor._arrangement.updateTrack(trackId, (t: { clips: { id: string }[] }) => ({
+      ...t,
+      clips: t.clips.filter((c: { id: string }) => c.id !== 'take-1'),
+    }));
 
     const clips = editor.tracks.find((t: { trackId: string }) => t.trackId === trackId).clips;
     expect(clips.map((c: { clipId?: string }) => c.clipId)).toEqual(['take-2']);
     editor.remove();
   });
 
-  it('a split take leaves no stale descriptor behind (its id is gone from the engine)', () => {
+  it('a split take is listed as its left half (the same id) and a new right half', () => {
     const editor = setupEditor();
     const trackId = seedRecordedTake(editor);
-    const engineTrack = editor._engineTracks.get(trackId);
-    const [take1, take2] = engineTrack.clips;
 
-    editor._reconcileDescriptorsWithEngineTracks([
-      {
-        ...engineTrack,
-        clips: [
-          { ...take1, id: 'left-half', durationSamples: 48000 },
-          { ...take1, id: 'right-half', startSample: 48000, durationSamples: 48000 },
-          take2,
-        ],
-      },
-    ]);
+    editor._arrangement.splitClip(trackId, 'take-1', 48000);
 
     const clips = editor.tracks.find((t: { trackId: string }) => t.trackId === trackId).clips;
-    expect(clips.map((c: { clipId?: string }) => c.clipId)).toEqual(['take-2']);
+    expect(clips).toHaveLength(3);
+    expect(clips[0]).toMatchObject({ clipId: 'take-1', start: 0, duration: 1 });
+    expect(clips[1]).toMatchObject({ start: 1, duration: 1 });
+    expect(clips[2]).toMatchObject({ clipId: 'take-2' });
     editor.remove();
   });
 
-  it('a take moved or trimmed by the engine has its descriptor refreshed', () => {
+  it('a take moved or trimmed in the arrangement is listed where it is', () => {
     const editor = setupEditor();
     const trackId = seedRecordedTake(editor);
-    const engineTrack = editor._engineTracks.get(trackId);
-    const [take1, take2] = engineTrack.clips;
 
-    editor._reconcileDescriptorsWithEngineTracks([
-      {
-        ...engineTrack,
-        clips: [
-          { ...take1, startSample: 24000, durationSamples: 48000, offsetSamples: 12000 },
-          take2,
-        ],
-      },
-    ]);
+    // take-1 ends where take-2 starts: move take-2, which has room after it.
+    editor._arrangement.moveClip(trackId, 'take-2', 24000);
 
     const clips = editor.tracks.find((t: { trackId: string }) => t.trackId === trackId).clips;
-    expect(clips[0]).toMatchObject({ clipId: 'take-1', start: 0.5, duration: 1, offset: 0.25 });
-    editor.remove();
-  });
-
-  it('reconciling an unchanged track keeps the same descriptor map (no re-render per mixer frame)', () => {
-    const editor = setupEditor();
-    const trackId = seedRecordedTake(editor);
-    const engineTrack = editor._engineTracks.get(trackId);
-    const before = editor._tracks;
-
-    editor._reconcileDescriptorsWithEngineTracks([engineTrack]);
-
-    expect(editor._tracks).toBe(before);
-    editor.remove();
-  });
-
-  it('descriptors without an id (file drops) are never pruned by the reconcile', () => {
-    const editor = setupEditor();
-    const trackId = seedRecordedTake(editor);
-    const desc = editor._tracks.get(trackId);
-    const fileDrop = { ...desc.clips[0] };
-    delete fileDrop.clipId;
-    editor._tracks = new Map([[trackId, { ...desc, clips: [fileDrop, desc.clips[1]] }]]);
-    const engineTrack = editor._engineTracks.get(trackId);
-
-    editor._reconcileDescriptorsWithEngineTracks([{ ...engineTrack, clips: [] }]);
-
-    const clips = editor.tracks.find((t: { trackId: string }) => t.trackId === trackId).clips;
-    expect(clips).toHaveLength(1);
-    expect(clips[0].clipId).toBeUndefined();
+    expect(clips[1]).toMatchObject({ clipId: 'take-2', start: 2.5, duration: 2 });
     editor.remove();
   });
 });
@@ -514,7 +422,7 @@ describe('descriptor sync for element-less clips addressed by id (#659)', () => 
 describe('Phase 1 regression fixes', () => {
   it('addClip rejects synchronously when config.src is missing', async () => {
     const editor = setupEditor();
-    editor.addTrack({ name: 'T' });
+    addElementTrack(editor, { name: 'T' });
     await new Promise((r) => setTimeout(r, 60));
     const trackEl = editor.querySelector('daw-track') as any;
     await expect(editor.addClip(trackEl.trackId, {})).rejects.toThrow(/src is required/);
@@ -553,25 +461,23 @@ describe('Phase 1 regression fixes', () => {
     const clipId = 'c1';
     const trackId = 't1';
     editor._clipBuffers = new Map([[clipId, fakeBuf]]);
-    editor._engineTracks = new Map([
-      [
-        trackId,
+    editor._arrangement.addTrack({
+      ...createTrack({ name: 'T', clips: [] }),
+      id: trackId,
+      clips: [
         {
-          id: trackId,
-          clips: [
-            {
-              id: clipId,
-              startSample: 0,
-              durationSamples: 96000,
-              offsetSamples: 0,
-              gain: 1,
-              name: 'X',
-              sampleRate: 48000,
-            },
-          ],
+          ...createClip({
+            startSample: 0,
+            durationSamples: 96000,
+            offsetSamples: 0,
+            sampleRate: 48000,
+            sourceDurationSamples: 96000,
+            name: 'X',
+          }),
+          id: clipId,
         },
       ],
-    ]);
+    });
     editor._peakPipeline.reextractPeaks = vi
       .fn()
       .mockReturnValue(new Map([[clipId, { data: [new Int16Array(0)], length: 0, bits: 16 }]]));
@@ -705,7 +611,7 @@ describe('Phase 3 refactor: per-clip load isolation', () => {
     await settle(editor);
 
     // Track loaded with 2 successful clips
-    const engineTrack = editor._engineTracks.get(trackId);
+    const engineTrack = played(editor, trackId);
     expect(engineTrack.clips.length).toBe(2);
     // Per-clip error dispatched for the failed one
     expect(clipErrors).toHaveLength(1);
@@ -720,12 +626,12 @@ describe('Phase 2: end-to-end engine state assertions', () => {
     const { editor } = await setupLoadingEditor();
     const trackId = await editor.addTrack({ name: 'T' });
 
-    const clipsBefore = editor._engineTracks.get(trackId)?.clips.length ?? 0;
+    const clipsBefore = played(editor, trackId)?.clips.length ?? 0;
     const clipId = await editor.addClip(trackId, { src: '/a.opus', start: 4 });
 
     expect(typeof clipId).toBe('string');
-    expect(editor._engineTracks.get(trackId).clips.length).toBe(clipsBefore + 1);
-    const newClip = editor._engineTracks.get(trackId).clips.find((c: any) => c.id === clipId);
+    expect(played(editor, trackId).clips.length).toBe(clipsBefore + 1);
+    const newClip = played(editor, trackId).clips.find((c: any) => c.id === clipId);
     expect(newClip).toBeDefined();
     // `start: 4` × 48000 = 192000 samples
     expect(newClip.startSample).toBe(192000);
@@ -753,9 +659,9 @@ describe('Phase 2: end-to-end engine state assertions', () => {
 
   it('late-append <daw-clip> via direct appendChild loads the clip into the engine', async () => {
     const { editor } = await setupLoadingEditor();
-    const trackId = await editor.addTrack({ name: 'T' });
+    const trackId = await addElementTrack(editor, { name: 'T' });
     const trackEl = trackElement(editor, trackId);
-    const clipsBefore = editor._engineTracks.get(trackId).clips.length;
+    const clipsBefore = played(editor, trackId).clips.length;
 
     // Directly construct + append, no editor.addClip API
     const clipEl = document.createElement('daw-clip') as any;
@@ -764,22 +670,20 @@ describe('Phase 2: end-to-end engine state assertions', () => {
     trackEl.appendChild(clipEl);
 
     // Wait for daw-clip-connected (deferred via setTimeout(0)) and the clip's audio
-    await vi.waitFor(() =>
-      expect(editor._engineTracks.get(trackId).clips.length).toBe(clipsBefore + 1)
-    );
-    const added = editor._engineTracks.get(trackId).clips.find((c: any) => c.id === clipEl.clipId);
+    await vi.waitFor(() => expect(played(editor, trackId).clips.length).toBe(clipsBefore + 1));
+    const added = played(editor, trackId).clips.find((c: any) => c.id === clipEl.clipId);
     expect(added).toBeDefined();
     editor.remove();
   });
 
   it('removeClip cleans up engine state, _clipBuffers, _clipOffsets, _peaksData', async () => {
     const { editor, fake } = await setupLoadingEditor();
-    const trackId = await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }] });
+    const trackId = await addElementTrack(editor, { name: 'T', clips: [{ src: '/a.opus' }] });
     await settle(editor);
     const clipId = trackElement(editor, trackId).querySelector('daw-clip').clipId;
 
     // Sanity — clip exists in engine and caches
-    expect(editor._engineTracks.get(trackId).clips.length).toBe(1);
+    expect(played(editor, trackId).clips.length).toBe(1);
     expect(editor._clipBuffers.has(clipId)).toBe(true);
     await vi.waitFor(() => expect(editor._peaksData.has(clipId)).toBe(true));
 
@@ -787,7 +691,7 @@ describe('Phase 2: end-to-end engine state assertions', () => {
     editor.removeClip(trackId, clipId);
     // MutationObserver cleanup is async — retry instead of one macrotask.
     await vi.waitFor(() => {
-      expect(editor._engineTracks.get(trackId).clips.length).toBe(0);
+      expect(played(editor, trackId).clips.length).toBe(0);
       expect(editor._clipBuffers.has(clipId)).toBe(false);
       expect(editor._clipOffsets.has(clipId)).toBe(false);
       expect(editor._peaksData.has(clipId)).toBe(false);
@@ -802,7 +706,7 @@ describe('Phase 2: end-to-end engine state assertions', () => {
     // Stub _stopPlayhead — happy-dom playhead controller isn't fully realized
     // and throws when the engine empties at the end of MutationObserver work.
     editor._stopPlayhead = vi.fn();
-    const trackId = await editor.addTrack({
+    const trackId = await addElementTrack(editor, {
       name: 'T',
       clips: [{ src: '/a.opus' }, { src: '/b.opus' }],
     });
@@ -811,7 +715,7 @@ describe('Phase 2: end-to-end engine state assertions', () => {
       (c: any) => c.clipId
     );
     expect(clipIds.length).toBe(2);
-    expect(editor._engineTracks.get(trackId).clips.length).toBe(2);
+    expect(played(editor, trackId).clips.length).toBe(2);
 
     editor.removeTrack(trackId);
     // MutationObserver cleanup is async — retry instead of one macrotask.
@@ -820,23 +724,24 @@ describe('Phase 2: end-to-end engine state assertions', () => {
         expect(editor._clipBuffers.has(id)).toBe(false);
         expect(editor._peaksData.has(id)).toBe(false);
       }
-      expect(editor._engineTracks.has(trackId)).toBe(false);
+      expect(played(editor, trackId) !== undefined).toBe(false);
     });
     editor.remove();
   });
 
   it('updateClip DOM-path triggers _applyClipUpdate which mutates engine startSample', async () => {
     const { editor } = await setupLoadingEditor();
-    const trackId = await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus', start: 0 }] });
+    const trackId = await addElementTrack(editor, {
+      name: 'T',
+      clips: [{ src: '/a.opus', start: 0 }],
+    });
     await settle(editor);
     const clipEl = trackElement(editor, trackId).querySelector('daw-clip') as any;
 
     editor.updateClip(trackId, clipEl.clipId, { start: 3 });
     await clipEl.updateComplete; // Lit fires daw-clip-update post-render
 
-    const engineClip = editor._engineTracks
-      .get(trackId)
-      .clips.find((c: any) => c.id === clipEl.clipId);
+    const engineClip = played(editor, trackId).clips.find((c: any) => c.id === clipEl.clipId);
     // start: 3 × 48000 = 144000
     expect(engineClip.startSample).toBe(144000);
     editor.remove();
@@ -845,7 +750,7 @@ describe('Phase 2: end-to-end engine state assertions', () => {
   it('updateClip with changed bounds invokes reextractPeaks', async () => {
     const { editor, fake, pipeline } = await setupLoadingEditor();
     fake.setDecoded('/a.opus', makeDecodedBuffer(8)); // longer than the clip
-    const trackId = await editor.addTrack({
+    const trackId = await addElementTrack(editor, {
       name: 'T',
       clips: [{ src: '/a.opus', start: 0, duration: 4 }],
     });
@@ -908,7 +813,7 @@ describe('Phase 2: silent no-op warns', () => {
     // then calling updateClip with a non-existent clipId.
     const editor = setupEditor();
     const trackId = 'engine-only';
-    editor._engineTracks = new Map([[trackId, { id: trackId, clips: [], name: 'T' }]]);
+    editor._arrangement.addTrack({ ...createTrack({ name: 'T', clips: [] }), id: trackId });
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     editor.updateClip(trackId, 'missing-clip', { start: 1 });
@@ -921,11 +826,11 @@ describe('Phase 2: silent no-op warns', () => {
 describe('engine clip-id alignment', () => {
   it('engine clip ids match <daw-clip>.clipId after loading', async () => {
     const { editor } = await setupLoadingEditor();
-    await editor.addTrack({ name: 'T', clips: [{ src: '/a.opus' }, { src: '/b.opus' }] });
+    await addElementTrack(editor, { name: 'T', clips: [{ src: '/a.opus' }, { src: '/b.opus' }] });
     await settle(editor);
 
     const domClipIds = [...editor.querySelectorAll('daw-clip')].map((c: any) => c.clipId);
-    const engineTracks = [...editor._engineTracks.values()] as any[];
+    const engineTracks = editor._loadedTracks() as any[];
     const engineClipIds = engineTracks[0].clips.map((c: any) => c.id);
 
     expect(domClipIds.length).toBe(2);
@@ -982,7 +887,7 @@ describe('removeTrack timeline sync (audit wave 2)', () => {
     const seek = vi.spyOn(editor.engine, 'seek');
 
     editor.removeTrack(trackId);
-    await vi.waitFor(() => expect(editor._tracks.has(trackId)).toBe(false));
+    await vi.waitFor(() => expect(editor._extras.has(trackId)).toBe(false));
 
     // Without engine.seek(0), the display shows 0 but the next play()
     // resumes from the engine's stale position (engine.removeTrack never
@@ -1005,7 +910,7 @@ describe('removeTrack timeline sync (audit wave 2)', () => {
     editor.addEventListener('daw-stop', (e: Event) => events.push(e.type));
 
     editor.removeTrack(trackId);
-    await vi.waitFor(() => expect(editor._tracks.has(trackId)).toBe(false));
+    await vi.waitFor(() => expect(editor._extras.has(trackId)).toBe(false));
 
     // An empty timeline has nothing to play — leaving the transport rolling
     // strands isPlaying=true with a dead playhead RAF. Transport UIs key on
@@ -1170,7 +1075,7 @@ describe('zoom floor recompute (audit wave 5 review)', () => {
     await settle(editor);
 
     editor.removeTrack(trackId);
-    await vi.waitFor(() => expect(editor._tracks.has(trackId)).toBe(false));
+    await vi.waitFor(() => expect(editor._extras.has(trackId)).toBe(false));
 
     // The recompute raised the floor above the live spp — without a
     // re-clamp, layout stays at 64 while peaks clamp to 128: the exact
@@ -1182,57 +1087,35 @@ describe('zoom floor recompute (audit wave 5 review)', () => {
 });
 
 describe('audit wave 6 — lifecycle & rendering state', () => {
-  it('synthesizes descriptors for engine tracks restored by undo', async () => {
+  it('lists a track restored by undo with its name and mix', async () => {
     const { editor } = await setupLoadingEditor();
-    const id = await editor.addTrack({ name: 'Guitar', volume: 0.7, pan: -0.2 });
+    const id = await addElementTrack(editor, { name: 'Guitar', volume: 0.7, pan: -0.2 });
     trackElement(editor, id).remove();
-    await vi.waitFor(() => expect(editor._tracks.has(id)).toBe(false));
+    await vi.waitFor(() => expect(editor._extras.has(id)).toBe(false));
 
     editor.engine.undo(); // the removal: the track comes back without an element
 
-    // Undo restores the track in ENGINE state, but _tracks was purged at
-    // removal — without a synthesized descriptor the track plays and renders
-    // yet shows "Untitled" controls and is missing from editor.tracks.
+    // editor.tracks reads the arrangement (#848): the restored track is
+    // listed with its name and mix, with nothing written for it.
     const t = editor.tracks.find((x: any) => x.trackId === id);
     expect(t?.name).toBe('Guitar');
     expect(t?.volume).toBe(0.7);
     editor.remove();
   });
 
-  it('prunes a synthesized descriptor when redo removes the track again', () => {
-    const editor = setupEditor();
-    const ghost = {
-      id: 'ghost',
-      name: 'Guitar',
-      volume: 0.7,
-      pan: 0,
-      muted: false,
-      soloed: false,
-      clips: [],
-    };
-    editor._reconcileDescriptorsWithEngineTracks([ghost]); // undo restored it
-
-    editor._reconcileDescriptorsWithEngineTracks([]); // redo removed it again
-
-    // Without the prune, editor.tracks forever lists a track the engine no
-    // longer has — and removeTrack() can't clean it (no element, no engine
-    // entry → warns "no track found").
+  it('a track removed again by redo is no longer listed, and removeTrack does not find it', async () => {
+    const { editor } = await setupLoadingEditor();
+    const id = await addElementTrack(editor, { name: 'Guitar' });
+    trackElement(editor, id).remove();
+    await vi.waitFor(() => expect(editor._extras.has(id)).toBe(false));
+    editor.engine.undo();
+    expect(editor.tracks.map((t: { trackId: string }) => t.trackId)).toEqual([id]);
+    editor.engine.redo();
     expect(editor.tracks).toHaveLength(0);
-    editor.remove();
-  });
-
-  it('does not prune descriptors for tracks that are still loading or element-backed', async () => {
-    const { editor, fake } = await setupLoadingEditor();
-    const held = fake.holdDecode('/a.opus');
-    await editor.addTrack({ name: 'Loading', clips: [{ src: '/a.opus' }] });
-
-    // A statechange arriving mid-load doesn't contain the loading track —
-    // its descriptor must survive (it is loading, not removed).
-    editor._reconcileDescriptorsWithEngineTracks([]);
-    expect(editor.tracks).toHaveLength(1);
-
-    held.resolve();
-    await settle(editor);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    editor.removeTrack(id);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('no track found'));
+    warnSpy.mockRestore();
     editor.remove();
   });
 

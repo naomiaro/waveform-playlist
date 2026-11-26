@@ -182,7 +182,99 @@ export function purgeTrack(
   trackId: string,
   base: SavedState | null = null
 ): { history: History; current: SavedState; base: SavedState | null } {
-  const strip = stateWithoutTrack(trackId);
+  return purgeStates(history, current, stateWithoutTrack(trackId), base);
+}
+
+/** A track's clip out of every state: what `removeClip(…, { undoable: false })` does. */
+export function purgeClip(
+  history: History,
+  current: SavedState,
+  trackId: string,
+  clipId: string,
+  base: SavedState | null = null
+): { history: History; current: SavedState; base: SavedState | null } {
+  return purgeStates(
+    history,
+    current,
+    stateWithoutClip(history, current, trackId, clipId, base),
+    base
+  );
+}
+
+type SavedTrack = SavedState['tracks'][number];
+
+/**
+ * A function that takes a track's clip out of a state. The states are
+ * walked in time order (undo steps oldest first, an open transaction's base,
+ * the current state, the redo steps nearest first): a track that, after the
+ * clip is gone, equals the same track in the state just before becomes that
+ * object, so `dropRepeats` (which compares by identity) drops exactly the
+ * steps that now change nothing, on either side of the current state
+ * (review of #919: matching the oldest equal object left a no-op step when
+ * the track had held the same content at two times). A state that holds
+ * neither the clip nor a track equal to the one before is the same object.
+ */
+export function stateWithoutClip(
+  history: History,
+  current: SavedState,
+  trackId: string,
+  clipId: string,
+  base: SavedState | null = null
+): (state: SavedState) => SavedState {
+  const inOrder = [
+    ...history.undo,
+    ...(base ? [base] : []),
+    current,
+    ...[...history.redo].reverse(),
+  ];
+  const mapped = new Map<SavedState, SavedState>();
+  let before: SavedTrack | undefined;
+  let stripped = false;
+  for (const state of inOrder) {
+    const known = mapped.get(state);
+    if (known) {
+      before = known.tracks.find((t) => t.id === trackId);
+      continue;
+    }
+    const track = state.tracks.find((t) => t.id === trackId);
+    let next: SavedTrack | undefined = track;
+    if (track?.clips.some((c) => c.id === clipId)) {
+      next = { ...track, clips: track.clips.filter((c) => c.id !== clipId) };
+      stripped = true;
+    }
+    // Once a state was stripped, an equal track next to it is the same object.
+    if (stripped && next && before && next !== before && sameTrackFields(before, next))
+      next = before;
+    mapped.set(
+      state,
+      next === track
+        ? state
+        : { tracks: state.tracks.map((t) => (t === track ? next! : t)), mixer: state.mixer }
+    );
+    before = next;
+  }
+  return (state) => mapped.get(state) ?? state;
+}
+
+/** The same fields as the same values, and the same clip objects in the same order. */
+function sameTrackFields(a: SavedTrack, b: SavedTrack): boolean {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof SavedTrack>;
+  for (const key of keys) {
+    if (key !== 'clips' && a[key] !== b[key]) return false;
+  }
+  return a.clips.length === b.clips.length && a.clips.every((c, i) => c === b.clips[i]);
+}
+
+/**
+ * Apply `strip` to the current state, an open transaction's base and every
+ * undo and redo state, then drop the steps that no longer differ.
+ */
+function purgeStates(
+  history: History,
+  current: SavedState,
+  strip: (state: SavedState) => SavedState,
+  base: SavedState | null
+): { history: History; current: SavedState; base: SavedState | null } {
   const nextCurrent = strip(current);
   const nextBase = base && strip(base);
   const stripped = dropRepeats(mapHistoryStates(history, strip), nextBase ?? nextCurrent);

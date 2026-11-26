@@ -390,7 +390,7 @@ const result = await editor.loadFiles(fileList);
 </script>
 ```
 
-A recorded take has no `<daw-clip>` element; its engine clip id is the `clipId` in `daw-recording-clip-add`, and it is also on the take's entry in `editor.tracks[n].clips` (`kind: 'drop'`, `clipId`). That entry follows the engine: `updateClip()`, drags and trims refresh it, and it is dropped when the clip goes away (`removeClip()`, undo, a later punch-in over it). Splitting a take replaces it with two new clips, which have no entry of their own.
+A recorded take has no `<daw-clip>` element; its engine clip id is the `clipId` in `daw-recording-clip-add`, and it is also on the take's entry in `editor.tracks[n].clips` (`kind: 'drop'`, `clipId`). `editor.tracks` reads the arrangement, so the entry is where the clip is after `updateClip()`, a drag or a trim, and it is gone when the clip goes away (`removeClip()`, undo, a later punch-in over it). Splitting a take keeps its id on the left half (#848); the right half is a new clip, listed with its own id.
 
 `daw-recording-clip-add` is not guaranteed after every `daw-recording-complete`: it is skipped when you cancel the complete event, when peak generation for the take fails (`daw-error` with `operation: 'recording-peaks'`), and when the track was removed in the meantime.
 
@@ -498,25 +498,25 @@ Core orchestrator. Attributes:
 | `eager-resume` | string | — | Resume AudioContext on first gesture; bare attribute targets the editor, or pass `"document"` / a CSS selector |
 | `time-format` | string | `'hh:mm:ss.sss'` | Clock format read by `<daw-time-display>` / `<daw-time-format>`: `'hh:mm:ss.sss'`, `'hh:mm:ss'`, or `'seconds'` |
 
-JS properties: `adapter` (required `PlayoutAdapter`), `recordingStream`, `bpm`, `ppqn`, `timeSignature`, `meterEntries`, `secondsToTicks` / `ticksToSeconds` (variable-tempo callbacks), `spectrogramConfig`, `spectrogramColorMap`. Read-only: `engine`, `audioContext` (from the adapter), `tracks`, `selection`, `selectedTrackId`, `currentTime`, `canUndo` / `canRedo`, `isRecording`.
+JS properties: `adapter` (required `PlayoutAdapter`), `arrangement` (the arrangement the editor plays: its own, whose content the `<daw-track>` children declare, or one the app hands in with `editor.arrangement = createArrangement({ tracks })`, played alone until `null`; the adapter is kept across the swap), `recordingStream`, `bpm`, `ppqn`, `timeSignature`, `meterEntries`, `secondsToTicks` / `ticksToSeconds` (variable-tempo callbacks), `spectrogramConfig`, `spectrogramColorMap`. Read-only: `engine`, `audioContext` (from the adapter), `tracks`, `selection`, `selectedTrackId`, `currentTime`, `canUndo` / `canRedo`, `isRecording`.
 
 Methods:
 
 - Playback: `play(startTime?)`, `pause()`, `stop()`, `togglePlayPause()`, `seekTo(time)`
-- Loading: `loadFiles(files)`, `loadMidi(urlOrFile, options?)`, `ready()`
+- Loading: `loadFiles(files, options?)`, `loadMidi(urlOrFile, options?)`, `ready()`. `options.signal` cancels the call (an `AbortError`; what it added is taken out, with no undo step)
 - Display: `setTimeFormat(format)` — sugar over the `timeFormat` property, fires `daw-time-format-change`
-- Tracks & clips: `addTrack(config)`, `removeTrack(id)`, `updateTrack(id, partial)`, `addClip(trackId, config)`, `removeClip(trackId, clipId)`, `updateClip(trackId, clipId, partial)`
+- Tracks & clips: `addTrack(config, options?)`, `removeTrack(id)`, `updateTrack(id, partial)`, `reorderTrack(id, toIndex)`, `addClip(trackId, config, options?)`, `removeClip(trackId, clipId)`, `updateClip(trackId, clipId, partial)`. They are calls on `editor.arrangement`: `addTrack` and `addClip` create no element, `updateTrack` / `updateClip` / `reorderTrack` write and move no element, and `removeTrack` / `removeClip` remove the element when there is one
 - Editing: `splitAtPlayhead()`, `undo()`, `redo()`, `setSelection(start, end)`
 - Recording: `startRecording(stream?, options?)`, `stopRecording()`, `pauseRecording()`, `resumeRecording()`, `togglePauseRecording()`. Options include `overdub` (start playback with the take), `latencyOffset` (seconds), and `clipName` (live-preview header + finalized clip name, default `"Recording"`)
 - Effects & export: the master-chain effects API (see [Effects](#effects)), `getEffectsState()` / `setEffectsState(entries)`, `openEffectGui()` / `closeEffectGui()`, `exportAudio(options?)`
 
 ### `<daw-track>`
 
-Declarative track data. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`, `kind` (`'audio' | 'midi'`, default `'audio'`: what the track holds; set it before the track is added), `render-mode` (`'waveform' | 'spectrogram'`, default `'waveform'`: how an audio track is drawn; a MIDI track is always a piano roll). JS property: `spectrogramConfig` (per-track spectrogram override). Also exposes the per-track effects API (see [Effects](#effects)). Fires `daw-track-update` `{ trackId, changed }` after a property changes (`changed` names them). A `volume`, `pan`, `muted` or `soloed` change is one undo step per update, also while the track loads. The editor does not write the element back after an Undo: read the restored mix from `editor.tracks`. Loading does not clear the undo history.
+Declarative track data. Attributes: `src`, `name`, `volume`, `pan`, `muted`, `soloed`, `kind` (`'audio' | 'midi'`, default `'audio'`: what the track holds; set it before the track is added), `render-mode` (`'waveform' | 'spectrogram'`, default `'waveform'`: how an audio track is drawn; a MIDI track is always a piano roll). JS property: `spectrogramConfig` (per-track spectrogram override). Also exposes the per-track effects API (see [Effects](#effects)). The attributes are the declaration and are never written by the editor; the properties `name`, `volume`, `pan`, `muted` and `soloed` read the arrangement live (after an Undo they show the restored values), and setting one, or changing its attribute, is one undo step. `index` is the track's position in the arrangement. An element whose track left the arrangement (an Undo of its arrival, a removal made on the arrangement) or that waits while a handed-in arrangement is set is detached: `:state(detached)` in CSS, its properties read the declaration, and a change warns and does nothing. Moving a `<daw-track>` in the DOM reorders the track; an Undo moves no element. Fires `daw-track-update` `{ trackId, changed }` after a property changes. Loading does not clear the undo history.
 
 ### `<daw-clip>`
 
-Declarative clip data. Attributes: `src`, `peaks-src`, `start`, `duration`, `offset`, `gain`, `name`, `color`, `midi-channel`, `midi-program`. JS-only property: `midiNotes: MidiNoteData[] | null` (note arrays are too large for attributes).
+Declarative clip data. Attributes: `src`, `peaks-src`, `start`, `duration`, `offset`, `gain`, `name`, `color`, `fade-in`, `fade-out`, `fade-type`, `midi-channel`, `midi-program`. JS-only property: `midiNotes: MidiNoteData[] | null` (note arrays are too large for attributes). `start`, `duration`, `offset`, `gain`, `name` and the MIDI fields read the arrangement live (after a drag, `clipEl.start` is where the clip is; the attribute keeps what the page wrote), and setting one is one undo step. A split keeps the clip's id on its left half, so the element follows it.
 
 ### `<daw-piano-roll>`
 

@@ -2,7 +2,12 @@
 export * from './operations';
 
 // The arrangement: the owner of the tracks, the mix and the undo history
-export { attachDecodeContext, createArrangement, defaultLoadSource } from './arrangement';
+export {
+  attachDecodeContext,
+  createArrangement,
+  defaultLoadSource,
+  isArrangement,
+} from './arrangement';
 export type {
   Arrangement,
   ArrangementSourceState,
@@ -11,6 +16,7 @@ export type {
   CreateArrangementOptions,
   LoadSource,
   MixerChangeOptions,
+  RemoveClipOptions,
   RemoveTrackOptions,
   AddTrackOptions,
   TrackMixerValues,

@@ -24,7 +24,10 @@ const LINE_HEIGHT_PX = 16;
 export class ScrollSyncController implements ReactiveController {
   private _host: ReactiveControllerHost & HTMLElement;
   private _scrollContainer: HTMLElement | null = null;
-  private _wheelTargets: Set<HTMLElement> = new Set();
+  /** The scroll listener on `_scrollContainer`, aborted when it is replaced or detached. */
+  private _scrollListener: AbortController | null = null;
+  /** Each wheel target and the controller of its listener. */
+  private _wheelTargets = new Map<HTMLElement, AbortController>();
   private _warnedX = false;
   private _warnedY = false;
 
@@ -62,11 +65,15 @@ export class ScrollSyncController implements ReactiveController {
   }
 
   hostDisconnected() {
-    this._scrollContainer?.removeEventListener('scroll', this._onScroll);
+    this._detachAll();
+  }
+
+  /** Remove the scroll and every wheel listener. */
+  private _detachAll() {
+    this._scrollListener?.abort();
+    this._scrollListener = null;
     this._scrollContainer = null;
-    for (const target of this._wheelTargets) {
-      target.removeEventListener('wheel', this._onWheel);
-    }
+    for (const listener of this._wheelTargets.values()) listener.abort();
     this._wheelTargets.clear();
   }
 
@@ -98,31 +105,33 @@ export class ScrollSyncController implements ReactiveController {
             this.scrollSelector +
             '" was removed from the DOM — detaching listeners until it reappears.'
         );
-        this._scrollContainer.removeEventListener('scroll', this._onScroll);
-        this._scrollContainer = null;
-        for (const t of this._wheelTargets) t.removeEventListener('wheel', this._onWheel);
-        this._wheelTargets.clear();
+        this._detachAll();
       }
       return;
     }
     if (container !== this._scrollContainer) {
-      this._scrollContainer?.removeEventListener('scroll', this._onScroll);
+      this._scrollListener?.abort();
       this._scrollContainer = container;
-      container.addEventListener('scroll', this._onScroll, { passive: true });
+      this._scrollListener = new AbortController();
+      container.addEventListener('scroll', this._onScroll, {
+        passive: true,
+        signal: this._scrollListener.signal,
+      });
     }
 
     // Diff the current set of matched wheel targets.
     const nextTargets = new Set(this._queryAll(this.wheelForwardSelector));
-    for (const old of this._wheelTargets) {
+    for (const [old, listener] of [...this._wheelTargets]) {
       if (!nextTargets.has(old)) {
-        old.removeEventListener('wheel', this._onWheel);
+        listener.abort();
         this._wheelTargets.delete(old);
       }
     }
     for (const next of nextTargets) {
       if (!this._wheelTargets.has(next)) {
-        next.addEventListener('wheel', this._onWheel, { passive: false });
-        this._wheelTargets.add(next);
+        const listener = new AbortController();
+        next.addEventListener('wheel', this._onWheel, { passive: false, signal: listener.signal });
+        this._wheelTargets.set(next, listener);
       }
     }
 

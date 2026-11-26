@@ -606,6 +606,46 @@ describe('RecordingController', () => {
     expect(host._addRecordedClip).not.toHaveBeenCalled();
   });
 
+  describe('the mic-unplug listener (D8, #848)', () => {
+    /** A stream whose track is a real EventTarget, so 'ended' can be dispatched. */
+    function liveStream() {
+      const track = Object.assign(new EventTarget(), { getSettings: () => ({ channelCount: 1 }) });
+      return { stream: { getAudioTracks: () => [track] } as unknown as MediaStream, track };
+    }
+
+    it("a track's 'ended' stops its take", async () => {
+      const controller = new RecordingController(host);
+      const { stream, track } = liveStream();
+      await controller.startRecording(stream, { trackId: 'track-1' });
+      const stop = vi.spyOn(controller, 'stopRecording');
+      track.dispatchEvent(new Event('ended'));
+      expect(stop).toHaveBeenCalledWith('track-1');
+    });
+
+    it("after a stop, the old stream's 'ended' does not stop the next take on that track", async () => {
+      const controller = new RecordingController(host);
+      const first = liveStream();
+      await controller.startRecording(first.stream, { trackId: 'track-1' });
+      await controller.stopRecording('track-1');
+      await controller.startRecording(liveStream().stream, { trackId: 'track-1' });
+      const stop = vi.spyOn(controller, 'stopRecording');
+      first.track.dispatchEvent(new Event('ended'));
+      expect(stop).not.toHaveBeenCalled();
+    });
+
+    it("after a teardown, the old stream's 'ended' does not stop the next take on that track", async () => {
+      const controller = new RecordingController(host);
+      const first = liveStream();
+      await controller.startRecording(first.stream, { trackId: 'track-1' });
+      controller.hostDisconnected();
+      controller.hostConnected();
+      await controller.startRecording(liveStream().stream, { trackId: 'track-1' });
+      const stop = vi.spyOn(controller, 'stopRecording');
+      first.track.dispatchEvent(new Event('ended'));
+      expect(stop).not.toHaveBeenCalled();
+    });
+  });
+
   it('cleans up all sessions on hostDisconnected', async () => {
     const controller = new RecordingController(host);
     await controller.startRecording(createMockStream(), { trackId: 'track-1' });

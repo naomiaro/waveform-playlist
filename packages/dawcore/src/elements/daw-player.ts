@@ -73,6 +73,10 @@ export class DawPlayerElement extends LitElement {
   private _resizeObserver: ResizeObserver | null = null;
 
   static styles = css`
+    /* The hidden attribute hides the element: :host sets display (modern-web-guidance custom-elements). */
+    :host([hidden]) {
+      display: none;
+    }
     :host {
       display: block;
       position: relative;
@@ -111,6 +115,9 @@ export class DawPlayerElement extends LitElement {
       const area = this.shadowRoot?.querySelector('.waveform-area');
       if (area) this._resizeObserver?.observe(area);
     });
+    // Peaks that had not arrived when it was disconnected (the fetch was
+    // aborted, #848): fetch them again.
+    if (rebuilt && this.peaksSrc && !this._peaksSettled) void this._loadPeaks();
     if (rebuilt && this.src) {
       this._loadSource();
       // The fresh engine is at 0 but the playhead kept its imperatively-set
@@ -167,7 +174,12 @@ export class DawPlayerElement extends LitElement {
     if (changed.has('mono')) this._renderWaveform();
   }
 
+  /** The peaks fetch in flight: a newer peaks-src or a disconnect aborts it (#848, D7). */
+  private _peaksFetch: AbortController | null = null;
+
   private async _loadPeaks(): Promise<void> {
+    this._peaksFetch?.abort();
+    this._peaksFetch = null;
     this._waveformData = null;
     this._readyDispatched = false; // re-arm ready for the new source
     this._peaksSettled = false; // new load in progress; wait for outcome before firing daw-ready
@@ -179,8 +191,11 @@ export class DawPlayerElement extends LitElement {
       return;
     }
     const requested = this.peaksSrc;
+    const fetching = new AbortController();
+    this._peaksFetch = fetching;
     try {
-      const wd = await loadWaveformDataFromUrl(requested);
+      const wd = await loadWaveformDataFromUrl(requested, fetching.signal);
+      if (this._peaksFetch === fetching) this._peaksFetch = null;
       if (this.peaksSrc !== requested) return; // stale — a newer peaks-src won (don't settle)
       this._waveformData = wd;
       this._sampleRate = wd.sample_rate;
@@ -188,6 +203,8 @@ export class DawPlayerElement extends LitElement {
       this._renderWaveform();
       this._maybeDispatchReady();
     } catch (err) {
+      // Aborted (a newer peaks-src, a disconnect): that one settles nothing.
+      if (fetching.signal.aborted) return;
       // Same stale guard as the success path: a superseded load's late
       // rejection must not settle readiness (daw-ready would fire while the
       // NEWER peaks-src is still in flight) or clobber its waveform.
@@ -324,6 +341,9 @@ export class DawPlayerElement extends LitElement {
     this._engine.off('error', this._onError);
     this._engine.dispose();
     this._engineDisposed = true;
+    // The peaks fetch in flight is aborted; a reconnect fetches again.
+    this._peaksFetch?.abort();
+    this._peaksFetch = null;
   }
 
   // --- Private event handlers (arrow fields for stable identity) ---

@@ -8,6 +8,8 @@ export interface AudioResumeHost extends ReactiveControllerHost, HTMLElement {
 export class AudioResumeController implements ReactiveController {
   private _host: AudioResumeHost;
   private _target: EventTarget | null = null;
+  /** The gesture listeners on `_target`: one controller per attach. */
+  private _listeners: AbortController | null = null;
   private _attached = false;
   private _generation = 0;
 
@@ -43,13 +45,17 @@ export class AudioResumeController implements ReactiveController {
 
       this._target = resolvedTarget;
       this._attached = true;
+      this._listeners = new AbortController();
+      const { signal } = this._listeners;
       resolvedTarget.addEventListener('pointerdown', this._onGesture, {
         once: true,
         capture: true,
+        signal,
       });
       resolvedTarget.addEventListener('keydown', this._onGesture, {
         once: true,
         capture: true,
+        signal,
       });
     });
   }
@@ -59,7 +65,7 @@ export class AudioResumeController implements ReactiveController {
     this._attached = false;
   }
 
-  private _onGesture = (e: Event) => {
+  private _onGesture = () => {
     let ctx: AudioContext;
     try {
       ctx = this._host.audioContext;
@@ -84,12 +90,8 @@ export class AudioResumeController implements ReactiveController {
         );
       });
     }
-    // Remove the other listener (the fired one was auto-removed by { once: true })
-    const otherType = e.type === 'pointerdown' ? 'keydown' : 'pointerdown';
-    this._target?.removeEventListener(otherType, this._onGesture, {
-      capture: true,
-    });
-    this._target = null;
+    // The fired listener was removed by { once: true }; this removes the other.
+    this._removeListeners();
   };
 
   private _resolveTarget(): EventTarget | null {
@@ -113,12 +115,8 @@ export class AudioResumeController implements ReactiveController {
 
   private _removeListeners() {
     if (!this._target) return;
-    this._target.removeEventListener('pointerdown', this._onGesture, {
-      capture: true,
-    });
-    this._target.removeEventListener('keydown', this._onGesture, {
-      capture: true,
-    });
+    this._listeners?.abort();
+    this._listeners = null;
     this._target = null;
   }
 }

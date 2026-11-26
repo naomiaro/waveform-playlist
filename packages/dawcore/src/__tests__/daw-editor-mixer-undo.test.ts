@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { appendTrackElement } from './helpers/editor-harness';
 
 // #843: the arrangement owns a track's mix in <daw-editor> too. The controls
 // and editor.tracks read it from the arrangement, so an engine undo moves
@@ -77,10 +78,11 @@ async function makeEditor() {
  * steps, so each starts from the track with an empty history. Resolves with
  * the `<daw-track>` element addTrack appended (addTrack resolves with its id).
  */
+/** A `<daw-track>` the page declares (addTrack makes no element since #848). */
 async function addBaseTrack(editor: any, config: ReturnType<typeof midiTrackConfig>) {
-  const trackId: string = await editor.addTrack(config);
+  const trackEl = await appendTrackElement(editor, config);
   editor.engine.clearHistory();
-  return [...editor.querySelectorAll('daw-track')].find((t: any) => t.trackId === trackId);
+  return trackEl;
 }
 
 function controlsFor(editor: any, trackId: string): any {
@@ -132,21 +134,17 @@ describe('<daw-editor> draws the arrangement mix (#843)', () => {
     expect(editor.tracks[0]).toMatchObject({ trackId: id, volume: 0.8, muted: false });
   });
 
-  it('a synthesized descriptor after an undo has no mixer fields of its own', async () => {
+  it('a track restored by an undo is listed with the arrangement mix, the editor holding none (#848)', async () => {
     const { editor } = await makeEditor();
     await addBaseTrack(editor, midiTrackConfig('A'));
     const b = await addBaseTrack(editor, midiTrackConfig('B', 0.6));
     const bId: string = b.trackId;
 
     b.remove(); // the MutationObserver removes the track from the engine
-    await vi.waitFor(() => expect(editor._tracks.has(bId)).toBe(false));
+    await vi.waitFor(() => expect(editor._extras.has(bId)).toBe(false));
     editor.engine.undo(); // the removal
 
-    const desc = editor._tracks.get(bId);
-    expect(desc).toBeDefined();
-    for (const field of ['volume', 'pan', 'muted', 'soloed']) {
-      expect(desc).not.toHaveProperty(field);
-    }
+    expect(editor._extras.has(bId)).toBe(false);
     expect(editor.tracks.find((t: any) => t.trackId === bId)).toMatchObject({
       name: 'B',
       volume: 0.6,
@@ -185,9 +183,13 @@ describe('<daw-editor> track updates and undo steps (#843)', () => {
     trackEl.setAttribute('name', 'Renamed');
     await trackEl.updateComplete;
 
-    expect(editor._tracks.get(id).name).toBe('Renamed');
+    expect(editor._arrangement.getTracks()[0].name).toBe('Renamed');
     expect(volumeOf(editor, id)).toBe(0.8);
-    expect(engine.canRedo).toBe(true);
+    // The rename is a request of its own (#848 P8): one undo step, which
+    // gives the name back and leaves the volume where the undo put it.
+    engine.undo();
+    expect(editor._arrangement.getTracks()[0].name).toBe('A');
+    expect(volumeOf(editor, id)).toBe(0.8);
   });
 
   it('setting volume and pan in one update is one step', async () => {

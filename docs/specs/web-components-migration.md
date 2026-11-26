@@ -380,11 +380,11 @@ editor.zoomOut(): void
 editor.setMasterVolume(volume: number): void
 // Programmatic track/clip mutation (see "Programmatic Track Mutation" section)
 editor.ready(): Promise<PlaylistEngine>                                  // Ensure engine is built; resolves with it
-editor.addTrack(config: TrackConfig): Promise<string>                    // Append a <daw-track>; resolves with its id once it has entered (before its audio loads)
+editor.addTrack(config: TrackConfig, options?: EditorCallOptions): Promise<string> // Add a track to the arrangement played at the call (no element, #848; a swap before it enters rejects); resolves with its id once it has entered (before its audio loads)
 editor.retryTrack(trackId: string): void                                 // Load the track's failed sources again
 editor.removeTrack(trackId: string): void                                // Remove track by ID
 editor.updateTrack(trackId: string, partial: Partial<TrackConfig>): void
-editor.addClip(trackId: string, config: ClipConfig): Promise<string>     // Returns clipId
+editor.addClip(trackId: string, config: ClipConfig, options?: EditorCallOptions): Promise<string> // Returns clipId; options.signal cancels
 editor.removeClip(trackId: string, clipId: string): void
 editor.updateClip(trackId: string, clipId: string, partial: Partial<ClipConfig>): void
 editor.setTimeFormat(format: string): void             // 'hh:mm:ss.sss' | 'hh:mm:ss' | 'seconds'
@@ -415,7 +415,7 @@ editor.undo(): void
 editor.redo(): void
 editor.clearHistory(): void
 // File loading (audio + MIDI auto-detection)
-editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<LoadFilesResult>
+editor.loadFiles(files: File[] | FileList, options?: EditorCallOptions): Promise<LoadFilesResult>
 ```
 
 **Events:**
@@ -459,7 +459,7 @@ editor.loadFiles(files: File[] | FileList, options?: LoadFilesOptions): Promise<
 
 ### `<daw-track>` API
 
-**Attributes (reflected):**
+**Attributes** (the page's declaration: never written by the editor, #848):
 
 ```
 src              String    —        Audio source URL
@@ -479,7 +479,9 @@ render-mode      String    waveform 'waveform' | 'spectrogram' | 'split'. Audio 
 ```typescript
 track.recordArmed: boolean       // Reflects record-armed attribute
 track.inputDevice: string|null   // Reflects input-device attribute
-track.kind: 'audio' | 'midi'     // Reflects kind attribute; a change after the track is registered is undone with a warning
+track.kind: 'audio' | 'midi'     // Reflects kind attribute; a change after the track has entered is ignored with a warning
+track.name / volume / pan / muted / soloed  // Live (#848): the arrangement's values while it holds the track (muted: the stored mute); a set is one undo step and never writes the attribute; the declaration otherwise
+track.index: number              // Read-only: position in the arrangement the editor plays, -1 when not in it
 track.renderMode: string         // Reflects render-mode attribute
 track.isRecording: boolean       // Read-only: currently recording (armed + editor.isRecording)
 track.inputStream: MediaStream   // Read-only: active mic stream when recording
@@ -506,7 +508,7 @@ When `arm()` is called without a `deviceId`, it uses the default input device. T
 
 ### `<daw-clip>` API
 
-**Attributes (reflected):**
+**Attributes** (the page's declaration: never written by the editor, #848):
 
 ```
 src              String    —        Audio file URL
@@ -528,6 +530,7 @@ midi-program     Number    —        MIDI program number (0-127)
 
 ```typescript
 clip.midiNotes: MidiNoteData[] | null        // Parsed MIDI notes
+clip.start / duration / offset / gain / name / midiNotes / midiChannel / midiProgram  // Live (#848): the arrangement's values while it holds the clip (after a drag, clip.start is where the clip is); a set is one undo step and never writes the attribute
 ```
 
 Decoded audio is held by the editor's arrangement (#848), not exposed as properties on the element. There is no way to pass a decoded buffer or peak data through `<daw-clip>` or `addClip`; give pre-computed peaks by URL (`peaks-src`, or `peaksSrc` in `addClip`).
@@ -912,7 +915,7 @@ The track doesn't care what fired the event — any element that dispatches `daw
 - `PointerHandler` — timeline interactions: click-to-seek, drag-to-select, track selection.
 - `ClipPointerHandler` — clip move and boundary trim via `setPointerCapture`, with a small `DRAG_THRESHOLD` to distinguish clicks from drags.
 
-Both handlers talk to the engine through narrow contracts (`moveClip`, `trimClip`, `constrainTrimDelta`, `getClipBounds`) so collision and bounds logic stays engine-side, and they wrap each gesture in `beginTransaction()` / `commitTransaction()` so a full drag is one undo step (`abortTransaction()` on cancel). Snapping uses `snapTickToGrid` / `snapToTicks` from `@waveform-playlist/core` driven by the editor's `snapTo` value.
+Both handlers talk to the engine through narrow contracts (`moveClip`, `trimClip`, `constrainTrimDelta`, `getClipBounds`) so collision and bounds logic stays engine-side, and a drag previews in the view and makes one `moveClip` / `trimClip` call on release, which is its one undo step; a cancel writes nothing (#848). Snapping uses `snapTickToGrid` / `snapToTicks` from `@waveform-playlist/core` driven by the editor's `snapTo` value.
 
 Note for E2E tests: synthetic `dispatchEvent(new PointerEvent(...))` cannot drive these handlers — `setPointerCapture` throws for fabricated pointerIds. Use real input (`page.mouse.*`).
 
@@ -1267,7 +1270,7 @@ editor.loadMidi(source: string | File, options?: MidiLoadOptions): Promise<MidiL
 interface MidiLoadOptions {
   /** Timeline position in seconds applied to every created clip (default: 0) */
   startTime?: number;
-  /** AbortSignal forwarded to fetch() when source is a URL */
+  /** Cancels the fetch, the parse and the addTrack waits; the tracks added are taken out (no undo step) */
   signal?: AbortSignal;
 }
 
@@ -1295,7 +1298,7 @@ await editor.loadMidi('/midi/bridge.mid', { startTime: 30.0 });
 
 Created tracks are MIDI tracks (`kind="midi"`), drawn as piano rolls. Each track's clip carries `midiNotes` data for the piano-roll renderer. Track names are derived from the MIDI file (instrument name, channel, or GM program name).
 
-**Cleanup-on-failure:** if any of the N track creations fails, `loadMidi` removes all successfully-created tracks before rejecting — the editor returns to its pre-call state. Documented limitation: an `AbortSignal` only cancels the fetch phase; aborts during the track-creation phase are a no-op (the in-flight `addTrack` calls run to completion).
+**Cleanup-on-failure:** if any of the N track creations fails, `loadMidi` removes all successfully-created tracks, with no undo step, before rejecting — the editor returns to its pre-call state. An abort of `options.signal` (or a swap of `editor.arrangement`) in any phase does the same and rejects with the signal's reason (#848).
 
 **Deferred to future versions:**
 
@@ -1530,9 +1533,57 @@ annotationTrack.moveEndBoundary(deltaMs: number): void
 
 ---
 
+## Element Lifecycle: Declaration and Live State (#848)
+
+`<daw-track>` and `<daw-clip>` behave like native form elements. **The markup is the page's declaration; live state is read from properties.** The editor never writes an attribute and never moves an element. The one exception is an explicit request to remove: `editor.removeTrack()` / `removeClip()` remove the element, as `select.remove(i)` does. Everything a consumer can observe follows from that rule and from the native element each case is modelled on.
+
+### Native precedents
+
+| Native | What it shows | Here |
+|---|---|---|
+| `<input value>` / `input.value` | The attribute is the default; the property is live, and setting it never writes the attribute | `<daw-track volume>` / `trackEl.volume`, `<daw-clip start>` / `clipEl.start` |
+| `<option selected>` / `option.index` | A property that reports position in the parent's list | `trackEl.index`: the position in the arrangement, -1 when not there |
+| `<video>` with `<source>` children and `srcObject` | The children declare the content; `srcObject` replaces it while set, and the children are inert | `editor.arrangement = other` plays `other` alone; `null` goes back to the arrangement the children declare |
+| `<track>` in `<video>` | Removing the element removes its text track; moving it moves it | Removing a `<daw-clip>` removes its clip; moving it into another `<daw-track>` moves the clip |
+| Custom states (`ElementInternals.states`) | Runtime state for CSS, never written to the DOM | `:state(detached)` |
+| `<details open>` (counter-example) | Writes its own attribute back on user action | Not followed: a state change shows in a property or a custom state, never in the page's attribute |
+
+### The three states of an element
+
+An element is linked to the arrangement by id (`trackEl.trackId`, `clipEl.clipId`).
+
+| State | When | Properties read | A property set / attribute change |
+|---|---|---|---|
+| **pending** | Outside an editor, or registered and not entered yet (waiting for `editor.adapter`) | The declaration | Changes the declaration: it is the value the track enters with |
+| **live** | The arrangement played holds the id | The arrangement (`name`, `volume`, `pan`, `muted`, `soloed`, `kind`; `start`, `duration`, `offset`, `gain`, `name`, the MIDI fields) | A request to the arrangement, synchronous, one undo step (mix changes in one synchronous run are one step); the attribute keeps what the page wrote |
+| **detached** | The editor took it and the arrangement no longer holds its id (an Undo of its arrival, a removal made through the arrangement, a refusal), or a handed-in arrangement is set | The declaration | Changes nothing in the arrangement and logs a warning; an attribute change still updates the declaration. The element carries `:state(detached)`; a Redo of its arrival makes it live again (for a handed-in arrangement: `editor.arrangement = null`) |
+
+`src`, `render-mode`, `spectrogramConfig`, fades and `color` are declaration-only: the arrangement has no field for them (`editor.updateTrack()` changes what is drawn; read it from `editor.tracks`). `kind` is live and cannot change after entry: a later change warns, and the attribute keeps what the page wrote. A `<daw-clip>` is linked to its clip by id wherever it sits, so after an Undo of a move it can sit in another track's element and still be live.
+
+### What the page does, and what follows
+
+| The page… | Result | Undo / Redo |
+|---|---|---|
+| appends a `<daw-track>` | It enters the arrangement at the next flush, in DOM position, its `<daw-clip>` children read then | One undo step (except at page load: tracks entering an empty history make none) |
+| appends a `<daw-clip>` to a live track | A loading clip (a loaded one for MIDI) enters the track | One step |
+| appends a `<daw-clip>` to a pending track | Read when the track enters | Part of the track's entry |
+| appends a `<daw-clip>` to a detached track | Never enters, also after a Redo; warns; `:state(detached)` | None |
+| moves a `<daw-track>` (`insertBefore`, `moveBefore()`) | A reorder request: placed after the track of the `<daw-track>` before it | One step per observer batch; an Undo moves no element |
+| moves a `<daw-clip>` into another live track | Its clip moves there as it is (times, audio) | One step; an Undo moves no element: the element stays, linked by id |
+| moves a `<daw-clip>` into a track of the other kind | Refused: nothing changes, `daw-clip-error`, a warning; the element stays where the page put it | None |
+| moves a `<daw-clip>` into a pending track | The clip moves when the track enters, as it is (times, audio); one of the other kind stays where it is, with `daw-clip-error` | Part of the track's arrival step (none at page load, when the arrival makes none) |
+| moves a `<daw-clip>` into a detached track | Refused: the clip stays in its track, `daw-clip-error`, a warning; the element shows `:state(detached)` and, once a Redo brings the track back, is live, linked to its clip by id | None |
+| removes a `<daw-clip>` | Its clip leaves the track that holds it | One step |
+| removes a `<daw-track>` | The track leaves, with every clip its children declared (also a clip another track holds, whose element sat inside it) | One step for the whole removal |
+| removes an element whose clip or track the arrangement does not hold (an Undo, a removal made through the arrangement, a refusal) | Gone for good: taken out of the undo and redo states too, so no Redo brings it back (and no Redo is lost) | None |
+| removes an element while a handed-in arrangement is set | An ordinary undo step in the editor's own arrangement | One step there |
+| moves the elements with `moveBefore()` | As the moves above; `connectedMoveCallback` keeps the elements' state and announces their new place | As above |
+
+The editor reads its children again when it is put back in the page (a `<daw-track>` or `<daw-clip>` removed meanwhile goes as the observer would have done) and shows the link states then.
+
 ## Programmatic Track Mutation
 
-Two consumer-facing ways to mutate tracks at runtime exist by design: **declarative DOM mutation** (append/remove/update `<daw-track>` and `<daw-clip>` elements) and **imperative editor methods** (`editor.addTrack`, `editor.removeTrack`, `editor.loadFiles`). The engine API (`editor.engine.setTracks`, `editor.engine.addTrack`, …) is **internal plumbing**, not a consumer surface — calling it directly bypasses the descriptor map that backs `<daw-track-controls>` and the peak/buffer caches that back the waveform.
+Two consumer-facing ways to mutate tracks at runtime exist by design: **declarative DOM mutation** (append/remove/update `<daw-track>` and `<daw-clip>` elements) and **imperative editor methods** (`editor.addTrack`, `editor.removeTrack`, `editor.loadFiles`). The engine API (`editor.engine.setTracks`, `editor.engine.addTrack`, …) is **internal plumbing**, not a consumer surface — the editor reads its arrangement, so a change made through `editor.arrangement` (or the engine) is drawn; see "Drive tracks through `editor.arrangement`, not `editor.engine`" below (#848).
 
 ### Engine Lifecycle
 
@@ -1569,17 +1620,17 @@ Removal works via `element.remove()` — the editor's MutationObserver detects d
 
 Changing `src` on an already-loaded `<daw-clip>` is **not** supported via `daw-clip-update` — remove and re-add the clip instead.
 
-The editor's `daw-track-connected` handler reads all `<daw-clip>` children synchronously via `_readTrackDescriptor` during initial track load; `daw-clip-connected` events fired during that initial pass are skipped (the track loader handles them). Late-append clips (after `_engineTracks` already has the parent track) trigger the incremental path.
+A track's `<daw-clip>` children are read when the track enters the arrangement (#848); their own deferred `daw-clip-connected` events after that are skipped. A `<daw-clip>` appended to a track that has entered goes in as a loading clip, one undo step. A live property set (or attribute change) on a clip is a request to the arrangement; the editor does not act on `daw-clip-update`.
 
 ### Imperative Editor API
 
 For consumers who can't or won't go through declarative DOM (Vue/Svelte/Angular templates, MIDI sources without a `src` URL, dynamic clip generation):
 
 ```typescript
-editor.addTrack(config: TrackConfig): Promise<string>
+editor.addTrack(config: TrackConfig, options?: EditorCallOptions): Promise<string>
 editor.removeTrack(trackId: string): void
 editor.updateTrack(trackId: string, partial: Partial<TrackConfig>): void
-editor.addClip(trackId: string, config: ClipConfig): Promise<string>      // returns clipId
+editor.addClip(trackId: string, config: ClipConfig, options?: EditorCallOptions): Promise<string> // returns clipId
 editor.removeClip(trackId: string, clipId: string): void
 editor.updateClip(trackId: string, clipId: string, partial: Partial<ClipConfig>): void
 
@@ -1609,12 +1660,12 @@ interface ClipConfig {
 
 Behavior contract — all methods go through the same path as a declared `<daw-track>` (#848): the track enters the editor's arrangement, which loads its audio, so that:
 
-1. `<daw-track-controls>` shows the correct name/volume/pan/mute/solo (the descriptor map `_tracks` is populated; the mix is the arrangement's).
+1. `<daw-track-controls>` shows the correct name/volume/pan/mute/solo (read from the arrangement, #848).
 2. The waveform renders (peaks generated and cached in `_peaksData` as each clip loads).
 3. Drag/trim/split work once a clip has loaded.
 4. `daw-track-ready` / `daw-track-error` fire as the audio loads or fails.
 
-`addTrack` appends a real `<daw-track>` element to the editor's light DOM so subsequent declarative mutations work uniformly, and resolves with its track id once the track has entered. The element's `src`/`name`/etc. attributes are reflected from the config.
+`addTrack` adds the track to the arrangement played and creates no element (#848); it resolves with its track id once the track has entered. Change it with the id-keyed editor methods or `editor.arrangement`.
 
 ```javascript
 // Plain audio
@@ -1632,15 +1683,9 @@ await editor.addTrack({
 });
 ```
 
-### Why `editor.engine.setTracks(...)` is not a consumer API
+### Drive tracks through `editor.arrangement`, not `editor.engine`
 
-The engine owns the playback graph; the editor owns the descriptor map, the DOM elements, the peak cache, and the clip-buffer cache. Calling `engine.setTracks` directly partially works — the `statechange` listener mirrors engine tracks into `_engineTracks` and `syncPeaksForChangedClips` regenerates peaks from any `clip.audioBuffer` attached to the engine clip — so a waveform will render. What stays broken:
-
-- `_tracks` **descriptor map** is not populated. `<daw-track-controls>` falls back to `name='Untitled'`, `volume=1`, `pan=0`, `muted=false`, `soloed=false` — regardless of what the engine track was constructed with. The track's real name and volume are invisible in the controls column.
-- `_onTrackControl` (volume slider, mute, solo buttons) early-returns when no descriptor exists, so user interactions on the controls column become silent no-ops.
-- `_trackElements` is not populated. `editor.removeTrack(trackId)` falls back to `_onTrackRemoved` directly, but consumers that walk the DOM (`editor.querySelectorAll('daw-track')`) see nothing.
-
-Treat `editor.engine` as **read-only** from consumer code (analyzers, master taps, effect insertions on `engine.masterOutputNode` are fine); mutate tracks via the editor API.
+Since #848 the editor draws and lists what its arrangement holds and keeps no copy of it, so an app or an agent changes tracks through `editor.arrangement` (its `addTrack`, `updateTrack`, `moveClip`, mixer setters, `undo`, …) or the editor's methods, which are calls on it. `editor.arrangement.setTracks(...)` (or `editor.engine.setTracks`) replaces every track and clears the undo history; the tracks are drawn with the default render mode and have no element. Handing in a whole arrangement is `editor.arrangement = createArrangement({ tracks })`. Treat `editor.engine` as read-only from consumer code (analyzers, master taps, effect insertions on `engine.masterOutputNode` are fine).
 
 ### Backwards-compat surface
 
@@ -1669,7 +1714,7 @@ Dropping audio files (`.mp3`, `.wav`, `.ogg`, `.flac`, etc.) creates one new tra
 For custom drop zones, file pickers, or other UIs:
 
 ```typescript
-editor.loadFiles(files: File[] | FileList): Promise<LoadFilesResult>
+editor.loadFiles(files: File[] | FileList, options?: EditorCallOptions): Promise<LoadFilesResult>
 
 interface LoadFilesResult {
   loaded: string[];                                 // Successfully-loaded track IDs (audio only today)

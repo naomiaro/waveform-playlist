@@ -24,9 +24,6 @@ function makeEngine() {
     redo: vi.fn(),
     canUndo: true,
     canRedo: true,
-    beginTransaction: vi.fn(),
-    commitTransaction: vi.fn(),
-    abortTransaction: vi.fn(),
     moveClip: vi.fn((_t: string, _c: string, delta: number) => delta),
     trimClip: vi.fn(),
     updateTrack: vi.fn(),
@@ -41,7 +38,15 @@ function makeEngine() {
     play: vi.fn(),
     seek: vi.fn(),
     getCurrentTime: vi.fn(() => 0),
-    getState: vi.fn(() => ({ tracks: [] })),
+    // The pressed clip, so a move drag can start (#848: it reads the clips).
+    getState: vi.fn(() => ({
+      tracks: [
+        {
+          id: 't1',
+          clips: [{ id: 'c1', startSample: 0, durationSamples: 48000, offsetSamples: 0 }],
+        },
+      ],
+    })),
     on: vi.fn(),
     dispose: vi.fn(),
     recordingTrackIds: new Set<string>(),
@@ -173,8 +178,9 @@ describe('<daw-editor> during a drag (#848)', () => {
     movePointer(timeline, 140);
     const event = pressEscape();
     expect(event.defaultPrevented).toBe(true);
-    expect(editor._engine.abortTransaction).toHaveBeenCalledTimes(1);
     expect(editor._clipPointer.isActive).toBe(false);
+    // Nothing was written during the drag, and the cancel writes nothing either.
+    expect(editor._engine.moveClip).not.toHaveBeenCalled();
   });
 
   it('Escape cancels a track-reorder drag and an annotation edge drag', async () => {
@@ -205,17 +211,15 @@ describe('<daw-editor> during a drag (#848)', () => {
     expect(stop).toHaveBeenCalledTimes(1);
   });
 
-  it('undo during a press, then a drag, is one transaction (the press stays live)', async () => {
+  it('undo during a press, then a drag, is one moveClip on release (the press stays live)', async () => {
     const editor = await setupEditor();
     const timeline = pressClipHeader(editor);
     editor.undo();
     expect(editor._engine.undo).toHaveBeenCalledTimes(1);
-    expect(editor._engine.beginTransaction).not.toHaveBeenCalled();
     movePointer(timeline, 140);
-    expect(editor._engine.beginTransaction).toHaveBeenCalledTimes(1);
+    expect(editor._engine.moveClip).not.toHaveBeenCalled();
     timeline.dispatchEvent(new PointerEvent('pointerup', { clientX: 140, pointerId: 1 }));
-    expect(editor._engine.commitTransaction).toHaveBeenCalledTimes(1);
-    expect(editor._engine.abortTransaction).not.toHaveBeenCalled();
+    expect(editor._engine.moveClip).toHaveBeenCalledTimes(1);
   });
 
   it('Escape during a press that has not moved is left to the shortcuts', async () => {
@@ -241,7 +245,7 @@ describe('<daw-editor> during a drag (#848)', () => {
     const timeline = pressClipHeader(editor);
     movePointer(timeline, 140);
     editor.remove();
-    expect(engine.abortTransaction).toHaveBeenCalledTimes(1);
+    expect(engine.moveClip).not.toHaveBeenCalled();
     document.body.appendChild(editor);
     expect(editor._dragInProgress).toBe(false);
   });

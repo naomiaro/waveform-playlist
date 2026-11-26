@@ -124,6 +124,17 @@ export interface EngineState {
   canRedo: boolean;
 }
 
+/** Options of `PlaylistEngine.dispose()`. */
+export interface EngineDisposeOptions {
+  /**
+   * Leave the adapter undisposed (#848), for a host that plays another
+   * arrangement on the same adapter next: playback is stopped, the engine
+   * lets go of its arrangement and of the adapter's `onPlaybackEnded`, and a
+   * new engine can be built with the adapter.
+   */
+  keepAdapter?: boolean;
+}
+
 /**
  * Configuration options for PlaylistEngine constructor.
  */

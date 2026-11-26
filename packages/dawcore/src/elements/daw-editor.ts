@@ -1,9 +1,12 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { repeat } from 'lit/directives/repeat.js';
 import type {
+  ArrangementTrack,
   AudioClip,
   ClipTrack,
   FadeType,
+  TrackKind,
   LoadingClip,
   Peaks,
   PeakData,
@@ -14,10 +17,14 @@ import type {
 } from '@waveform-playlist/core';
 import type {
   StoredTrackDescriptor,
+  TrackExtras,
+  TrackRenderMode,
   TrackWithId,
   ClipDescriptor,
   DomClipDescriptor,
+  DropClipDescriptor,
   TrackConfig,
+  EditorCallOptions,
   ClipConfig,
 } from '../types';
 import { isDomClip, normalizeRenderMode, trackDescriptorRenderMode } from '../types';
@@ -50,13 +57,7 @@ import type {
   PlayoutAdapter,
   TrackMixerValues,
 } from '@waveform-playlist/engine';
-import {
-  DEFAULT_TRACK_MIX,
-  clampNumber,
-  mixOfElement,
-  mixOfTrack,
-  pickMix,
-} from '../utils/track-mix';
+import { DEFAULT_TRACK_MIX, clampNumber, mixOfElement, mixOfTrack } from '../utils/track-mix';
 import '../elements/daw-track-controls';
 import '../elements/daw-grid';
 import { hostStyles, clipStyles } from '../styles/theme';
@@ -112,6 +113,18 @@ import {
   validMidiNotes,
 } from '../interactions/track-entry';
 import { LoadAnnouncer } from '../interactions/load-announcer';
+import { clipSeconds, loadedTrack, mixOf } from '../interactions/arrangement-view';
+import { normalizeHandedIn, swapArrangement } from '../interactions/arrangement-swap';
+import { clipDragChanged, trackDragChanged } from '../interactions/drag-watch';
+import { moveClipToTrack, trackHoldingClip } from '../interactions/clip-rehome';
+import { abortError, isAbortError, PlaySignals, reasonOf } from '../interactions/abort';
+import {
+  refreshLinkStates,
+  detachedWarning,
+  type ClipLinkValues,
+  type LinkState,
+  type TrackLinkValues,
+} from '../interactions/element-links';
 import { EffectsManager } from '../effects/effects-manager';
 import { exportAudioImpl } from '../interactions/export-audio';
 import type { ExportOptions } from '../interactions/export-audio';
@@ -124,6 +137,59 @@ import { installCommand } from '../utils/install-command';
 
 /** Height of the ruler band — single source for the ruler element and the header row. */
 const RULER_HEIGHT = 30;
+
+/**
+ * A track registered and not in the arrangement yet (#848): a `<daw-track>`
+ * (read when it enters, with clips `addClip()` gave it meanwhile), or a
+ * declaration with no element (`addTrack()`, a dropped file) and its mix.
+ */
+type PendingEntry =
+  | { element: DawTrackElement; extraClips: DropClipDescriptor[] }
+  | { descriptor: StoredTrackDescriptor; mix: TrackMixerValues };
+
+/** The values a clip change is computed from: the live values with the request applied (#848). */
+type ClipUpdateValues = ClipLinkValues & { src: string };
+
+/** What a row of the template reads about its track (#848: from the arrangement and the extras). */
+interface RowInfo {
+  name: string;
+  kind: TrackKind;
+  renderMode: TrackRenderMode;
+}
+
+/** The descriptor of a clip from `addTrack()` / `addClip()` config: no element, a new id. */
+function clipDescriptorOf(config: ClipConfig): DropClipDescriptor & { clipId: string } {
+  return {
+    kind: 'drop',
+    clipId: crypto.randomUUID(),
+    src: config.src ?? '',
+    peaksSrc: config.peaksSrc ?? '',
+    start: config.start ?? 0,
+    duration: config.duration ?? 0,
+    offset: config.offset ?? 0,
+    gain: config.gain ?? 1,
+    name: config.name ?? '',
+    fadeIn: config.fadeIn ?? 0,
+    fadeOut: config.fadeOut ?? 0,
+    fadeType: config.fadeType ?? 'linear',
+    midiNotes: config.midiNotes ?? null,
+    midiChannel: config.midiChannel ?? null,
+    midiProgram: config.midiProgram ?? null,
+  };
+}
+
+/** The extras of a track entering with this declaration: every clip it takes, with its `peaks-src`. */
+function extrasOf(descriptor: StoredTrackDescriptor): TrackExtras {
+  return {
+    kind: descriptor.kind,
+    renderMode: descriptor.renderMode,
+    spectrogramConfig: descriptor.spectrogramConfig,
+    src: descriptor.src,
+    peaksSrc: new Map(
+      descriptor.clips.flatMap((c) => (c.clipId ? [[c.clipId, c.peaksSrc] as const] : []))
+    ),
+  };
+}
 
 // Built when thrown, so a bundler can drop it with the code that throws it.
 const noAdapterError = (): string =>
@@ -141,6 +207,9 @@ const noAdapterError = (): string =>
   '\n' +
   "  import { createToneAdapter } from '@waveform-playlist/playout';\n" +
   '  editor.adapter = createToneAdapter();';
+
+/** The outcome of `_settleEntry` for a track that entered. */
+const ENTERED: unique symbol = Symbol('entered');
 
 @customElement('daw-editor')
 export class DawEditorElement extends LitElement implements MidiLoaderHost {
@@ -363,8 +432,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * render — even if no canvases have been registered yet.
    */
   private _maybeRegisterSpectrogramClipAudio(trackId: string, clip: AudioClip): void {
-    const descriptor = this._tracks.get(trackId);
-    if (descriptor?.renderMode !== 'spectrogram') return;
+    if (this._renderModeOf(trackId) !== 'spectrogram') return;
     // Read the buffer off the clip itself — `_clipBuffers` is mutated in-place
     // by `cleanupOrphanedClipData` during concurrent track loading and may
     // briefly miss this clip even though the clip object still holds the
@@ -468,22 +536,114 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return null;
   }
   /**
-   * The one owner of the tracks, the clips, the mix, the undo history and
-   * loading (#848). Made with the editor, kept across a disconnect; the
-   * engine plays it once there is an adapter.
+   * The editor's own arrangement (#848): the one owner of the tracks, the
+   * clips, the mix, the undo history and loading of what the `<daw-track>`
+   * children declare. Made with the editor, kept across a disconnect.
    */
-  _arrangement: Arrangement = createArrangement();
-  /** Sends the load events, read from the arrangement (#848). */
+  readonly _ownArrangement: Arrangement = createArrangement();
+  /** An arrangement the app handed in (`editor.arrangement`), played alone; null: the own one. */
+  _handedIn: Arrangement | null = null;
+  /** The arrangement played now: a handed-in one, else the editor's own. */
+  get _arrangement(): Arrangement {
+    return this._handedIn ?? this._ownArrangement;
+  }
+  /**
+   * The arrangement the editor plays (#848 PR 3): one handed in by the app,
+   * or else the editor's own, whose content the `<daw-track>` children
+   * declare. Setting one plays it alone, like `video.srcObject`: the
+   * children are not added to it and show `:state(detached)` while it is
+   * set; `null` (or the editor's own) goes back to the own arrangement with
+   * what it held. A swap keeps the adapter: playback stops, a new engine is
+   * built on the new arrangement. Refused (with a warning) during a take.
+   * The editor never disposes or clears an arrangement it was handed.
+   * Throws a `TypeError` for a value that is not an arrangement.
+   */
+  get arrangement(): Arrangement {
+    return this._arrangement;
+  }
+  set arrangement(value: Arrangement | null) {
+    swapArrangement(this, normalizeHandedIn(value, this._ownArrangement));
+  }
+  /** Sends the load events, read from the arrangement played (#848; a new one per swap). */
   private _announcer = new LoadAnnouncer((event) => this.dispatchEvent(event));
+  /** Stops following the arrangement played (its sources and its tracks). */
+  private _unfollow: () => void = () => {};
   constructor() {
     super();
-    // A source that fails changes no track: only `sources` tells of it (the
-    // events, and the failed look). Never unsubscribed: the arrangement lives
-    // exactly as long as the editor.
-    this._arrangement.sources.subscribe(() => {
+    this._follow(this._ownArrangement);
+  }
+  /**
+   * Follow the arrangement played: a source that fails changes no track,
+   * only `sources` tells of it (the events, the failed look); the elements'
+   * link states follow its tracks (a structural change only, not every
+   * mixer frame).
+   */
+  private _follow(arrangement: Arrangement): void {
+    this._unfollow();
+    const stopSources = arrangement.sources.subscribe(() => {
       this._announceLoading();
       this.requestUpdate();
     });
+    let tracksVersion = arrangement.tracksVersion;
+    const stopTracks = arrangement.subscribe(() => {
+      this._watchDrags();
+      if (arrangement.tracksVersion === tracksVersion) return;
+      tracksVersion = arrangement.tracksVersion;
+      this._refreshLinkStates();
+    });
+    this._unfollow = () => {
+      stopSources();
+      stopTracks();
+    };
+  }
+  /**
+   * A change to the arrangement while a drag is in progress came from
+   * elsewhere (a drag writes nothing until its release): cancel the drag
+   * when it changed what is dragged (#848 P2, interactions/drag-watch.ts).
+   */
+  private _watchDrags(): void {
+    const clip = this._clipPointer.draggedClip;
+    if (clip && clipDragChanged(this._arrangement, clip)) this._pointer.cancelClipDrag();
+    const track = this._trackReorderDrag.draggedTrack;
+    if (track && trackDragChanged(this._arrangement, track)) this._trackReorderDrag.cancel();
+  }
+  // --- The swap (interactions/arrangement-swap.ts) ---
+  /** @internal */
+  _releaseEngine(): void {
+    if (!this._engine) return;
+    try {
+      this._engine.dispose({ keepAdapter: true });
+    } catch (err) {
+      console.warn('[dawcore] Error releasing the engine: ' + String(err));
+    }
+    this._engine = null;
+  }
+  /** @internal */
+  _disposeTrackChain(trackId: string): void {
+    this._effectsManager?.disposeTrackChain(trackId);
+  }
+  /** @internal */
+  _playArrangement(next: Arrangement | null): void {
+    // The waits on the arrangement played until now end (D2): an addClip()
+    // rejects, a loadFiles() wait ends as loaded, a peaks fetch is aborted.
+    this._playSignals.swappedOut(
+      this._arrangement,
+      abortError('the arrangement was swapped out (editor.arrangement) before it finished')
+    );
+    this._handedIn = next;
+    // A new load cycle: every track of the arrangement now played is announced.
+    this._announcer = new LoadAnnouncer((event) => this.dispatchEvent(event));
+    this._follow(this._arrangement);
+    this._currentTime = 0;
+    this._stopPlayhead();
+    this._recomputeDuration();
+    this._refreshLinkStates();
+    this._announceLoading();
+    this.requestUpdate();
+  }
+  /** @internal */
+  _buildEngineIfReady(): void {
+    if (this._externalAdapter && this.isConnected && !this._engine) this._buildEngineReporting();
   }
   /**
    * Ids of tracks registered (a `<daw-track>` connected, a file dropped) and
@@ -497,7 +657,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * reject the call: a removal of the clip or of its track before the clip
    * loads settles it here, without a public event (#917).
    */
-  private _awaitedClips = new Map<string, { trackId: string; reject: (error: Error) => void }>();
+  private _awaitedClips = new Map<string, { trackId: string; reject: (error: unknown) => void }>();
   /** Reject the `addClip()` calls waiting for clips that match `which`. */
   private _rejectAwaitedClips(
     which: (clipId: string, trackId: string) => boolean,
@@ -507,15 +667,19 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       if (which(clipId, awaited.trackId)) awaited.reject(new Error(message));
     }
   }
-  /** `<daw-track>` elements `addTrack()` made: every other one is the page's (the history rule). */
-  private _editorMadeTracks = new WeakSet<DawTrackElement>();
   /** `.dat` peaks drawn for a clip still loading, by clip id (an editor-only render cache). */
   @state() _previewPeaks: Map<string, PeakData> = new Map();
   /** The `.dat` data of those clips, handed to the peak pipeline when the audio arrives. */
   private _previewWaveforms = new Map<string, import('waveform-data').default>();
-  /** Per-track descriptors, without the mix: the arrangement owns that (#843). */
-  @state() _tracks: Map<string, StoredTrackDescriptor> = new Map();
-  @state() _engineTracks: Map<string, ClipTrack> = new Map();
+  /**
+   * Tracks registered and not in the arrangement yet, with their declaration
+   * (#848): a `<daw-track>` is read when it enters (its clips and attributes
+   * as they are then); a dropped file carries its descriptor. The one place a
+   * track's state lives until it enters.
+   */
+  _pending: Map<string, PendingEntry> = new Map();
+  /** What the arrangement has no field for, by track id (#848; render mode, `peaks-src`). */
+  @state() _extras: Map<string, TrackExtras> = new Map();
   @state() _peaksData: Map<string, PeakData> = new Map();
   @state() _isPlaying = false;
   @state() _duration = 0;
@@ -661,7 +825,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       {
         effectiveSampleRate: this.effectiveSampleRate,
         duration: this._duration,
-        tracks: [...this._engineTracks.values()],
+        tracks: this._loadedTracks(),
         masterVolume: this._engine?.getState().masterVolume ?? 1,
         getMasterEffectsState: () => this.getEffectsState(),
         getTrackEffectsState: (trackId) => this.getTrackEffectsState(trackId),
@@ -859,10 +1023,27 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * Returns false for unknown track/clip IDs (defensive).
    */
   isMidiClip(trackId: string, clipId: string): boolean {
-    const track = this._engineTracks.get(trackId);
-    if (!track) return false;
-    const clip = track.clips.find((c) => c.id === clipId);
+    const clip = this._loadedClip(trackId, clipId);
     return clip?.midiNotes != null;
+  }
+  /** The arrangement's tracks as they are played: loaded clips, the current mix (#848). */
+  _loadedTracks(): ClipTrack[] {
+    const arrangement = this._arrangement;
+    return arrangement
+      .getTracks()
+      .map((t) =>
+        loadedTrack(
+          t,
+          arrangement.getMixer().get(t.id) ?? mixOfTrack(t as ClipTrack),
+          arrangement.recordingTrackIds.has(t.id)
+        )
+      );
+  }
+  /** A loaded clip of a track of the arrangement, or undefined. */
+  private _loadedClip(trackId: string, clipId: string): AudioClip | undefined {
+    const track = this._arrangement.getTracks().find((t) => t.id === trackId);
+    const clip = track?.clips.find((c) => c.id === clipId);
+    return clip && !isLoadingClip(clip) ? clip : undefined;
   }
 
   private _pointer = new PointerHandler(this);
@@ -883,6 +1064,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   static styles = [
     hostStyles,
     css`
+      /* The hidden attribute hides the element: :host sets display (modern-web-guidance custom-elements). */
+      :host([hidden]) {
+        display: none;
+      }
       :host {
         display: flex;
         flex-direction: column;
@@ -1115,11 +1300,92 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * the arrangement is not listed (its descriptor stays for a Redo).
    */
   get tracks(): TrackWithId[] {
-    const ids = [...this._arrangement.getTracks().map((t) => t.id), ...this._entryQueue];
-    return ids.flatMap((trackId) => {
-      const descriptor = this._tracks.get(trackId);
+    const listed = this._arrangement.getTracks().map((track) => this._listTrack(track));
+    // While a handed-in arrangement is played, the page's tracks waiting for
+    // the own one are not listed (P15).
+    const queue = this._handedIn
+      ? this._entryQueue.filter((id) => !this._trackElements.has(id))
+      : this._entryQueue;
+    const waiting = queue.flatMap((trackId) => {
+      const descriptor = this._pendingDescriptor(trackId);
       return descriptor ? [{ trackId, ...descriptor, ...this._mixOf(trackId) }] : [];
     });
+    return [...listed, ...waiting];
+  }
+  /** A track of the arrangement as `editor.tracks` lists it: everything read from the arrangement. */
+  private _listTrack(track: ArrangementTrack): TrackWithId {
+    const extras = this._extras.get(track.id);
+    // Anywhere in the editor: after an Undo of a move a clip's element sits
+    // in another track's element (#848).
+    const clipEls = new Map<string, DawClipElement>(
+      [...this.querySelectorAll('daw-clip')].map((el) => [
+        (el as DawClipElement).clipId,
+        el as DawClipElement,
+      ])
+    );
+    const sr = this.effectiveSampleRate;
+    const clips: ClipDescriptor[] = track.clips.map((clip) => {
+      const el = clipEls.get(clip.id);
+      const times = clipSeconds(clip, sr);
+      const midi = isLoadingClip(clip) ? null : clip;
+      const base = {
+        src: typeof clip.src === 'string' ? clip.src : '',
+        peaksSrc: extras?.peaksSrc.get(clip.id) ?? this._takenPeaksSrc(clip.id) ?? '',
+        ...times,
+        gain: clip.gain ?? 1,
+        name: clip.name ?? '',
+        fadeIn: el?.fadeIn ?? 0,
+        fadeOut: el?.fadeOut ?? 0,
+        fadeType: ((el?.fadeType as FadeType) ?? 'linear') as FadeType,
+        midiNotes: midi?.midiNotes ?? null,
+        midiChannel: midi?.midiChannel ?? null,
+        midiProgram: midi?.midiProgram ?? null,
+      };
+      return el
+        ? { kind: 'dom' as const, clipId: clip.id, ...base }
+        : { kind: 'drop' as const, clipId: clip.id, ...base };
+    });
+    return {
+      trackId: track.id,
+      name: track.name ?? '',
+      src: extras?.src ?? '',
+      kind: trackKind(track),
+      renderMode: this._renderModeOf(track.id),
+      spectrogramConfig: extras?.spectrogramConfig ?? null,
+      clips,
+      ...this._mixOf(track.id),
+    };
+  }
+  /** A pending track's declaration: its element's attributes and clips now, or its descriptor. */
+  private _pendingDescriptor(trackId: string): StoredTrackDescriptor | null {
+    const pending = this._pending.get(trackId);
+    if (!pending) return null;
+    if (!('element' in pending)) return pending.descriptor;
+    const read = this._readTrackDescriptor(pending.element);
+    return pending.extraClips.length > 0
+      ? { ...read, clips: [...read.clips, ...pending.extraClips] }
+      : read;
+  }
+  /** The extras a track of the arrangement takes when the editor has none for it. */
+  private _defaultExtras(trackId: string): TrackExtras | null {
+    const track = this._arrangementOf(trackId)
+      .getTracks()
+      .find((t) => t.id === trackId);
+    if (!track) return null;
+    const kind = trackKind(track);
+    return {
+      kind,
+      renderMode: trackDescriptorRenderMode(kind, 'waveform'),
+      src: '',
+      peaksSrc: new Map(),
+    };
+  }
+  /** How a track is drawn: its extras, else from its kind (an undo-restored track has none). */
+  _renderModeOf(trackId: string): TrackRenderMode {
+    const extras = this._extras.get(trackId);
+    if (extras) return extras.renderMode;
+    const track = this._arrangement.getTracks().find((t) => t.id === trackId);
+    return trackDescriptorRenderMode(track ? trackKind(track) : 'audio', 'waveform');
   }
   /**
    * A track's mix, from its one owner, the arrangement (#843), as the engine
@@ -1128,12 +1394,182 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * waiting to enter shows what its element declares.
    */
   _mixOf(trackId: string): TrackMixerValues {
-    const played = this._engineTracks.get(trackId);
-    if (played) return mixOfTrack(played);
-    const mix = this._arrangement.getMixer().get(trackId);
+    const mix = mixOf(this._arrangement, trackId);
     if (mix) return mix;
+    const pending = this._pending.get(trackId);
+    if (pending && 'mix' in pending) return pending.mix;
     const el = this._trackElements.get(trackId);
     return el ? mixOfElement(el) : DEFAULT_TRACK_MIX;
+  }
+  // --- Element links (#848, interactions/element-links.ts) ---
+  /** @internal */
+  _trackLinkState(trackId: string): LinkState {
+    // While a handed-in arrangement is set, the children are not played (P7).
+    if (this._handedIn && this._trackElements.has(trackId)) return 'detached';
+    if (this._isEntered(trackId)) return 'live';
+    return this._extras.has(trackId) && !this._pending.has(trackId) ? 'detached' : 'pending';
+  }
+  /** @internal */
+  _clipLinkState(trackId: string, clipId: string): LinkState {
+    const track = this._trackLinkState(trackId);
+    if (track !== 'live') return track;
+    // Linked by id, wherever the element sits (#848: the editor moves no
+    // element, so after an Undo of a move it is in another track's element).
+    const held = this._arrangement.getTracks().some((t) => t.clips.some((c) => c.id === clipId));
+    if (held) return 'live';
+    return this._extras.get(trackId)?.peaksSrc.has(clipId) ? 'detached' : 'pending';
+  }
+  /** @internal The stored mix (not a take's mute) and the name. */
+  _trackValues(trackId: string): TrackLinkValues | null {
+    const track = this._arrangement.getTracks().find((t) => t.id === trackId);
+    const mix = this._arrangement.getMixer().get(trackId);
+    if (!track || !mix) return null;
+    return { ...mix, name: track.name ?? '' };
+  }
+  /** @internal */
+  _clipValues(trackId: string, clipId: string): ClipLinkValues | null {
+    const clip = this._arrangement
+      .getTracks()
+      .find((t) => t.id === this._clipHolderId(trackId, clipId))
+      ?.clips.find((c) => c.id === clipId);
+    if (!clip) return null;
+    const midi = isLoadingClip(clip) ? null : clip;
+    return {
+      ...clipSeconds(clip, this.effectiveSampleRate),
+      gain: clip.gain ?? 1,
+      name: clip.name ?? '',
+      midiNotes: midi?.midiNotes ?? null,
+      midiChannel: midi?.midiChannel ?? null,
+      midiProgram: midi?.midiProgram ?? null,
+    };
+  }
+  /** @internal A property or attribute set on a live `<daw-track>`: one undo step per field kind. */
+  _requestTrackChange(trackId: string, partial: Partial<TrackLinkValues>): void {
+    const { name, ...mix } = partial;
+    if (Object.keys(mix).length > 0) this._writeMixFields(trackId, mix, this._taskGesture(trackId));
+    if (name !== undefined) this._renameTrack(trackId, name || 'Untitled');
+  }
+  /** One gesture id per track for the rest of this task: mix sets made together are one step (#843). */
+  private _taskGestures = new Map<string, string>();
+  private _taskGesture(trackId: string): string {
+    let id = this._taskGestures.get(trackId);
+    if (!id) {
+      id = createMixerGesture().id;
+      this._taskGestures.set(trackId, id);
+      if (this._taskGestures.size === 1) queueMicrotask(() => this._taskGestures.clear());
+    }
+    return id;
+  }
+  /** @internal A property or attribute set on a live `<daw-clip>`: one undo step. */
+  _requestClipChange(trackId: string, clipId: string, partial: Partial<ClipLinkValues>): void {
+    const current = this._clipValues(trackId, clipId);
+    if (!current) return;
+    const holderId = this._clipHolderId(trackId, clipId);
+    const clip = this._arrangement
+      .getTracks()
+      .find((t) => t.id === holderId)
+      ?.clips.find((c) => c.id === clipId);
+    const src = clip && typeof clip.src === 'string' ? clip.src : '';
+    this._applyClipUpdate(holderId, clipId, { ...current, ...partial, src });
+  }
+  /**
+   * The clips of an entering track that another track of the arrangement
+   * holds (the page moved their `<daw-clip>` here while the track waited):
+   * the track takes the held clip as it is, and `from` names what leaves
+   * where. A held clip of the other kind is refused and stays.
+   */
+  private _takeOverMovedClips(
+    trackId: string,
+    track: ArrangementTrack
+  ): {
+    track: ArrangementTrack;
+    from: Map<string, Set<string>>;
+    movedIds: Set<string>;
+    refused: Array<{ clipId: string; error: Error }>;
+  } {
+    const from = new Map<string, Set<string>>();
+    const movedIds = new Set<string>();
+    const refused: Array<{ clipId: string; error: Error }> = [];
+    const others = this._arrangement.getTracks().filter((t) => t.id !== trackId);
+    const kind = trackKind(track);
+    const clips: ArrangementTrack['clips'] = [];
+    for (const clip of track.clips) {
+      const holder = others.find((t) => t.clips.some((c) => c.id === clip.id));
+      const held = holder?.clips.find((c) => c.id === clip.id);
+      if (!holder || !held) {
+        clips.push(clip);
+        continue;
+      }
+      const isMidi = 'midiNotes' in held && held.midiNotes != null;
+      const error = clipKindError(track.name ?? '', kind, isMidi, held.name || held.id);
+      if (error) {
+        refused.push({ clipId: clip.id, error });
+        continue;
+      }
+      clips.push(held);
+      movedIds.add(clip.id);
+      const ids = from.get(holder.id) ?? new Set<string>();
+      from.set(holder.id, ids.add(clip.id));
+    }
+    return {
+      track: movedIds.size || refused.length ? { ...track, clips } : track,
+      from,
+      movedIds,
+      refused,
+    };
+  }
+  /** Run `fn` as one undo step of each arrangement it changes. */
+  private _inOneStep(arrangements: readonly Arrangement[], fn: () => void): void {
+    for (const a of arrangements) a.beginTransaction();
+    try {
+      fn();
+    } finally {
+      for (const a of arrangements) a.commitTransaction();
+    }
+  }
+  /** The `peaks-src` some track took for a clip element, if any. */
+  private _takenPeaksSrc(clipId: string): string | undefined {
+    for (const extras of this._extras.values()) {
+      const peaksSrc = extras.peaksSrc.get(clipId);
+      if (peaksSrc !== undefined) return peaksSrc;
+    }
+    return undefined;
+  }
+  /**
+   * The arrangement whose history holds a track: the one that holds it now,
+   * or else, for a page track, the own one (an Undo took it out there; a
+   * handed-in arrangement may be played meanwhile), or else the one played.
+   */
+  private _historyOf(trackId: string, isPageTrack = this._trackElements.has(trackId)): Arrangement {
+    const holder = this._arrangementOf(trackId);
+    if (holder.getTracks().some((t) => t.id === trackId)) return holder;
+    return isPageTrack ? this._ownArrangement : holder;
+  }
+  /** The track of the arrangement played that holds a clip: `trackId` when it does, or else the one that does. */
+  private _clipHolderId(trackId: string, clipId: string): string {
+    const tracks = this._arrangement.getTracks();
+    if (tracks.some((t) => t.id === trackId && t.clips.some((c) => c.id === clipId)))
+      return trackId;
+    return tracks.find((t) => t.clips.some((c) => c.id === clipId))?.id ?? trackId;
+  }
+  /** @internal */
+  _trackKind(trackId: string): TrackKind | null {
+    const track = this._arrangement.getTracks().find((t) => t.id === trackId);
+    return track ? trackKind(track) : null;
+  }
+  /** @internal */
+  _trackIndex(trackId: string): number {
+    return this._arrangement.getTracks().findIndex((t) => t.id === trackId);
+  }
+  /** @internal */
+  _detachedReason(): string {
+    return this._handedIn
+      ? 'a handed-in arrangement is set (editor.arrangement)'
+      : 'its track or clip is not in the arrangement the editor plays';
+  }
+  /** Set or clear `:state(detached)` on every registered element (#848). */
+  private _refreshLinkStates(): void {
+    refreshLinkStates(this, this._trackElements);
   }
   /**
    * Change one mixer field of a track: the arrangement's setter with
@@ -1156,8 +1592,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * Change the given mixer fields of a track as ONE undo step (#843): all
    * of them carry one fresh gesture id. A field left out is not sent.
    */
-  private _writeMixFields(trackId: string, mix: Partial<TrackMixerValues>): void {
-    const options: MixerChangeOptions = { gesture: createMixerGesture().id };
+  private _writeMixFields(
+    trackId: string,
+    mix: Partial<TrackMixerValues>,
+    gesture: string = createMixerGesture().id
+  ): void {
+    const options: MixerChangeOptions = { gesture };
     if (mix.volume !== undefined) this._writeMix(trackId, 'volume', mix.volume, options);
     if (mix.pan !== undefined) this._writeMix(trackId, 'pan', mix.pan, options);
     if (mix.muted !== undefined) this._writeMix(trackId, 'muted', mix.muted, options);
@@ -1188,21 +1628,38 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   // --- Lifecycle ---
   connectedCallback() {
     super.connectedCallback();
+    if (this._connection.signal.aborted) this._connection = new AbortController();
+    // Follow the arrangement played again (a disconnect let it go, #848),
+    // and show what changed meanwhile (an Undo made while out of the page).
+    this._follow(this._arrangement);
+    this._refreshLinkStates();
+    // Every listener of this connection goes with its signal (D8).
+    const { signal } = this._connection;
     // Capture on window: runs before <daw-keyboard-shortcuts>' document listener.
-    window.addEventListener('keydown', this._onDragEscape, { capture: true });
-    this.addEventListener('daw-track-connected', this._onTrackConnected as EventListener);
-    this.addEventListener('daw-track-update', this._onTrackUpdate as EventListener);
-    this.addEventListener('daw-track-control', this._onTrackControl as EventListener);
-    this.addEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener);
-    this.addEventListener('daw-clip-connected', this._onClipConnected as EventListener);
-    this.addEventListener('daw-clip-update', this._onClipUpdate as EventListener);
+    window.addEventListener('keydown', this._onDragEscape, { capture: true, signal });
+    this.addEventListener('daw-track-connected', this._onTrackConnected as EventListener, {
+      signal,
+    });
+    this.addEventListener('daw-track-update', this._onTrackUpdate as EventListener, { signal });
+    this.addEventListener('daw-track-control', this._onTrackControl as EventListener, { signal });
+    this.addEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener, {
+      signal,
+    });
+    this.addEventListener('daw-clip-connected', this._onClipConnected as EventListener, {
+      signal,
+    });
     this.addEventListener(
       'daw-annotation-track-connected',
-      this._onAnnotationTrackConnected as EventListener
+      this._onAnnotationTrackConnected as EventListener,
+      { signal }
     );
-    this.addEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
-    this.addEventListener('daw-track-reorder', this._onTrackReorder as EventListener);
-    this.addEventListener('daw-track-reorder-grab', this._onTrackReorderGrab as EventListener);
+    this.addEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener, {
+      signal,
+    });
+    this.addEventListener('daw-track-reorder', this._onTrackReorder as EventListener, { signal });
+    this.addEventListener('daw-track-reorder-grab', this._onTrackReorderGrab as EventListener, {
+      signal,
+    });
     // Detect track + clip removal via MutationObserver (detached elements can't
     // bubble events). A node present in BOTH removedNodes and addedNodes within
     // one batch is a MOVE (insertBefore fires remove+insert) — treated as a
@@ -1210,6 +1667,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._childObserver = new MutationObserver((mutations) => {
       const removedTracks = new Map<string, DawTrackElement>();
       const removedClips = new Set<DawClipElement>();
+      // The clips that left inside a removed <daw-track>, by its id.
+      const clipsOfRemoved = new Map<string, DawClipElement[]>();
       const addedTrackIds = new Set<string>();
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
@@ -1234,22 +1693,44 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           node.querySelectorAll?.('daw-clip').forEach((c) => {
             removedClips.add(c as DawClipElement);
           });
+          for (const t of node.tagName === 'DAW-TRACK'
+            ? [node]
+            : [...(node.querySelectorAll?.('daw-track') ?? [])]) {
+            clipsOfRemoved.set((t as DawTrackElement).trackId, [
+              ...t.querySelectorAll('daw-clip'),
+            ] as DawClipElement[]);
+          }
         }
       }
-      let orderMayHaveChanged = addedTrackIds.size > 0;
+      const movedTrackIds = new Set<string>();
       for (const [trackId] of removedTracks) {
         if (addedTrackIds.has(trackId)) {
-          orderMayHaveChanged = true; // move, not removal
+          movedTrackIds.add(trackId); // move, not removal
           continue;
         }
-        this._onTrackRemoved(trackId);
+        // The track and what its children declared are one undo step: a
+        // child may be the element of another track's clip (after an Undo
+        // of a move), which goes with it (the maintainer's choice, #848).
+        const children = (clipsOfRemoved.get(trackId) ?? []).filter((c) => !c.isConnected);
+        // Only the arrangement that holds the track (a page track's children
+        // declare clips of the same one): an app's open transaction on
+        // another is left alone (review of #919).
+        this._inOneStep([this._historyOf(trackId)], () => {
+          this._onTrackRemoved(trackId);
+          for (const clip of children) {
+            removedClips.delete(clip);
+            this._onClipRemovedFromDom(clip);
+          }
+        });
       }
       for (const clip of removedClips) {
-        // A clip that moved with its track (or was re-slotted) is still connected.
-        if (clip.isConnected) continue;
+        // A clip that moved with its track, or into another track of this
+        // editor (its connected event moves it, #848), is still here. One
+        // moved out of the editor goes.
+        if (clip.isConnected && this.contains(clip)) continue;
         this._onClipRemovedFromDom(clip);
       }
-      if (orderMayHaveChanged) this._syncEngineOrderToDom();
+      if (movedTrackIds.size > 0) this._placeMovedTracks(movedTrackIds);
     });
     this._childObserver.observe(this, { childList: true, subtree: true });
     // A <daw-track> the page removed while the editor was detached (the
@@ -1258,38 +1739,52 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     for (const [trackId, el] of [...this._trackElements]) {
       if (!this.contains(el)) this._onTrackRemoved(trackId);
     }
+    // ... and a <daw-clip> the page removed meanwhile: its clip goes (#848).
+    // Present anywhere in the editor: an element may sit in another track's
+    // element than the one holding its clip (an Undo of a move, #848).
+    const present = new Set(
+      [...this.querySelectorAll('daw-clip')].map((c) => (c as DawClipElement).clipId as string)
+    );
+    for (const [trackId] of this._trackElements) {
+      for (const clipId of this._extras.get(trackId)?.peaksSrc.keys() ?? []) {
+        if (present.has(clipId)) continue;
+        // The track that holds the clip, which may be another one than the
+        // element's (an Undo of a move, #848): the removal takes it from there.
+        const holder = this._historyOf(trackId)
+          .getTracks()
+          .find((t) => t.clips.some((c) => c.id === clipId));
+        if (holder) {
+          this._removeClipFromTrack(holder.id, clipId);
+          this._forgetClip(trackId, clipId);
+        } else this._dropUnheldClip(trackId, clipId);
+      }
+    }
     if (this._externalAdapter && !this._engine) this._buildEngineReporting();
   }
   disconnectedCallback() {
     super.disconnectedCallback();
-    window.removeEventListener('keydown', this._onDragEscape, { capture: true });
+    // A removed editor does not follow its arrangement: a handed-in one would
+    // keep it alive and run its listeners (review of #919).
+    this._unfollow();
+    this._unfollow = () => {};
+    // The listeners of this connection go, and its waits end: a track's
+    // load wait resolves (the track is kept and loads after a reparent).
+    this._connection.abort(abortError('<daw-editor> was disconnected'));
     this._effectsManager?.disposeAll();
     this._effectsManager = null;
-    this.removeEventListener('daw-track-connected', this._onTrackConnected as EventListener);
-    this.removeEventListener('daw-track-update', this._onTrackUpdate as EventListener);
-    this.removeEventListener('daw-track-control', this._onTrackControl as EventListener);
-    this.removeEventListener('daw-track-remove', this._onTrackRemoveRequest as EventListener);
-    this.removeEventListener('daw-clip-connected', this._onClipConnected as EventListener);
-    this.removeEventListener('daw-clip-update', this._onClipUpdate as EventListener);
-    this.removeEventListener(
-      'daw-annotation-track-connected',
-      this._onAnnotationTrackConnected as EventListener
-    );
-    this.removeEventListener('daw-annotation-select', this._onAnnotationSelect as EventListener);
-    this.removeEventListener('daw-track-reorder', this._onTrackReorder as EventListener);
-    this.removeEventListener('daw-track-reorder-grab', this._onTrackReorderGrab as EventListener);
-    // Before the engine is disposed: a clip drag's cancel aborts its transaction.
+    // Before the engine is disposed: every pointer interaction ends here.
     this._cancelDrags(true);
     // No audio loads while detached (the decode context goes with the
     // engine). A dropped file whose track has entered is kept and counts as
-    // loaded: it loads after a reparent, like the page's tracks (maintainer,
-    // #917). One not entered yet is not added.
-    for (const end of [...this._loadWaitEnds]) end();
+    // loaded (the connection's abort above ended its wait): it loads after a
+    // reparent, like the page's tracks (maintainer, #917). One not entered
+    // yet is not added.
     for (const trackId of this._entryQueue) {
-      if (this._trackElements.has(trackId) || !this._entryWaiters.has(trackId)) continue;
-      const nextTracks = new Map(this._tracks);
-      nextTracks.delete(trackId);
-      this._tracks = nextTracks;
+      const pending = this._pending.get(trackId);
+      if (!pending || 'element' in pending || !this._entryWaiters.has(trackId)) continue;
+      const nextPending = new Map(this._pending);
+      nextPending.delete(trackId);
+      this._pending = nextPending;
       this._entryQueue = this._entryQueue.filter((id) => id !== trackId);
       this._settleEntry(
         trackId,
@@ -1445,31 +1940,42 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       console.warn('[dawcore] Invalid daw-track-connected event detail: ' + String(e.detail));
       return;
     }
-    // Custom elements fire disconnectedCallback+connectedCallback on a pure
-    // DOM MOVE (e.g. insertBefore during a consumer reorder), not just on a
-    // genuine removal — no moveBefore() is used anywhere in this codebase.
-    // daw-track.ts's connectedCallback re-dispatches a deferred
-    // daw-track-connected for the SAME trackId in that case. If the track is
+    // A DOM MOVE sends daw-track-connected again for the SAME trackId: an
+    // insertBefore runs disconnectedCallback+connectedCallback, a
+    // moveBefore() runs connectedMoveCallback, and both announce (#848). If the track is
     // already registered (loading or fully loaded), this is a reconnect from
     // a move, not a first-time registration: refresh the element mapping and
     // bail out WITHOUT re-reading the descriptor or entering it again. The
     // same holds when the EDITOR itself was reparented: the disconnect keeps
     // the arrangement and the descriptors (#848), so the children's
     // reconnect enters nothing again, also a track an Undo took out.
-    if (this._tracks.has(trackId)) {
+    if (this._pending.has(trackId) || this._extras.has(trackId) || this._isEntered(trackId)) {
       this._trackElements.set(trackId, trackEl as DawTrackElement);
       return;
     }
-    const descriptor = this._readTrackDescriptor(trackEl as DawTrackElement);
-    this._tracks = new Map(this._tracks).set(trackId, descriptor);
+    // Its declaration is read when it enters (#848 PR 3).
+    this._pending = new Map(this._pending).set(trackId, {
+      element: trackEl as DawTrackElement,
+      extraClips: [],
+    });
     this._trackElements.set(trackId, trackEl as DawTrackElement);
     // It enters the arrangement at the next flush, in DOM position (#848).
     this._queueEntry(trackId);
   };
   private _onTrackRemoved(trackId: string) {
-    // Captured before the cleanup below mutates _tracks — gates the outbound
-    // event so it only fires for a track that was actually registered.
-    const existed = this._tracks.has(trackId);
+    // Captured before the cleanup below — gates the outbound event so it only
+    // fires for a track that was actually registered.
+    const existed =
+      this._pending.has(trackId) || this._extras.has(trackId) || this._isEntered(trackId);
+    // Detached (an Undo of its arrival): gone for good, also from the undo
+    // and redo states (maintainer's choice, #848).
+    const isPageTrack = this._trackElements.has(trackId);
+    const history = this._historyOf(trackId, isPageTrack);
+    const detached =
+      this._extras.has(trackId) &&
+      !this._pending.has(trackId) &&
+      !history.getTracks().some((t) => t.id === trackId);
+    const detachedClipIds = detached ? [...(this._extras.get(trackId)?.peaksSrc.keys() ?? [])] : [];
     // An addClip() waiting for a clip of this track would never settle (the
     // clip may not even have connected yet): reject it (#917).
     this._rejectAwaitedClips(
@@ -1478,7 +1984,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     );
     this._entryQueue = this._entryQueue.filter((id) => id !== trackId);
     this._settleEntry(trackId, new Error('track "' + trackId + '" was removed before it entered'));
-    const arrangementTrack = this._arrangement.getTracks().find((t) => t.id === trackId);
+    // A page track removed while a handed-in arrangement is played is the own one's (P7).
+    const holder = this._arrangementOf(trackId);
+    const arrangementTrack = holder.getTracks().find((t) => t.id === trackId);
     const clipIds = arrangementTrack?.clips.map((c) => c.id) ?? [];
     this._announcer.forget(trackId, clipIds);
     if (clipIds.some((id) => this._previewPeaks.has(id))) {
@@ -1489,11 +1997,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     for (const id of clipIds) this._previewWaveforms.delete(id);
     this._trackElements.delete(trackId);
     this._effectsManager?.disposeTrackChain(trackId);
-    // Clean up per-clip data before removing the track (need clip IDs from engine tracks)
-    const removedTrack = this._engineTracks.get(trackId);
-    if (removedTrack) {
+    // Clean up per-clip data before removing the track
+    if (arrangementTrack) {
       const nextPeaks = new Map(this._peaksData);
-      for (const clip of removedTrack.clips) {
+      for (const clip of arrangementTrack.clips) {
         this._clipBuffers.delete(clip.id);
         this._clipOffsets.delete(clip.id);
         nextPeaks.delete(clip.id);
@@ -1501,22 +2008,29 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       }
       this._peaksData = nextPeaks;
     }
-    const nextTracks = new Map(this._tracks);
-    nextTracks.delete(trackId);
-    this._tracks = nextTracks;
-    const nextEngine = new Map(this._engineTracks);
-    nextEngine.delete(trackId);
-    this._engineTracks = nextEngine;
-    this._recomputeDuration();
+    const nextPending = new Map(this._pending);
+    nextPending.delete(trackId);
+    this._pending = nextPending;
+    const nextExtras = new Map(this._extras);
+    nextExtras.delete(trackId);
+    this._extras = nextExtras;
     // An undo step; the engine follows (incremental removal, playback goes on).
-    this._arrangement.removeTrack(trackId);
+    if (arrangementTrack) holder.removeTrack(trackId);
+    else if (detached) {
+      history.removeTrack(trackId, { undoable: false });
+      for (const id of detachedClipIds) {
+        this._purgeClipCaches(id);
+        this._previewWaveforms.delete(id);
+      }
+    }
+    this._recomputeDuration();
     // Recompute zoom floor from remaining cached WaveformData scales
     this._recomputeZoomFloor();
     this._disposeSpectrogramControllerIfEmpty();
     // `existed` gate: the MutationObserver fires this for never-registered
     // <daw-track> churn too (element added+removed before its deferred
     // connect) — that must not rewind the user's cursor on an empty timeline.
-    if (existed && nextEngine.size === 0) {
+    if (existed && this._arrangement.getTracks().length === 0) {
       if (this._engine) {
         // The editor rewinds to 0 when the last track goes away — the engine
         // must follow (engine.removeTrack never touches time), or the next
@@ -1538,7 +2052,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       this._stopPlayhead();
     }
     // Outbound notification (symmetric with daw-track-ready) — fired after
-    // _tracks is updated so handlers reading editor.tracks see the removal.
+    // the removal so handlers reading editor.tracks see it.
     // Only for a track that was registered, and never on a detached editor
     // (a bubbling/composed event can't reach ancestors — CLAUDE.md pattern #36).
     if (existed && this.isConnected) {
@@ -1556,79 +2070,63 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     if (!trackId) return;
     const trackEl = (e.target as HTMLElement).closest('daw-track') as DawTrackElement | null;
     if (!trackEl) return;
-    const oldDescriptor = this._tracks.get(trackId);
-    let descriptor = this._readTrackDescriptor(trackEl);
-    if (oldDescriptor && oldDescriptor.kind !== descriptor.kind) {
-      // The clips already loaded are of the old kind (#756).
-      console.warn(
-        '[dawcore] <daw-track> "' +
-          descriptor.name +
-          '": kind cannot change after the track has loaded (still "' +
-          oldDescriptor.kind +
-          '"). Remove the track and add one of the other kind.'
-      );
-      descriptor = {
-        ...descriptor,
-        kind: oldDescriptor.kind,
-        renderMode: trackDescriptorRenderMode(oldDescriptor.kind, trackEl.renderMode),
-      };
-      // Put the element back, so it says what the editor holds and the next
-      // unrelated update (a volume change) does not warn again. The update
-      // this assignment dispatches finds the kinds equal. In a microtask: we
-      // are inside the element's own updated(), where Lit's dev build warns
-      // about a property change.
-      const keptKind = oldDescriptor.kind;
-      queueMicrotask(() => {
-        trackEl.kind = keptKind;
-      });
-    }
-    // The <daw-track src> shorthand: its clip keeps the id it entered with
-    // while the src is the same.
-    if (
-      oldDescriptor &&
-      oldDescriptor.src === descriptor.src &&
-      !descriptor.clips.some(isDomClip) &&
-      !oldDescriptor.clips.some(isDomClip)
-    ) {
-      descriptor = { ...descriptor, clips: oldDescriptor.clips };
-    }
-    this._tracks = new Map(this._tracks).set(trackId, descriptor);
-    // Only the mixer properties this update changed (#843), as one undo step:
-    // a rename after an Undo must not send the element's older volume back.
-    // The arrangement's setters (a loading track is in the arrangement too, #848).
+    // A track that has not entered is read when it enters; one an Undo took
+    // out keeps what it had (#848).
+    const old = this._extras.get(trackId);
+    if (!old || !this._isEntered(trackId)) return;
     const changed = Array.isArray(e.detail.changed) ? e.detail.changed : [];
-    this._writeMixFields(trackId, pickMix(mixOfElement(trackEl), changed));
-    if (oldDescriptor && oldDescriptor.src !== descriptor.src) {
-      this._replaceShorthandClips(trackId, descriptor);
-    }
+    // A `kind` change after entry is refused by the element itself (its
+    // live property warns, #848).
+    // Only what this update changed: an unrelated change (a volume) must
+    // not put back a render mode or a config `updateTrack` gave the track.
+    const next: TrackExtras = {
+      ...old,
+      ...(changed.includes('renderMode') && {
+        renderMode: trackDescriptorRenderMode(old.kind, trackEl.renderMode),
+      }),
+      ...(changed.includes('spectrogramConfig') && {
+        spectrogramConfig: trackEl.spectrogramConfig,
+      }),
+      ...(changed.includes('src') && { src: trackEl.src }),
+    };
+    this._extras = new Map(this._extras).set(trackId, next);
+    // The mix and the name are not handled here: the element's setters ask
+    // the arrangement directly (#848, element-links.ts).
+    if (old.src !== next.src) this._replaceShorthandClips(trackId, trackEl);
+    const loaded = this._loadedTracks().find((t) => t.id === trackId)?.clips ?? [];
     // Track switched into spectrogram mode — push existing clip audio into the controller.
-    if (descriptor.renderMode === 'spectrogram' && oldDescriptor?.renderMode !== 'spectrogram') {
-      const engineTrack = this._engineTracks.get(trackId);
-      if (engineTrack) {
-        for (const clip of engineTrack.clips) {
-          this._maybeRegisterSpectrogramClipAudio(trackId, clip);
-        }
-      }
+    if (next.renderMode === 'spectrogram' && old.renderMode !== 'spectrogram') {
+      for (const clip of loaded) this._maybeRegisterSpectrogramClipAudio(trackId, clip);
     }
     // Track switched OUT of spectrogram mode — drop clip audio.
-    if (descriptor.renderMode !== 'spectrogram' && oldDescriptor?.renderMode === 'spectrogram') {
-      const engineTrack = this._engineTracks.get(trackId);
-      if (engineTrack && this._spectrogramController) {
-        for (const clip of engineTrack.clips) {
-          this._spectrogramController.unregisterClipAudio(clip.id);
-        }
+    if (next.renderMode !== 'spectrogram' && old.renderMode === 'spectrogram') {
+      if (this._spectrogramController) {
+        for (const clip of loaded) this._spectrogramController.unregisterClipAudio(clip.id);
       }
       this._disposeSpectrogramControllerIfEmpty();
     }
-    if (descriptor.spectrogramConfig !== oldDescriptor?.spectrogramConfig) {
-      this._spectrogramController?.setTrackConfig(trackId, descriptor.spectrogramConfig ?? null);
+    if (next.spectrogramConfig !== old.spectrogramConfig) {
+      this._spectrogramController?.setTrackConfig(trackId, next.spectrogramConfig ?? null);
     }
   };
+  /** The arrangement that holds a track: the one played, else the own one (a page track while handed in). */
+  private _arrangementOf(trackId: string): Arrangement {
+    const has = (a: Arrangement) => a.getTracks().some((t) => t.id === trackId);
+    return has(this._arrangement) || !has(this._ownArrangement)
+      ? this._arrangement
+      : this._ownArrangement;
+  }
+  /** Rename a track in the arrangement (an undo step); the same name changes nothing. */
+  private _renameTrack(trackId: string, name: string): void {
+    const track = this._arrangement.getTracks().find((t) => t.id === trackId);
+    if (!track || track.name === name) return;
+    this._arrangement.updateTrack(trackId, (current) => ({ ...current, name }));
+  }
 
   /** Drop the controller when no spectrogram tracks remain. */
   private _disposeSpectrogramControllerIfEmpty(): void {
     if (!this._spectrogramController) return;
-    const stillNeeded = Array.from(this._tracks.values()).some(
+    const stillNeeded = Array.from(this._extras.values()).some(
       (d) => d.renderMode === 'spectrogram'
     );
     if (!stillNeeded) {
@@ -1641,101 +2139,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
   }
 
-  /** Reconcile `_tracks` descriptors with the engine's track list.
-   *
-   * ADD: engine.undo() restores removed tracks in ENGINE state only —
-   * without a synthesized descriptor the track plays and renders but shows
-   * "Untitled" controls and is missing from `editor.tracks`.
-   * PRUNE (the symmetric half): redo removes the track from engine state
-   * again — without pruning, the synthesized descriptor is a permanent
-   * ghost that even removeTrack() can't clean (no element, no engine
-   * entry). Never prunes tracks that are mid-load or element-backed —
-   * their descriptors legitimately precede their engine entries. */
-  _reconcileDescriptorsWithEngineTracks(tracks: readonly ClipTrack[]): void {
-    const engineIds = new Set(tracks.map((t) => t.id));
-    let next: Map<string, StoredTrackDescriptor> | null = null;
-    for (const track of tracks) {
-      if (this._tracks.has(track.id)) continue;
-      next ??= new Map(this._tracks);
-      // No mix of its own: it is read from the engine track (#843).
-      next.set(track.id, {
-        name: track.name ?? '',
-        src: '',
-        kind: trackKind(track),
-        renderMode: trackDescriptorRenderMode(trackKind(track), 'waveform'),
-        clips: [],
-      });
-    }
-    for (const trackId of this._tracks.keys()) {
-      if (
-        engineIds.has(trackId) ||
-        this._entryQueue.includes(trackId) ||
-        this._trackElements.has(trackId)
-      ) {
-        continue;
-      }
-      next ??= new Map(this._tracks);
-      next.delete(trackId);
-    }
-    // Element-less clips that carry their engine id (recorded takes, #659)
-    // have no <daw-clip> to re-read them, and the engine changes them on its
-    // own: undo removes a take, a split replaces it with two new ids, a
-    // punch-in carves it away, a drag moves or trims it. Follow the engine —
-    // a descriptor whose id is gone would otherwise be a ghost that even
-    // removeClip() cannot reach.
-    for (const track of tracks) {
-      const desc = (next ?? this._tracks).get(track.id);
-      if (!desc || !desc.clips.some((c) => !isDomClip(c) && c.clipId !== undefined)) continue;
-      const reconciled = this._reconcileIdentifiedDropClips(desc.clips, track);
-      if (reconciled === desc.clips) continue;
-      next ??= new Map(this._tracks);
-      next.set(track.id, { ...desc, clips: reconciled });
-    }
-    if (next) {
-      this._tracks = next;
-    }
-  }
-  /** Prune id-bearing drop descriptors the engine no longer has, and refresh
-   *  the rest from their engine clip. Returns the SAME array when nothing
-   *  changed, so an unchanged track never triggers a re-render. */
-  private _reconcileIdentifiedDropClips(
-    clips: ClipDescriptor[],
-    track: ClipTrack
-  ): ClipDescriptor[] {
-    const engineClips = new Map(track.clips.map((c) => [c.id, c]));
-    let changed = false;
-    const result: ClipDescriptor[] = [];
-    for (const desc of clips) {
-      if (isDomClip(desc) || desc.clipId === undefined) {
-        result.push(desc);
-        continue;
-      }
-      const clip = engineClips.get(desc.clipId);
-      if (!clip) {
-        changed = true;
-        continue;
-      }
-      const sr = clip.sampleRate ?? this.effectiveSampleRate;
-      const start = clip.startSample / sr;
-      const duration = clip.durationSamples / sr;
-      const offset = clip.offsetSamples / sr;
-      const gain = clip.gain ?? desc.gain;
-      const name = clip.name ?? desc.name;
-      if (
-        desc.start === start &&
-        desc.duration === duration &&
-        desc.offset === offset &&
-        desc.gain === gain &&
-        desc.name === name
-      ) {
-        result.push(desc);
-        continue;
-      }
-      changed = true;
-      result.push({ ...desc, start, duration, offset, gain, name });
-    }
-    return changed ? result : clips;
-  }
   private static _CONTROL_PROPS = new Set(['volume', 'pan', 'muted', 'soloed']);
   private _onTrackControl = (e: CustomEvent<Partial<DawTrackControlDetail>>) => {
     const { trackId, prop, value, gesture } = e.detail ?? {};
@@ -1754,7 +2157,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         })
       );
     }
-    if (this._tracks.has(trackId)) {
+    if (this._isEntered(trackId)) {
       // Validated values to the arrangement's setters (also while the track
       // loads, #848). A slider's gesture id makes its drag one undo step
       // (#843); a control without one (mute, solo) is a step per event.
@@ -1786,88 +2189,172 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const trackEl = clipEl.closest('daw-track') as DawTrackElement | null;
     if (!trackEl) return;
     const trackId = trackEl.trackId;
-    // A track that has not entered yet reads its clips at entry: add this one
-    // to its descriptor (the deferred connects of the clips read at connect
-    // are already there). No descriptor: the parent's own deferred connect
-    // has not run yet and will read this clip.
-    if (!this._isEntered(trackId)) {
+    // Moved here from another track of this editor (#848, choice a): the
+    // clip moves with it, one undo step.
+    if (this._rehomeClip(trackId, clipEl)) return;
+    // The arrangement that holds the track: the own one for a page track
+    // while a handed-in arrangement is played (the children declare it, P7).
+    const entered = this._arrangementOf(trackId)
+      .getTracks()
+      .some((t) => t.id === trackId);
+    if (!entered && !this._pending.has(trackId) && this._trackLinkState(trackId) === 'detached') {
+      // Added under a detached track (an Undo of its arrival): it never
+      // enters, also after a Redo. It is taken, so it shows detached
+      // (maintainer's choice, #848).
+      this._takeClip(trackId, clipEl.clipId, clipEl.peaksSrc || '');
+      console.warn(
+        detachedWarning(
+          '<daw-track> "' + (trackEl.name || 'Untitled') + '"',
+          'a <daw-clip> added to it',
+          this._detachedReason()
+        )
+      );
+      this._rejectAwaitedClips(
+        (id) => id === clipEl.clipId,
+        'addClip: track "' + trackId + '" is detached'
+      );
+      this._refreshLinkStates();
+      return;
+    }
+    if (!entered) {
       // Neither entered nor waiting to enter: an Undo took the track out
-      // between an addClip() and this deferred connect. Nothing will take the
-      // clip, so its addClip() is rejected (#917).
+      // between an addClip() and this deferred connect, or the arrangement
+      // refused it. Nothing will take the clip, so its addClip() is rejected
+      // (#917). A track waiting to enter reads its <daw-clip> children when
+      // it enters (#848 PR 3), this one included.
       if (!this._entryQueue.includes(trackId)) {
         this._rejectAwaitedClips(
           (id) => id === clipEl.clipId,
           'addClip: track "' + trackId + '" is not in the editor (an Undo took it out)'
         );
-        return;
-      }
-      const desc = this._tracks.get(trackId);
-      if (desc && !desc.clips.some((c) => isDomClip(c) && c.clipId === clipEl.clipId)) {
-        this._tracks = new Map(this._tracks).set(trackId, {
-          ...desc,
-          clips: [...desc.clips, this._readClipDescriptor(clipEl)],
-        });
       }
       return;
     }
-    // Reconnect from a DOM move (custom elements fire disconnectedCallback+
-    // connectedCallback on insertBefore, same as the track-level case in
-    // _onTrackConnected) — or any other duplicate deferred daw-clip-connected
-    // for a clip already registered on this FULLY LOADED track. Unlike the
-    // still-loading branch above, _readTrackDescriptor cannot have filtered
-    // this one out (that only runs once, before the track finished loading),
-    // so this check is the only guard against _loadAndAppendClip inserting a
-    // second engine clip with the same id. Reuses the exact same isDomClip
-    // membership check as the still-loading branch.
-    const loadedDesc = this._tracks.get(trackId);
-    if (loadedDesc && loadedDesc.clips.some((c) => isDomClip(c) && c.clipId === clipEl.clipId)) {
-      return;
-    }
+    // A clip the editor took already: read when its track entered (this is
+    // its own deferred connect), or a reconnect from a DOM move (custom
+    // elements fire disconnectedCallback+connectedCallback on insertBefore).
+    if (this._extras.get(trackId)?.peaksSrc.has(clipEl.clipId)) return;
     this._loadAndAppendClip(trackId, this._readClipDescriptor(clipEl));
   };
-  private _onClipUpdate = (e: CustomEvent) => {
-    const clipEl = e.target as DawClipElement;
-    if (!(clipEl instanceof HTMLElement) || clipEl.tagName !== 'DAW-CLIP') return;
-    const detail = e.detail as { trackId: string; clipId: string };
-    if (!detail.trackId) {
-      // <daw-clip> mounted outside a <daw-track> — developer error.
+  /**
+   * A `<daw-clip>` now under `trackId` whose clip another track holds: the
+   * clip moves to this track (one undo step) when both have entered the same
+   * arrangement; a clip of the other kind stays with `daw-clip-error`.
+   * Otherwise the old track lets it go and the element goes on as a new
+   * arrival. Returns true when nothing more is to be done.
+   */
+  private _rehomeClip(trackId: string, clipEl: DawClipElement): boolean {
+    const clipId = clipEl.clipId;
+    // Declared here already (its own deferred connect, a move inside the
+    // track, an Undo that left the element here): not a move.
+    if (this._extras.get(trackId)?.peaksSrc.has(clipId)) return true;
+    // The arrangement whose history holds the track: the own one for a page
+    // track that is waiting or detached while a handed-in one is played.
+    const arrangement = this._historyOf(trackId);
+    // Back in the track that holds its clip (the page moved it back after an
+    // Undo of its move): what the other tracks took comes here.
+    if (
+      arrangement.getTracks().some((t) => t.id === trackId && t.clips.some((c) => c.id === clipId))
+    ) {
+      let peaksSrc = clipEl.peaksSrc || '';
+      for (const [id, extras] of this._extras) {
+        if (id === trackId || !extras.peaksSrc.has(clipId)) continue;
+        peaksSrc = extras.peaksSrc.get(clipId) ?? peaksSrc;
+        this._forgetClip(id, clipId);
+      }
+      this._takeClip(trackId, clipId, peaksSrc);
+      return true;
+    }
+    const fromTrackId = trackHoldingClip(arrangement, clipId, trackId);
+    if (!fromTrackId) {
+      // Taken by another track of this editor and not held now: that one forgets it.
+      for (const [id, extras] of this._extras) {
+        if (id !== trackId && extras.peaksSrc.has(clipId)) this._forgetClip(id, clipId);
+      }
+      return false;
+    }
+    const entered = arrangement.getTracks().some((t) => t.id === trackId);
+    // Into a track waiting to enter: the clip moves when it enters, as it is,
+    // with its arrival (the maintainer's choice c, #848; _enterTrack).
+    if (!entered && this._pending.has(trackId)) return true;
+    const toExtras = this._extras.get(trackId) ?? this._defaultExtras(trackId);
+    if (!entered || !toExtras) {
+      // Into a detached track (an Undo took its arrival): refused. The clip
+      // stays where it is; the element is taken here, shows detached, and is
+      // linked to its clip by id once a Redo brings the track back.
+      this._takeClip(trackId, clipId, this._takenPeaksSrc(clipId) ?? clipEl.peaksSrc ?? '');
       console.warn(
-        '[dawcore] daw-clip-update fired from a <daw-clip> not nested in a <daw-track> — ignored'
+        '[dawcore] <daw-clip> cannot move into <daw-track> "' +
+          (this._trackElements.get(trackId)?.name || 'Untitled') +
+          '": the track is not in the arrangement (an Undo took it out). Its clip stays in its track.'
       );
-      return;
+      this.dispatchEvent(
+        new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
+          bubbles: true,
+          composed: true,
+          detail: {
+            trackId,
+            clipId,
+            error: new Error('track "' + trackId + '" is not in the arrangement'),
+          },
+        })
+      );
+      this._refreshLinkStates();
+      return true;
     }
-    // A track that has not entered yet: the change goes into its descriptor.
-    const desc = this._tracks.get(detail.trackId);
-    if (desc && !this._isEntered(detail.trackId)) {
-      this._tracks = new Map(this._tracks).set(detail.trackId, {
-        ...desc,
-        clips: desc.clips.map((c) =>
-          isDomClip(c) && c.clipId === clipEl.clipId ? this._readClipDescriptor(clipEl) : c
-        ),
-      });
-      return;
+    const error = moveClipToTrack(arrangement, fromTrackId, trackId, clipId, toExtras.kind);
+    if (error) {
+      // Refused (a clip of the other kind): nothing changes, no undo step,
+      // and the element stays where the page put it (the editor moves no
+      // element, #848). It is taken here too, so a later announcement does
+      // not try again, and it stays linked to its clip by id.
+      this._takeClip(trackId, clipId, this._extras.get(fromTrackId)?.peaksSrc.get(clipId) ?? '');
+      console.warn(
+        '[dawcore] <daw-clip> cannot move to track "' +
+          (this._trackElements.get(trackId)?.name || 'Untitled') +
+          '" (' +
+          String(error) +
+          '): its clip stays in its track.'
+      );
+      this.dispatchEvent(
+        new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
+          bubbles: true,
+          composed: true,
+          detail: { trackId, clipId, error },
+        })
+      );
+      return true;
     }
-    this._applyClipUpdate(detail.trackId, detail.clipId, clipEl);
-  };
+    const peaksSrc = this._takenPeaksSrc(clipId) ?? clipEl.peaksSrc ?? '';
+    // Every other track that took the element forgets it: after an Undo of
+    // a move it is still taken where it sat (review of #919, round 2).
+    for (const [id, extras] of this._extras) {
+      if (id !== trackId && extras.peaksSrc.has(clipId)) this._forgetClip(id, clipId);
+    }
+    if (!this._extras.has(trackId)) this._extras = new Map(this._extras).set(trackId, toExtras);
+    this._takeClip(trackId, clipId, peaksSrc);
+    return true;
+  }
   private _onClipRemovedFromDom(clipEl: DawClipElement) {
     const clipId = clipEl.clipId;
-    for (const t of this._arrangement.getTracks()) {
-      if (t.clips.some((c) => c.id === clipId)) {
-        this._removeClipFromTrack(t.id, clipId);
-        return;
+    // The arrangement played, and the own one (a page track's clip while a
+    // handed-in arrangement is played).
+    for (const arrangement of new Set([this._arrangement, this._ownArrangement])) {
+      for (const t of arrangement.getTracks()) {
+        if (t.clips.some((c) => c.id === clipId)) {
+          this._removeClipFromTrack(t.id, clipId);
+          return;
+        }
       }
     }
-    // A track that has not entered yet reads its clips from its descriptor.
-    for (const [trackId, desc] of this._tracks) {
-      if (this._isEntered(trackId) || !desc.clips.some((c) => c.clipId === clipId)) continue;
-      this._tracks = new Map(this._tracks).set(trackId, {
-        ...desc,
-        clips: desc.clips.filter((c) => c.clipId !== clipId),
-      });
-      this._rejectAwaitedClips((id) => id === clipId, 'the clip was removed before it loaded');
+    // A clip the arrangement refused (its kind): it goes from what the editor took.
+    for (const [trackId, extras] of this._extras) {
+      if (!extras.peaksSrc.has(clipId)) continue;
+      this._dropUnheldClip(trackId, clipId);
       return;
     }
-    // Removed before its deferred connect (in the task of its addClip()): the
+    // Removed before its deferred connect, or from a track that has not
+    // entered (it reads its clips when it enters) (in the task of its addClip()): the
     // connect will never reach the editor, so the addClip() is rejected (#917).
     this._rejectAwaitedClips((id) => id === clipId, 'the clip was removed before it loaded');
     // No matching engine clip. May be benign (clip was removed before its load
@@ -1891,13 +2378,20 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * a loading clip (a loaded one for MIDI), one undo step. Its audio loads
    * like any other; `daw-clip-ready` or `daw-clip-error` follows (#848).
    */
-  private _loadAndAppendClip(trackId: string, clipDesc: DomClipDescriptor) {
-    const trackDesc = this._tracks.get(trackId);
-    if (!trackDesc) return;
+  private _loadAndAppendClip(trackId: string, clipDesc: ClipDescriptor & { clipId: string }) {
+    const arrangement = this._arrangementOf(trackId);
+    const track = arrangement.getTracks().find((t) => t.id === trackId);
+    // A track with no extras (a handed-in one, one an Undo brought back)
+    // takes the defaults (P14).
+    const extras = this._extras.get(trackId) ?? this._defaultExtras(trackId);
+    if (!extras || !track) return;
+    // A <daw-clip>'s clip is taken, also when refused: its own deferred
+    // connect must not add it again. One from addClip() has no element.
+    if (isDomClip(clipDesc)) this._takeClip(trackId, clipDesc.clipId, clipDesc.peaksSrc);
     const clipIsMidi = isMidiDescriptor(clipDesc);
     const kindError = clipKindError(
-      trackDesc.name,
-      trackDesc.kind,
+      track.name ?? '',
+      extras.kind,
       clipIsMidi,
       clipDesc.name || clipDesc.src || clipDesc.clipId
     );
@@ -1908,7 +2402,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     try {
       if (kindError) throw kindError;
       // The function form: the track's loading clips stay as they are.
-      this._arrangement.updateTrack(trackId, (current) => ({
+      arrangement.updateTrack(trackId, (current) => ({
         ...current,
         clips: [...current.clips, clip],
       }));
@@ -1923,10 +2417,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       );
       return;
     }
-    this._tracks = new Map(this._tracks).set(trackId, {
-      ...trackDesc,
-      clips: [...trackDesc.clips, clipDesc],
-    });
     if (!clipIsMidi && clipDesc.peaksSrc) this._requestPreview(clipDesc.clipId, clipDesc.peaksSrc);
   }
   /**
@@ -1952,6 +2442,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       );
       return null;
     } catch (err) {
+      if (isAbortError(err)) return null; // a swap: nothing failed
       console.warn(
         '[dawcore] Failed to load peaks from ' +
           peaksSrc +
@@ -1983,29 +2474,29 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       clips: current.clips.map((c) => (c.id === clipId ? clip : c)),
     }));
   }
-  private _applyClipUpdate(trackId: string, clipId: string, clipEl: DawClipElement) {
-    const t = this._engineTracks.get(trackId);
+  private _applyClipUpdate(trackId: string, clipId: string, clipEl: ClipUpdateValues) {
+    const t = this._arrangement.getTracks().find((track) => track.id === trackId);
     if (!t) {
-      console.warn('[dawcore] _applyClipUpdate: no engine track for id "' + trackId + '"');
+      console.warn('[dawcore] _applyClipUpdate: no track for id "' + trackId + '"');
       return;
     }
-    const idx = t.clips.findIndex((c) => c.id === clipId);
-    if (idx === -1) {
-      const loading = this._arrangement
-        .getTracks()
-        .find((track) => track.id === trackId)
-        ?.clips.some((c) => c.id === clipId);
+    const loadedClip = this._loadedClip(trackId, clipId);
+    if (!loadedClip) {
+      const loading = t.clips.find((c) => c.id === clipId);
+      if (loading && isLoadingClip(loading)) {
+        this._updateLoadingClip(trackId, loading, clipEl);
+        return;
+      }
       console.warn(
         '[dawcore] _applyClipUpdate: clip "' +
           clipId +
-          '" ' +
-          (loading
-            ? 'is still loading; the change is dropped'
-            : 'not found in track "' + trackId + '" (DOM/engine clip-id misalignment?)')
+          '" not found in track "' +
+          trackId +
+          '" (DOM/engine clip-id misalignment?)'
       );
       return;
     }
-    const oldClip = t.clips[idx];
+    const oldClip = loadedClip;
     const sr = oldClip.sampleRate ?? this.effectiveSampleRate;
 
     // MIDI clips: rebuild the clip when notes/channel/program change. Detect
@@ -2033,6 +2524,19 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       return;
     }
     if (isMidiNow || wasMidi) {
+      // The value the arrangement holds already changes nothing (#848).
+      if (
+        clipEl.midiNotes === oldClip.midiNotes &&
+        (clipEl.midiChannel ?? undefined) === oldClip.midiChannel &&
+        (clipEl.midiProgram ?? undefined) === oldClip.midiProgram &&
+        Math.round(clipEl.start * sr) === oldClip.startSample &&
+        Math.round(clipEl.offset * sr) === oldClip.offsetSamples &&
+        (clipEl.duration <= 0 || Math.round(clipEl.duration * sr) === oldClip.durationSamples) &&
+        clipEl.gain === (oldClip.gain ?? 1) &&
+        (clipEl.name || oldClip.name) === oldClip.name
+      ) {
+        return;
+      }
       const notes = validMidiNotes(clipEl.midiNotes ?? []);
       const noteSpanSeconds = notes.length
         ? notes.reduce((max, n) => Math.max(max, n.time + n.duration), 0)
@@ -2072,6 +2576,16 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       gain: clipEl.gain,
       name: clipEl.name || oldClip.name,
     };
+    // The value the arrangement holds already changes nothing (#848).
+    if (
+      newStartSample === oldClip.startSample &&
+      newDurationSamples === oldClip.durationSamples &&
+      newOffsetSamples === oldClip.offsetSamples &&
+      updatedClip.gain === (oldClip.gain ?? 1) &&
+      updatedClip.name === oldClip.name
+    ) {
+      return;
+    }
     const boundsChanged =
       oldClip.offsetSamples !== newOffsetSamples || oldClip.durationSamples !== newDurationSamples;
     if (boundsChanged) {
@@ -2087,9 +2601,69 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
 
     this._replaceClip(trackId, clipId, updatedClip);
   }
+  /**
+   * A change to a clip still loading (#848 P10): its times, gain and name in
+   * seconds on the `LoadingClip`, one undo step; the audio loads into it.
+   */
+  private _updateLoadingClip(trackId: string, clip: LoadingClip, values: ClipUpdateValues): void {
+    const next: LoadingClip = {
+      ...clip,
+      start: values.start,
+      ...(values.duration > 0 ? { duration: values.duration } : {}),
+      offset: values.offset,
+      gain: values.gain,
+      ...(values.name ? { name: values.name } : {}),
+    };
+    if (
+      (next.start ?? 0) === (clip.start ?? 0) &&
+      next.duration === clip.duration &&
+      (next.offset ?? 0) === (clip.offset ?? 0) &&
+      (next.gain ?? 1) === (clip.gain ?? 1) &&
+      next.name === clip.name
+    ) {
+      return;
+    }
+    this._arrangement.updateTrack(trackId, (current) => ({
+      ...current,
+      clips: current.clips.map((c) => (c.id === clip.id ? next : c)),
+    }));
+  }
   /** Remove a clip (loaded or still loading) from a track of the arrangement: an undo step. */
-  private _removeClipFromTrack(trackId: string, clipId: string) {
-    const track = this._arrangement.getTracks().find((t) => t.id === trackId);
+  /**
+   * An aborted addClip (D3): its clip leaves for good, from the track it
+   * entered or from what a waiting track will enter with.
+   */
+  private _discardAddedClip(trackId: string, clipId: string): void {
+    const pending = this._pending.get(trackId);
+    if (pending) {
+      this._pending = new Map(this._pending).set(
+        trackId,
+        'element' in pending
+          ? { ...pending, extraClips: pending.extraClips.filter((c) => c.clipId !== clipId) }
+          : {
+              ...pending,
+              descriptor: {
+                ...pending.descriptor,
+                clips: pending.descriptor.clips.filter((c) => c.clipId !== clipId),
+              },
+            }
+      );
+      return;
+    }
+    const holder = this._arrangementOf(trackId)
+      .getTracks()
+      .find((t) => t.id === trackId);
+    if (holder?.clips.some((c) => c.id === clipId)) {
+      this._removeClipFromTrack(trackId, clipId, { undoable: false });
+    }
+  }
+  private _removeClipFromTrack(
+    trackId: string,
+    clipId: string,
+    options: { undoable?: boolean } = {}
+  ) {
+    const arrangement = this._arrangementOf(trackId);
+    const track = arrangement.getTracks().find((t) => t.id === trackId);
     if (!track) {
       console.warn('[dawcore] _removeClipFromTrack: no track for id "' + trackId + '"');
       return;
@@ -2107,21 +2681,46 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       nextPreview.delete(clipId);
       this._previewPeaks = nextPreview;
     }
-    const desc = this._tracks.get(trackId);
-    if (desc) {
-      this._tracks = new Map(this._tracks).set(trackId, {
-        ...desc,
-        clips: desc.clips.filter((c) => c.clipId !== clipId),
-      });
-    }
+    this._forgetClip(trackId, clipId);
     const wasLoading = track.clips.some((c) => c.id === clipId && isLoadingClip(c));
-    this._arrangement.updateTrack(trackId, (current) => ({
-      ...current,
-      clips: current.clips.filter((c) => c.id !== clipId),
-    }));
+    // `undoable: false`: out of every undo and redo state too (an aborted
+    // addClip leaves nothing behind, D3).
+    if (options.undoable === false) arrangement.removeClip(trackId, clipId, { undoable: false });
+    else
+      arrangement.updateTrack(trackId, (current) => ({
+        ...current,
+        clips: current.clips.filter((c) => c.id !== clipId),
+      }));
     // Its load will never be announced (an addClip() waiting for it watches
     // the arrangement and rejects).
     if (wasLoading) this._announcer.forgetClip(clipId);
+  }
+  /** Record that the editor took a clip of a track (with its `peaks-src`, '' when none). */
+  private _takeClip(trackId: string, clipId: string, peaksSrc: string): void {
+    const extras = this._extras.get(trackId);
+    if (!extras || extras.peaksSrc.get(clipId) === peaksSrc) return;
+    const next = new Map(extras.peaksSrc).set(clipId, peaksSrc);
+    this._extras = new Map(this._extras).set(trackId, { ...extras, peaksSrc: next });
+  }
+  /**
+   * A `<daw-clip>` the editor took is removed while the arrangement does not
+   * hold its clip (its track or its own arrival undone, or refused): it is
+   * gone for good, also from the undo and redo states, so no Redo brings it
+   * back (maintainer's choice, #848).
+   */
+  private _dropUnheldClip(trackId: string, clipId: string): void {
+    this._historyOf(trackId).removeClip(trackId, clipId, { undoable: false });
+    this._purgeClipCaches(clipId);
+    this._previewWaveforms.delete(clipId);
+    this._forgetClip(trackId, clipId);
+  }
+  /** The editor no longer holds anything for a clip of a track. */
+  private _forgetClip(trackId: string, clipId: string): void {
+    const extras = this._extras.get(trackId);
+    if (!extras?.peaksSrc.has(clipId)) return;
+    const next = new Map(extras.peaksSrc);
+    next.delete(clipId);
+    this._extras = new Map(this._extras).set(trackId, { ...extras, peaksSrc: next });
   }
   private _readTrackDescriptor(trackEl: DawTrackElement): StoredTrackDescriptor {
     const clipEls = trackEl.querySelectorAll('daw-clip') as NodeListOf<DawClipElement>;
@@ -2207,15 +2806,15 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // Without an engine the queue waits, silently (maintainer, #917; play()
     // without an adapter warns and fires daw-error with the no-adapter error).
     if (!this._engine) return;
-    // M1: during a drag the arrangement has the drag's transaction open; an
-    // add would join it (an abort would drop the track, a commit merge it
-    // into the drag's undo step). Enter when the drag has ended.
-    if (this._dragInProgress) {
-      this._flushAfterDrag();
-      return;
-    }
-    const queued = this._entryQueue;
-    this._entryQueue = [];
+    // No drag holds a transaction (#848 PR 3): a track enters during a drag
+    // as at any other time, an undo step of its own.
+    const isPageTrack = (id: string) => this._trackElements.has(id);
+    // The children declare the editor's OWN arrangement: while a handed-in
+    // one is played they wait (P7); addTrack() and drops go to the one played.
+    const queued = this._handedIn
+      ? this._entryQueue.filter((id) => !isPageTrack(id))
+      : this._entryQueue;
+    this._entryQueue = this._handedIn ? this._entryQueue.filter(isPageTrack) : [];
     const domOrder: string[] = [...this.querySelectorAll('daw-track')].map(
       (el) => (el as DawTrackElement).trackId
     );
@@ -2224,12 +2823,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       return at === -1 ? domOrder.length : at;
     };
     const ordered = [...queued].sort((a, b) => position(a) - position(b));
-    const isPageTrack = (id: string) => {
-      const el = this._trackElements.get(id);
-      return el !== undefined && !this._editorMadeTracks.has(el);
-    };
     const arrangement = this._arrangement;
-    const historyWasEmpty = !arrangement.canUndo && !arrangement.canRedo && !this._dragInProgress;
+    const historyWasEmpty = !arrangement.canUndo && !arrangement.canRedo;
     let pageEntered = false;
     for (const id of ordered.filter(isPageTrack)) {
       if (this._enterTrack(id)) pageEntered = true;
@@ -2237,34 +2832,23 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     if (historyWasEmpty && pageEntered) arrangement.clearHistory();
     for (const id of ordered.filter((id) => !isPageTrack(id))) this._enterTrack(id);
   }
-  private _waitingForDragEnd = false;
-  /** Flush the queue once the drag in progress has ended (its pointer or key is released). */
-  private _flushAfterDrag(): void {
-    if (this._waitingForDragEnd) return;
-    this._waitingForDragEnd = true;
-    const events = ['pointerup', 'pointercancel', 'keyup'] as const;
-    const retry = () => {
-      for (const type of events) window.removeEventListener(type, retry);
-      this._waitingForDragEnd = false;
-      // After the drag's own handlers have ended it.
-      setTimeout(() => this._flushTrackEntries(), 0);
-    };
-    for (const type of events) window.addEventListener(type, retry);
-  }
   /** Enter one registered track. False when it is gone, already in, or refused. */
   private _enterTrack(trackId: string): boolean {
-    const descriptor = this._tracks.get(trackId);
+    const descriptor = this._pendingDescriptor(trackId);
     if (!descriptor || this._isEntered(trackId)) return false;
     const el = this._trackElements.get(trackId);
     const built = buildArrangementTrack(
       trackId,
       descriptor,
-      el ? mixOfElement(el) : DEFAULT_TRACK_MIX,
+      this._mixOf(trackId),
       this.effectiveSampleRate
     );
-    if (built.descriptor !== descriptor) {
-      this._tracks = new Map(this._tracks).set(trackId, built.descriptor);
-    }
+    // From here the arrangement holds it; the editor keeps only what the
+    // arrangement has no field for (#848 PR 3).
+    const nextPending = new Map(this._pending);
+    nextPending.delete(trackId);
+    this._pending = nextPending;
+    this._extras = new Map(this._extras).set(trackId, extrasOf(built.descriptor));
     for (const { clipId, error } of built.refused) {
       console.warn('[dawcore] ' + error.message);
       this.dispatchEvent(
@@ -2282,16 +2866,52 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           this._arrangement.getTracks().map((t) => t.id)
         )
       : undefined;
+    // A child whose clip another track holds was moved here by the page: the
+    // clip moves in as it is, in the same undo step as the arrival (the
+    // maintainer's choice c, #848). One of the other kind stays where it is.
+    const moved = this._takeOverMovedClips(trackId, built.track);
+    const entering = moved.track;
+    for (const { clipId, error } of moved.refused) {
+      console.warn('[dawcore] ' + error.message);
+      this.dispatchEvent(
+        new CustomEvent<DawClipErrorDetail>('daw-clip-error', {
+          bubbles: true,
+          composed: true,
+          detail: { trackId, clipId, error },
+        })
+      );
+    }
     // Before the add: the announcement it causes counts the refused clips,
     // and a clip whose source is loaded already is still announced ready.
-    this._announcer.expect(trackId, built.refused.length);
-    for (const clip of built.track.clips) {
+    this._announcer.expect(trackId, built.refused.length + moved.refused.length);
+    for (const clip of entering.clips) {
       if (isLoadingClip(clip)) this._announcer.expectClip(clip.id);
     }
     try {
-      this._arrangement.addTrack(built.track, index === undefined ? undefined : { index });
+      if (moved.from.size === 0) {
+        this._arrangement.addTrack(entering, index === undefined ? undefined : { index });
+      } else {
+        this._inOneStep([this._arrangement], () => {
+          for (const [fromId, clipIds] of moved.from) {
+            this._arrangement.updateTrack(fromId, (t) => ({
+              ...t,
+              clips: t.clips.filter((c) => !clipIds.has(c.id)),
+            }));
+            for (const clipId of clipIds) this._forgetClip(fromId, clipId);
+          }
+          this._arrangement.addTrack(entering, index === undefined ? undefined : { index });
+        });
+      }
     } catch (err) {
       console.warn('[dawcore] Failed to add track "' + trackId + '": ' + String(err));
+      // An element stays linked to the refused track (it is not added
+      // again); a track with no element is gone.
+      if (!el) {
+        const nextExtras = new Map(this._extras);
+        nextExtras.delete(trackId);
+        this._extras = nextExtras;
+      }
+      this._refreshLinkStates();
       this._settleEntry(trackId, err instanceof Error ? err : new Error(String(err)));
       this.dispatchEvent(
         new CustomEvent<DawTrackErrorDetail>('daw-track-error', {
@@ -2302,8 +2922,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       );
       return false;
     }
-    this._settleEntry(trackId, null);
+    this._settleEntry(trackId, ENTERED);
     for (const clipDesc of built.descriptor.clips) {
+      if (clipDesc.clipId && moved.movedIds.has(clipDesc.clipId)) continue; // loaded as it is
       if (clipDesc.peaksSrc && clipDesc.clipId && clipSourceOf(clipDesc)) {
         this._requestPreview(clipDesc.clipId, clipDesc.peaksSrc);
       }
@@ -2316,7 +2937,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * `<daw-clip>` children keeps them. A track still queued reads the new
    * descriptor when it enters.
    */
-  private _replaceShorthandClips(trackId: string, descriptor: StoredTrackDescriptor): void {
+  private _replaceShorthandClips(trackId: string, trackEl: DawTrackElement): void {
+    const descriptor = this._readTrackDescriptor(trackEl);
     if (!this._isEntered(trackId) || descriptor.clips.some(isDomClip)) return;
     const built = buildArrangementTrack(
       trackId,
@@ -2324,7 +2946,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       DEFAULT_TRACK_MIX,
       this.effectiveSampleRate
     );
-    this._tracks = new Map(this._tracks).set(trackId, built.descriptor);
+    const extras = this._extras.get(trackId);
+    if (extras) {
+      this._extras = new Map(this._extras).set(trackId, {
+        ...extras,
+        peaksSrc: extrasOf(built.descriptor).peaksSrc,
+      });
+    }
     this._arrangement.updateTrack(trackId, (current) => ({ ...current, clips: built.track.clips }));
   }
   /** Run the load announcements over the arrangement's current state. */
@@ -2374,20 +3002,22 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   /** Who waits for a track to enter (addTrack, a dropped file). */
   private _entryWaiters = new Map<
     string,
-    { resolve: (trackId: string) => void; reject: (error: Error) => void }
+    { resolve: (trackId: string) => void; reject: (error: unknown) => void }
   >();
   private _waitForEntry(trackId: string): Promise<string> {
     return new Promise<string>((resolve, reject) => {
       this._entryWaiters.set(trackId, { resolve, reject });
     });
   }
-  /** Settle the wait for a track's entry: entered (`null`), or refused or gone. */
-  private _settleEntry(trackId: string, error: Error | null): void {
+  /** Settle the wait for a track's entry: entered (`ENTERED`), or refused or gone (the reason).*/
+  private _settleEntry(trackId: string, outcome: unknown): void {
     const waiter = this._entryWaiters.get(trackId);
     if (!waiter) return;
     this._entryWaiters.delete(trackId);
-    if (error) waiter.reject(error);
-    else waiter.resolve(trackId);
+    // Anything but ENTERED rejects, also a falsy abort reason ('', 0, null,
+    // false: a signal's reason is passed on as it is; review of #919).
+    if (outcome === ENTERED) waiter.resolve(trackId);
+    else waiter.reject(outcome);
   }
   /**
    * A dropped file as a track with no element (a File cannot be an attribute):
@@ -2397,7 +3027,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   _addDroppedFile(file: File): Promise<string> {
     const trackId = crypto.randomUUID();
     const name = file.name.replace(/\.\w+$/, '');
-    this._tracks = new Map(this._tracks).set(trackId, {
+    const descriptor: StoredTrackDescriptor = {
       name,
       src: '',
       kind: 'audio',
@@ -2421,8 +3051,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           midiProgram: null,
         },
       ],
-    });
+    };
+    this._pending = new Map(this._pending).set(trackId, { descriptor, mix: DEFAULT_TRACK_MIX });
     const entered = this._waitForEntry(trackId);
+    // A swap before it enters ends it, as a disconnect does (review of #919).
+    this._endEntryOnSwap(trackId, entered);
     this._queueEntry(trackId);
     return entered;
   }
@@ -2430,14 +3063,36 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * Take a track out for good: no undo step, and no undo or redo brings it
    * back (a dropped file that could not be loaded was never a declaration).
    */
-  _discardTrack(trackId: string): void {
-    const track = this._arrangement.getTracks().find((t) => t.id === trackId);
+  _discardTrack(trackId: string, from: Arrangement = this._arrangement): void {
+    // From the arrangement it entered: after a swap that is no longer the one
+    // played (review of #919). The editor shows nothing of that one, so only
+    // its own record of the track goes (no event, no playhead change).
+    if (from !== this._arrangement) {
+      from.removeTrack(trackId, { undoable: false });
+      if (this._extras.has(trackId)) {
+        const nextExtras = new Map(this._extras);
+        nextExtras.delete(trackId);
+        this._extras = nextExtras;
+      }
+      return;
+    }
+    const track = from.getTracks().find((t) => t.id === trackId);
     this._announcer.forget(trackId, track?.clips.map((c) => c.id) ?? []);
-    this._arrangement.removeTrack(trackId, { undoable: false });
+    from.removeTrack(trackId, { undoable: false });
     this._onTrackRemoved(trackId);
   }
-  /** Ends the waits of `_whenTrackLoaded` (as loaded) when the editor is disconnected. */
-  private _loadWaitEnds = new Set<() => void>();
+  /** One AbortController per arrangement while it is played (D2, interactions/abort.ts). */
+  private _playSignals = new PlaySignals();
+  /** The signal of the arrangement played now: aborted when it is swapped out. */
+  private get _playSignal(): AbortSignal {
+    return this._playSignals.signalOf(this._arrangement);
+  }
+  /** @internal A caller's signal combined with the arrangement played now (loadMidi, D6). */
+  _operationSignal(signal?: AbortSignal): AbortSignal {
+    return signal ? AbortSignal.any([signal, this._playSignal]) : this._playSignal;
+  }
+  /** One AbortController per connection: aborted in disconnectedCallback (D8). */
+  private _connection = new AbortController();
   /**
    * Resolves once the track has loaded (`daw-track-ready`), or when the
    * editor is disconnected meanwhile (the track is kept and loads after a
@@ -2447,30 +3102,33 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const state = this._announcer.stateOf(trackId);
     if (state === 'ready') return Promise.resolve();
     if (state === 'failed') return Promise.reject(this._announcer.errorOf(trackId));
+    // Ends as loaded when the arrangement is swapped out or the editor is
+    // disconnected meanwhile (the track is kept and loads after a reparent).
+    const ended = AbortSignal.any([this._playSignal, this._connection.signal]);
+    if (ended.aborted) return Promise.resolve();
     return new Promise<void>((resolve, reject) => {
-      const cleanup = () => {
-        this.removeEventListener('daw-track-ready', onReady);
-        this.removeEventListener('daw-track-error', onError);
-        this._loadWaitEnds.delete(end);
-      };
-      const onReady = (e: Event) => {
-        if ((e as CustomEvent<DawTrackIdDetail>).detail.trackId !== trackId) return;
-        cleanup();
-        resolve();
-      };
-      const onError = (e: Event) => {
-        const detail = (e as CustomEvent<DawTrackErrorDetail>).detail;
-        if (detail.trackId !== trackId) return;
-        cleanup();
-        reject(detail.error instanceof Error ? detail.error : new Error(String(detail.error)));
-      };
-      const end = () => {
-        cleanup();
-        resolve();
-      };
-      this.addEventListener('daw-track-ready', onReady);
-      this.addEventListener('daw-track-error', onError);
-      this._loadWaitEnds.add(end);
+      const done = new AbortController();
+      const signal = AbortSignal.any([ended, done.signal]);
+      this.addEventListener(
+        'daw-track-ready',
+        (e: Event) => {
+          if ((e as CustomEvent<DawTrackIdDetail>).detail.trackId !== trackId) return;
+          done.abort();
+          resolve();
+        },
+        { signal }
+      );
+      this.addEventListener(
+        'daw-track-error',
+        (e: Event) => {
+          const detail = (e as CustomEvent<DawTrackErrorDetail>).detail;
+          if (detail.trackId !== trackId) return;
+          done.abort();
+          reject(detail.error instanceof Error ? detail.error : new Error(String(detail.error)));
+        },
+        { signal }
+      );
+      ended.addEventListener('abort', () => resolve(), { signal: done.signal });
     });
   }
   /**
@@ -2496,7 +3154,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   private _fetchPeaks(src: string): Promise<import('waveform-data').default> {
     const cached = this._peaksCache.get(src);
     if (cached) return cached;
-    const promise = loadWaveformDataFromUrl(src).catch((err) => {
+    // The fetch belongs to the arrangement played now: a swap aborts it (D2),
+    // and an aborted one is dropped from the cache so a later request fetches again.
+    const promise = loadWaveformDataFromUrl(src, this._playSignal).catch((err) => {
       this._peaksCache.delete(src);
       throw err;
     });
@@ -2511,7 +3171,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   _recomputeDuration() {
     const sr = this.effectiveSampleRate;
     let maxSample = 0;
-    for (const track of this._engineTracks.values()) {
+    for (const track of this._loadedTracks()) {
       for (const clip of track.clips) {
         const endSample = clip.startSample + clip.durationSamples;
         if (endSample > maxSample) maxSample = endSample;
@@ -2558,6 +3218,18 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       this._buildEngine();
     } catch (err) {
       console.warn('[dawcore] Failed to build the engine: ' + String(err));
+      // An addTrack() waiting to enter would wait for an engine that does not
+      // come (#848): it fails with the build's error, and its track goes.
+      const error = err instanceof Error ? err : new Error(String(err));
+      for (const trackId of [...this._entryQueue]) {
+        const pending = this._pending.get(trackId);
+        if (!pending || 'element' in pending || !this._entryWaiters.has(trackId)) continue;
+        const nextPending = new Map(this._pending);
+        nextPending.delete(trackId);
+        this._pending = nextPending;
+        this._entryQueue = this._entryQueue.filter((id) => id !== trackId);
+        this._settleEntry(trackId, error);
+      }
       this.dispatchEvent(
         new CustomEvent<DawErrorDetail>('daw-error', {
           bubbles: true,
@@ -2614,11 +3286,15 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     });
     engine.on('stop', () => this._onEngineStop(engine));
     this._engine = engine;
+    // A new engine (a swap, a fresh adapter) plays the selection the editor shows.
+    if (this._selectionStartTime !== 0 || this._selectionEndTime !== 0) {
+      engine.setSelection(this._selectionStartTime, this._selectionEndTime);
+    }
     // A kept arrangement (a reconnect) already has tracks: draw them now,
     // and give a spectrogram track its audio again (the controller went with
     // the disconnect).
     this._onEngineState(engine.getState());
-    for (const track of this._engineTracks.values()) {
+    for (const track of this._loadedTracks()) {
       for (const clip of track.clips) this._maybeRegisterSpectrogramClipAudio(track.id, clip);
     }
     this._flushTrackEntries();
@@ -2644,42 +3320,26 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       }
     }
   }
-  /** The engine's state changed: follow it (the one writer of `_engineTracks`). */
+  /** The engine's state changed: draw it (the rows are read from the arrangement). */
   private _onEngineState(engineState: EngineState): void {
     this._isPlaying = engineState.isPlaying;
     this._selectedTrackId = engineState.selectedTrackId;
     const structuralChange = engineState.tracksVersion !== this._lastTracksVersion;
     // Per-track mixer edits (volume/mute/solo/pan) bump mixerVersion, NOT
-    // tracksVersion (#501). Refresh the _engineTracks cache on either so the
-    // controls show the current mix — but only run the
+    // tracksVersion (#501). Draw again on either so the controls show the
+    // current mix — but only run the
     // expensive structural work below for true structural changes, never on
     // every volume/pan drag frame.
     const mixerChange = engineState.mixerVersion !== this._lastMixerVersion;
     if (structuralChange || mixerChange) {
       this._lastTracksVersion = engineState.tracksVersion;
       this._lastMixerVersion = engineState.mixerVersion;
-      const nextTracks = new Map<string, ClipTrack>();
-      for (const track of engineState.tracks) {
-        nextTracks.set(track.id, track);
-      }
-      this._engineTracks = nextTracks;
-      // Undo can resurrect a track whose editor descriptor was purged at
-      // removal — synthesize one so the track shows real name/controls
-      // and appears in editor.tracks (the effects chain does not survive;
-      // it was disposed at removal).
-      this._reconcileDescriptorsWithEngineTracks(engineState.tracks);
+      this.requestUpdate();
     }
     // Sync clip positions when tracks change structurally (moveClip, trimClip,
     // splitClip, setTracks, addTrack, removeTrack).
     if (structuralChange) {
       this._recomputeDuration();
-      // Engine-initiated order changes (undo/redo of a reorder) move the
-      // DOM to match; guarded so the observer's own DOM→engine sync (which
-      // emits intermediate statechanges mid-transaction) can't bounce
-      // half-applied orders back into the DOM (#612).
-      if (!this._inOrderSync) {
-        this._syncDomToEngineOrder(engineState.tracks);
-      }
       // Transport setTracks rebuilds TrackNodes, severing effects hookups.
       this._effectsManager?.rewireTrackChains();
       // Regenerate peaks for new or trimmed clips.
@@ -2761,17 +3421,21 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       );
     }
   };
-  async loadFiles(files: FileList | File[]): Promise<LoadFilesResult> {
-    return loadFilesImpl(this, files);
+  async loadFiles(
+    files: FileList | File[],
+    options: EditorCallOptions = {}
+  ): Promise<LoadFilesResult> {
+    return loadFilesImpl(this, files, options);
   }
   /**
-   * Imperatively load a `.mid` file (URL or File) and create N `<daw-track>`
-   * elements — one per note-bearing MIDI track. On any per-track failure,
-   * every `<daw-track>` appended during the call is removed (both successful
-   * and failed) so the editor returns to its pre-call state.
+   * Imperatively load a `.mid` file (URL or File) and add N tracks (no
+   * element, #848), one per note-bearing MIDI track. On any per-track
+   * failure, every track the call added is removed with no undo step, so the
+   * editor is as before the call.
    *
-   * `options.signal` is forwarded to `fetch()` only for URL sources; aborting
-   * after parsing does not cancel in-flight `addTrack` calls.
+   * `options.signal` cancels the fetch, the parse and the tracks still
+   * waiting to enter (combined with the arrangement played: a swap cancels
+   * too); the call rejects with its `reason` and removes the tracks it added.
    *
    * Requires the optional `@dawcore/midi` peer dep — throws with an install
    * hint (and `console.warn`s the original error) when the dynamic import
@@ -2790,30 +3454,43 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return this._ensureEngine();
   }
   /**
-   * Append a `<daw-track>` element built from `config` and resolve with its
-   * track id once the track has entered the arrangement (#848), before its
-   * audio has loaded. To follow loading, add the `daw-track-ready` /
-   * `daw-track-error` listener BEFORE calling: for a track with nothing to
-   * fetch, or whose audio is already loaded, it fires before this resolves.
-   * Without `editor.adapter` it waits for one. Rejects when the track is
-   * refused by the arrangement or removed before it enters.
+   * Add a track built from `config` to the arrangement the editor plays when
+   * it is called, and resolve with its id once it has entered (#848), before
+   * its audio has loaded. A swap of `editor.arrangement` before it enters
+   * rejects with an `AbortError` and the track enters nowhere; to add to
+   * another arrangement, call that arrangement's own `addTrack`. No element is created: the track is drawn and listed like any
+   * other, and `<daw-track>` children stay the page's declaration. To follow
+   * loading, add the `daw-track-ready` / `daw-track-error` listener BEFORE
+   * calling: for a track with nothing to fetch it fires before this
+   * resolves. Without `editor.adapter` it waits for one. Rejects when the
+   * arrangement refuses the track, when it is removed before it enters, or
+   * when the engine cannot be built.
+   *
+   * `options.signal` (#848): aborting it before the track has entered takes
+   * it out of the queue (it never enters) and rejects with its `reason`;
+   * after that it changes nothing (the audio goes on loading). A signal
+   * already aborted rejects at once and queues nothing.
    */
-  addTrack(config: TrackConfig = {}): Promise<string> {
-    const trackEl = document.createElement('daw-track') as DawTrackElement;
-    // An editor method's track: an undo step, also at page load (#848).
-    this._editorMadeTracks.add(trackEl);
-    if (config.name !== undefined) trackEl.setAttribute('name', config.name);
-    if (config.volume !== undefined) trackEl.volume = config.volume;
-    if (config.pan !== undefined) trackEl.pan = config.pan;
-    if (config.muted) trackEl.setAttribute('muted', '');
-    if (config.soloed) trackEl.setAttribute('soloed', '');
-
-    // kind: explicit > 'midi' from the midi shorthand > default 'audio'. A
-    // MIDI track is drawn as a piano roll whatever render-mode says.
-    const kind = config.kind ?? (config.midi ? 'midi' : undefined);
-    if (kind !== undefined) trackEl.setAttribute('kind', kind);
-    if (config.renderMode !== undefined) trackEl.setAttribute('render-mode', config.renderMode);
-
+  addTrack(config: TrackConfig = {}, options: EditorCallOptions = {}): Promise<string> {
+    const signal = options.signal;
+    if (signal?.aborted) return Promise.reject(reasonOf(signal));
+    const trackId = crypto.randomUUID();
+    let kind: TrackKind = config.kind ?? (config.midi ? 'midi' : 'audio');
+    if (kind !== 'audio' && kind !== 'midi') {
+      console.warn(
+        '[dawcore] addTrack: kind "' +
+          String(kind) +
+          "\" is not a track kind ('audio' or 'midi'); using \"audio\""
+      );
+      kind = 'audio';
+    }
+    let renderMode = normalizeRenderMode(config.renderMode);
+    if (renderMode === 'both') {
+      console.warn(
+        '[dawcore] render-mode="both" is not yet supported; falling back to \'spectrogram\''
+      );
+      renderMode = 'spectrogram';
+    }
     const clipConfigs: ClipConfig[] = [...(config.clips ?? [])];
     if (config.midi) {
       clipConfigs.push({
@@ -2822,18 +3499,65 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         midiProgram: config.midi.program,
       });
     }
-    for (const clipConfig of clipConfigs) {
-      trackEl.appendChild(this._buildClipElement(clipConfig));
-    }
-
-    const entered = this._waitForEntry(trackEl.trackId);
-    this.appendChild(trackEl);
-    return entered;
+    const descriptor: StoredTrackDescriptor = {
+      name: config.name || 'Untitled',
+      src: '',
+      kind,
+      renderMode: trackDescriptorRenderMode(kind, renderMode),
+      spectrogramConfig: config.spectrogramConfig ?? null,
+      clips: clipConfigs.map((c) => clipDescriptorOf(c)),
+    };
+    const mix: TrackMixerValues = {
+      volume: config.volume ?? DEFAULT_TRACK_MIX.volume,
+      pan: config.pan ?? DEFAULT_TRACK_MIX.pan,
+      muted: config.muted ?? false,
+      soloed: config.soloed ?? false,
+    };
+    this._pending = new Map(this._pending).set(trackId, { descriptor, mix });
+    const entered = this._waitForEntry(trackId);
+    // It goes into the arrangement played now: a swap before it enters ends
+    // the call (the maintainer's choice, #848: capture it).
+    this._endEntryOnSwap(trackId, entered);
+    this._queueEntry(trackId);
+    if (!signal) return entered;
+    const settled = new AbortController();
+    signal.addEventListener('abort', () => this._abortEntry(trackId, reasonOf(signal)), {
+      signal: settled.signal,
+    });
+    return entered.finally(() => settled.abort());
   }
   /**
-   * Remove a track by id. Equivalent to `trackElement.remove()` —
-   * the editor's MutationObserver handles engine and cache cleanup.
-   * No-op if no matching track exists.
+   * A queued track goes into the arrangement played when it was queued: when
+   * that one is swapped out first, the track leaves the queue and its wait
+   * rejects with the swap's AbortError (addTrack, a dropped file).
+   */
+  private _endEntryOnSwap(trackId: string, entered: Promise<string>): void {
+    const settled = new AbortController();
+    this._playSignal.addEventListener(
+      'abort',
+      (e) => this._abortEntry(trackId, reasonOf(e.target as AbortSignal)),
+      { signal: settled.signal }
+    );
+    void entered.then(
+      () => settled.abort(),
+      () => settled.abort()
+    );
+  }
+  /** A track that has not entered leaves the queue and its wait rejects with `reason` (D4). */
+  private _abortEntry(trackId: string, reason: unknown): void {
+    if (!this._pending.has(trackId) || this._isEntered(trackId)) return;
+    // Out of what is waiting; its id left in the queue enters nothing.
+    const nextPending = new Map(this._pending);
+    nextPending.delete(trackId);
+    this._pending = nextPending;
+    this._settleEntry(trackId, reason);
+    this.requestUpdate();
+  }
+  /**
+   * Remove a track by id: its `<daw-track>` element is removed (the
+   * MutationObserver does the rest), or, for a track with no element
+   * (`addTrack`, a dropped file, an Undo), the track itself. One undo step.
+   * Warns when no track has the id.
    */
   removeTrack(trackId: string): void {
     const trackEl = this._trackElements.get(trackId);
@@ -2841,7 +3565,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       trackEl.remove();
       // Detached, the MutationObserver is off: remove the track here (#917).
       if (!this.isConnected) this._onTrackRemoved(trackId);
-    } else if (this._tracks.has(trackId) || this._isEntered(trackId)) {
+    } else if (
+      this._pending.has(trackId) ||
+      this._extras.has(trackId) ||
+      this._isEntered(trackId)
+    ) {
       // File-dropped and undo-restored tracks have no DOM element.
       this._onTrackRemoved(trackId);
     } else {
@@ -2849,32 +3577,23 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
   }
   /**
-   * Move a track to a new position in the vertical order (0-based index among
-   * `<daw-track>` elements). Element-backed tracks move their DOM element —
-   * the MutationObserver syncs the engine (single write path). Element-less
-   * tracks (undo-resurrected) reorder the engine directly.
+   * Move a track to a 0-based position in the arrangement's order (every
+   * track counts, those with no element too; `trackEl.index` and
+   * `editor.tracks` give the positions). One undo step; no element moves.
    */
   reorderTrack(trackId: string, toIndex: number): void {
     if (!Number.isFinite(toIndex)) {
       console.warn('[dawcore] reorderTrack: invalid toIndex ' + String(toIndex));
       return;
     }
-    const el = this._trackElements.get(trackId);
-    if (el) {
-      const els = [...this.querySelectorAll('daw-track')] as DawTrackElement[];
-      const from = els.indexOf(el);
-      if (from === -1) return;
-      const clamped = Math.max(0, Math.min(toIndex, els.length - 1));
-      if (from === clamped) return;
-      const anchor = els[clamped];
-      if (clamped > from) anchor.after(el);
-      else anchor.before(el);
-    } else if (this._isEntered(trackId)) {
-      this._arrangement.reorderTrack(trackId, toIndex);
-      this.requestUpdate();
-    } else {
+    if (!this._isEntered(trackId)) {
       console.warn('[dawcore] reorderTrack: no track found for id "' + trackId + '"');
+      return;
     }
+    // The arrangement's order; no element moves (#848: the markup is the
+    // starting declaration, order included).
+    const last = this._arrangement.getTracks().length - 1;
+    this._arrangement.reorderTrack(trackId, Math.max(0, Math.min(Math.trunc(toIndex), last)));
   }
 
   private _onTrackReorder = (e: CustomEvent<DawTrackReorderDetail>) => {
@@ -2887,68 +3606,110 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   };
 
   /**
-   * Update reflected attributes on a track. The mixer fields go to their
-   * owner, the arrangement, as one undo step (#843; also while the track
-   * loads, #848). For DOM-element tracks the
-   * changes are also written to the `<daw-track>` element; for tracks
-   * without a DOM element (file drops) the descriptor is updated in place.
+   * Change a track: the mix (one undo step, #843), the name (an undo step),
+   * the render mode and spectrogram config (the editor's). The arrangement
+   * is changed, never an element's attributes (#848): a `<daw-track>`'s
+   * properties show the change. A track that has not entered yet gets it as
+   * the value it enters with.
    */
   updateTrack(trackId: string, partial: Partial<TrackConfig>): void {
+    if (!this._isEntered(trackId)) {
+      this._updatePendingTrack(trackId, partial);
+      return;
+    }
     const mix: Partial<TrackMixerValues> = {
       volume: partial.volume,
       pan: partial.pan,
       muted: partial.muted,
       soloed: partial.soloed,
     };
-    const trackEl = this._trackElements.get(trackId);
-    if (trackEl) {
-      // Written directly as well: an element that already holds a value (the
-      // one an Undo took back) fires no update for it. The update the
-      // element does fire sends the same values, which changes nothing.
-      this._writeMixFields(trackId, mix);
-      if (partial.name !== undefined) trackEl.setAttribute('name', partial.name);
-      if (partial.volume !== undefined) trackEl.volume = partial.volume;
-      if (partial.pan !== undefined) trackEl.pan = partial.pan;
-      if (partial.muted !== undefined) {
-        if (partial.muted) trackEl.setAttribute('muted', '');
-        else trackEl.removeAttribute('muted');
-      }
-      if (partial.soloed !== undefined) {
-        if (partial.soloed) trackEl.setAttribute('soloed', '');
-        else trackEl.removeAttribute('soloed');
-      }
-      if (partial.renderMode !== undefined) trackEl.setAttribute('render-mode', partial.renderMode);
-      return;
-    }
-    // No DOM element — apply directly to descriptor + engine.
-    const oldDesc = this._tracks.get(trackId);
-    if (!oldDesc) return;
-    let normalizedRenderMode =
+    this._writeMixFields(trackId, mix);
+    if (partial.name !== undefined) this._renameTrack(trackId, partial.name);
+    const extras = this._extras.get(trackId) ?? this._defaultExtras(trackId);
+    if (!extras) return;
+    let renderMode =
       partial.renderMode === undefined ? undefined : normalizeRenderMode(partial.renderMode);
-    if (normalizedRenderMode === 'both') {
+    if (renderMode === 'both') {
       console.warn(
         '[dawcore] render-mode="both" is not yet supported; falling back to \'spectrogram\''
       );
-      normalizedRenderMode = 'spectrogram';
+      renderMode = 'spectrogram';
     }
-    const newDesc: StoredTrackDescriptor = {
-      ...oldDesc,
-      ...(partial.name !== undefined && { name: partial.name }),
-      ...(normalizedRenderMode !== undefined && {
-        renderMode: trackDescriptorRenderMode(oldDesc.kind, normalizedRenderMode),
+    if (renderMode === undefined && partial.spectrogramConfig === undefined) return;
+    const next: TrackExtras = {
+      ...extras,
+      ...(renderMode !== undefined && {
+        renderMode: trackDescriptorRenderMode(extras.kind, renderMode),
+      }),
+      ...(partial.spectrogramConfig !== undefined && {
+        spectrogramConfig: partial.spectrogramConfig,
       }),
     };
-    this._tracks = new Map(this._tracks).set(trackId, newDesc);
-    this._writeMixFields(trackId, mix);
+    this._extras = new Map(this._extras).set(trackId, next);
+    if (next.spectrogramConfig !== extras.spectrogramConfig) {
+      this._spectrogramController?.setTrackConfig(trackId, next.spectrogramConfig ?? null);
+    }
+  }
+  /** `updateTrack` on a track waiting to enter: the values it will enter with. */
+  private _updatePendingTrack(trackId: string, partial: Partial<TrackConfig>): void {
+    const pending = this._pending.get(trackId);
+    if (!pending) {
+      console.warn('[dawcore] updateTrack: no track found for id "' + trackId + '"');
+      return;
+    }
+    if ('element' in pending) {
+      // Before entry an element's properties are its declaration (P9).
+      const el = pending.element;
+      if (partial.name !== undefined) el.name = partial.name;
+      if (partial.volume !== undefined) el.volume = partial.volume;
+      if (partial.pan !== undefined) el.pan = partial.pan;
+      if (partial.muted !== undefined) el.muted = partial.muted;
+      if (partial.soloed !== undefined) el.soloed = partial.soloed;
+      if (partial.renderMode !== undefined) el.renderMode = partial.renderMode;
+      if (partial.spectrogramConfig !== undefined) el.spectrogramConfig = partial.spectrogramConfig;
+      return;
+    }
+    const { descriptor, mix } = pending;
+    this._pending = new Map(this._pending).set(trackId, {
+      descriptor: {
+        ...descriptor,
+        ...(partial.spectrogramConfig !== undefined && {
+          spectrogramConfig: partial.spectrogramConfig,
+        }),
+        ...(partial.name !== undefined && { name: partial.name }),
+        ...(partial.renderMode !== undefined && {
+          renderMode: trackDescriptorRenderMode(
+            descriptor.kind,
+            normalizeRenderMode(partial.renderMode)
+          ),
+        }),
+      },
+      mix: {
+        volume: partial.volume ?? mix.volume,
+        pan: partial.pan ?? mix.pan,
+        muted: partial.muted ?? mix.muted,
+        soloed: partial.soloed ?? mix.soloed,
+      },
+    });
   }
   /**
-   * Append a clip to an existing track. Builds a `<daw-clip>` from `config`
-   * and appends it to the track's DOM element; resolves with the new clip's
+   * Add a clip to a track (with or without an element) and resolve with its
    * id once its audio has loaded (`daw-clip-ready`, before its peaks are
-   * drawn); rejects when it fails to load, is refused, or leaves the
-   * arrangement before it loads (a removal, an Undo).
+   * drawn). The clip enters the arrangement as a loading clip, one undo
+   * step; no `<daw-clip>` is created (#848). Rejects when it fails to load,
+   * is refused (its kind), or leaves the arrangement before it loads (a
+   * removal, an Undo). A clip added while the editor is detached loads once
+   * a fresh adapter is set.
+   *
+   * `options.signal` (#848): aborting it before the clip has loaded rejects
+   * with its `reason` and removes the clip for good (no undo step); after it
+   * has loaded it changes nothing. A signal already aborted rejects at once
+   * and adds nothing. A swap of `editor.arrangement` rejects the call with an
+   * `AbortError`; its loading clip stays in the arrangement swapped out.
    */
-  addClip(trackId: string, config: ClipConfig): Promise<string> {
+  addClip(trackId: string, config: ClipConfig, options: EditorCallOptions = {}): Promise<string> {
+    const callerSignal = options.signal;
+    if (callerSignal?.aborted) return Promise.reject(reasonOf(callerSignal));
     if (!config.src) {
       return Promise.reject(
         new Error(
@@ -2957,29 +3718,19 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         )
       );
     }
-    const trackEl = this._trackElements.get(trackId);
-    if (!trackEl) {
-      return Promise.reject(
-        new Error(
-          'addClip: no <daw-track> element for trackId "' +
-            trackId +
-            '" — addClip currently requires a DOM-backed track. Use editor.addTrack(config) first.'
-        )
-      );
-    }
-    // A track an Undo took out (it has an element but is neither in the
-    // arrangement nor waiting to enter) would never take the clip (#917).
-    if (!this._isEntered(trackId) && !this._entryQueue.includes(trackId)) {
+    const pending = this._pending.get(trackId);
+    if (!this._isEntered(trackId) && !pending) {
       return Promise.reject(
         new Error(
           'addClip: track "' +
             trackId +
-            '" is not in the editor (an Undo took it out, or the arrangement refused it)'
+            '" is not in the editor (an Undo took it out, the arrangement refused it, or no ' +
+            'track has this id)'
         )
       );
     }
-    const clipEl = this._buildClipElement(config);
-    const clipId = clipEl.clipId;
+    const clipDesc = clipDescriptorOf(config);
+    const clipId = clipDesc.clipId;
     // Settled by daw-clip-ready / daw-clip-error for this clip; and, since a
     // clip that leaves the arrangement before its audio loads (a removal, an
     // Undo, its track removed) is never announced, rejected once it has been
@@ -2987,21 +3738,38 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // listeners.
     return new Promise<string>((resolve, reject) => {
       let seen = false;
-      const onReady = (e: Event) => {
-        if ((e as CustomEvent<DawClipIdDetail>).detail.clipId !== clipId) return;
-        cleanup();
-        resolve(clipId);
+      // One controller for this call: its abort removes every listener.
+      const call = new AbortController();
+      const cleanup = () => {
+        call.abort();
+        this._awaitedClips.delete(clipId);
       };
-      const onError = (e: Event) => {
-        const detail = (e as CustomEvent<DawClipErrorDetail>).detail;
-        if (detail.clipId !== clipId) return;
-        cleanup();
-        reject(detail.error instanceof Error ? detail.error : new Error(String(detail.error)));
-      };
-      const stopWatching = this._arrangement.subscribe(() => {
-        const present = this._arrangement
-          .getTracks()
-          .some((t) => t.clips.some((c) => c.id === clipId));
+      this.addEventListener(
+        'daw-clip-ready',
+        (e: Event) => {
+          if ((e as CustomEvent<DawClipIdDetail>).detail.clipId !== clipId) return;
+          cleanup();
+          resolve(clipId);
+        },
+        { signal: call.signal }
+      );
+      this.addEventListener(
+        'daw-clip-error',
+        (e: Event) => {
+          const detail = (e as CustomEvent<DawClipErrorDetail>).detail;
+          if (detail.clipId !== clipId) return;
+          cleanup();
+          reject(detail.error instanceof Error ? detail.error : new Error(String(detail.error)));
+        },
+        { signal: call.signal }
+      );
+      // One arrangement, the one the clip goes into, subscribed to and read.
+      const watched =
+        pending && 'element' in pending && !this._isEntered(trackId)
+          ? this._ownArrangement
+          : this._arrangement;
+      const stopWatching = watched.subscribe(() => {
+        const present = watched.getTracks().some((t) => t.clips.some((c) => c.id === clipId));
         if (present) {
           seen = true;
         } else if (seen) {
@@ -3009,14 +3777,26 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           reject(new Error('clip "' + clipId + '" was removed before its audio loaded'));
         }
       });
-      const cleanup = () => {
-        this.removeEventListener('daw-clip-ready', onReady);
-        this.removeEventListener('daw-clip-error', onError);
-        stopWatching();
-        this._awaitedClips.delete(clipId);
-      };
-      this.addEventListener('daw-clip-ready', onReady);
-      this.addEventListener('daw-clip-error', onError);
+      call.signal.addEventListener('abort', stopWatching);
+      // That arrangement swapped out (D2): the call ends; the clip stays there.
+      this._playSignals.signalOf(watched).addEventListener(
+        'abort',
+        (e) => {
+          cleanup();
+          reject(reasonOf(e.target as AbortSignal));
+        },
+        { signal: call.signal }
+      );
+      // The caller's abort (D3): the clip goes for good, and the call rejects.
+      callerSignal?.addEventListener(
+        'abort',
+        () => {
+          cleanup();
+          this._discardAddedClip(trackId, clipId);
+          reject(reasonOf(callerSignal));
+        },
+        { signal: call.signal }
+      );
       this._awaitedClips.set(clipId, {
         trackId,
         reject: (error) => {
@@ -3024,27 +3804,63 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
           reject(error);
         },
       });
-      trackEl.appendChild(clipEl);
+      if (this._isEntered(trackId)) {
+        seen = true;
+        this._loadAndAppendClip(trackId, clipDesc);
+      } else if (pending) {
+        // It enters with its track.
+        this._pending = new Map(this._pending).set(
+          trackId,
+          'element' in pending
+            ? { ...pending, extraClips: [...pending.extraClips, clipDesc] }
+            : {
+                ...pending,
+                descriptor: {
+                  ...pending.descriptor,
+                  clips: [...pending.descriptor.clips, clipDesc],
+                },
+              }
+        );
+      }
     });
   }
   /**
-   * Remove a clip by id. Removes the matching `<daw-clip>` DOM element when
-   * present (MutationObserver handles cleanup); otherwise updates engine
-   * state directly. No-op if no matching clip exists.
+   * Remove a clip by id: its `<daw-clip>` when there is one (the observer
+   * removes the clip, as `select.remove(i)` removes an option), otherwise
+   * the clip itself, one undo step. Undo brings the clip back with no
+   * element. No-op with a warning when there is no such clip.
    */
   removeClip(trackId: string, clipId: string): void {
     const trackEl = this._trackElements.get(trackId);
-    if (trackEl) {
-      const clipEl = [...trackEl.querySelectorAll('daw-clip')].find(
-        (c) => (c as DawClipElement).clipId === clipId
-      ) as DawClipElement | undefined;
-      if (clipEl) {
-        clipEl.remove();
-        return;
-      }
+    const clipEl = trackEl
+      ? ([...trackEl.querySelectorAll('daw-clip')].find(
+          (c) => (c as DawClipElement).clipId === clipId
+        ) as DawClipElement | undefined)
+      : undefined;
+    if (clipEl) {
+      clipEl.remove();
+      // Detached, the MutationObserver is off: remove the clip here.
+      if (!this.isConnected && this._isEntered(trackId)) this._removeClipFromTrack(trackId, clipId);
+      return;
     }
     if (this._isEntered(trackId)) {
       this._removeClipFromTrack(trackId, clipId);
+      return;
+    }
+    // A clip addClip() gave a track that has not entered yet.
+    const pending = this._pending.get(trackId);
+    if (pending) {
+      const without = (clips: ClipDescriptor[]) => clips.filter((c) => c.clipId !== clipId);
+      this._pending = new Map(this._pending).set(
+        trackId,
+        'element' in pending
+          ? { ...pending, extraClips: without(pending.extraClips) as DropClipDescriptor[] }
+          : {
+              ...pending,
+              descriptor: { ...pending.descriptor, clips: without(pending.descriptor.clips) },
+            }
+      );
+      this._rejectAwaitedClips((id) => id === clipId, 'the clip was removed before it loaded');
       return;
     }
     console.warn(
@@ -3052,100 +3868,36 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     );
   }
   /**
-   * Update a clip's position (start/duration/offset) or properties (gain/name).
-   * For DOM-element clips, writes properties on the `<daw-clip>` element which
-   * fires `daw-clip-update`; otherwise applies directly via `_applyClipUpdate`.
+   * Change a clip's position (start/duration/offset), gain or name: one undo
+   * step on the arrangement (#848; a clip still loading changes its loading
+   * clip). A `<daw-clip>`'s properties show the change, its attributes do
+   * not. Fades are a `<daw-clip>` declaration only (engine-side fades are
+   * #489): `fadeIn` / `fadeOut` / `fadeType` here change nothing.
    *
    * Re-decoding (changing `src`) is not supported via this method — remove and
    * re-add the clip instead.
-   *
-   * Note: `fadeIn` / `fadeOut` / `fadeType` on the partial are written to the
-   * `<daw-clip>` element (so they round-trip in the descriptor), but engine-side
-   * fade application from `<daw-clip>` properties is not yet implemented — see
-   * the broader fade-engine integration tracked separately.
    */
   updateClip(trackId: string, clipId: string, partial: Partial<ClipConfig>): void {
-    const trackEl = this._trackElements.get(trackId);
-    if (trackEl) {
-      const clipEl = [...trackEl.querySelectorAll('daw-clip')].find(
-        (c) => (c as DawClipElement).clipId === clipId
-      ) as DawClipElement | undefined;
-      if (clipEl) {
-        if (partial.start !== undefined) clipEl.start = partial.start;
-        if (partial.duration !== undefined) clipEl.duration = partial.duration;
-        if (partial.offset !== undefined) clipEl.offset = partial.offset;
-        if (partial.gain !== undefined) clipEl.gain = partial.gain;
-        if (partial.name !== undefined) clipEl.setAttribute('name', partial.name);
-        if (partial.fadeIn !== undefined) clipEl.fadeIn = partial.fadeIn;
-        if (partial.fadeOut !== undefined) clipEl.fadeOut = partial.fadeOut;
-        if (partial.fadeType !== undefined) clipEl.setAttribute('fade-type', partial.fadeType);
-        return;
-      }
-    }
-    // No DOM element — apply changes directly.
-    const t = this._engineTracks.get(trackId);
-    if (!t) {
+    if (!this._isEntered(trackId)) {
       console.warn('[dawcore] updateClip: no track found for id "' + trackId + '"');
       return;
     }
-    const idx = t.clips.findIndex((c) => c.id === clipId);
-    if (idx === -1) {
+    if (!this._clipValues(trackId, clipId)) {
       console.warn(
         '[dawcore] updateClip: clip "' + clipId + '" not found in track "' + trackId + '"'
       );
       return;
     }
-    const oldClip = t.clips[idx];
-    const sr = oldClip.sampleRate ?? this.effectiveSampleRate;
-    const updatedClip = {
-      ...oldClip,
-      ...(partial.start !== undefined && { startSample: Math.round(partial.start * sr) }),
-      ...(partial.duration !== undefined &&
-        partial.duration > 0 && { durationSamples: Math.round(partial.duration * sr) }),
-      ...(partial.offset !== undefined && { offsetSamples: Math.round(partial.offset * sr) }),
-      ...(partial.gain !== undefined && { gain: partial.gain }),
-      ...(partial.name !== undefined && { name: partial.name }),
-    };
-    // Keep editor.tracks truthful for element-less clips that carry their
-    // engine id (recorded takes, #659) — no <daw-clip> element re-reads them.
-    const desc = this._tracks.get(trackId);
-    if (desc?.clips.some((c) => c.clipId === clipId)) {
-      this._tracks = new Map(this._tracks).set(trackId, {
-        ...desc,
-        clips: desc.clips.map((c) =>
-          c.clipId === clipId
-            ? {
-                ...c,
-                start: updatedClip.startSample / sr,
-                duration: updatedClip.durationSamples / sr,
-                offset: updatedClip.offsetSamples / sr,
-                ...(partial.gain !== undefined && { gain: partial.gain }),
-                ...(partial.name !== undefined && { name: partial.name }),
-              }
-            : c
-        ),
-      });
-    }
-    this._replaceClip(trackId, clipId, updatedClip);
-  }
-  private _buildClipElement(config: ClipConfig): DawClipElement {
-    const clipEl = document.createElement('daw-clip') as DawClipElement;
-    if (config.src !== undefined) clipEl.setAttribute('src', config.src);
-    if (config.peaksSrc !== undefined) clipEl.setAttribute('peaks-src', config.peaksSrc);
-    if (config.start !== undefined) clipEl.start = config.start;
-    if (config.duration !== undefined) clipEl.duration = config.duration;
-    if (config.offset !== undefined) clipEl.offset = config.offset;
-    if (config.gain !== undefined) clipEl.gain = config.gain;
-    if (config.name !== undefined) clipEl.setAttribute('name', config.name);
-    if (config.fadeIn !== undefined) clipEl.fadeIn = config.fadeIn;
-    if (config.fadeOut !== undefined) clipEl.fadeOut = config.fadeOut;
-    if (config.fadeType !== undefined) clipEl.setAttribute('fade-type', config.fadeType);
-    if (config.midiNotes !== undefined) clipEl.midiNotes = config.midiNotes;
-    if (config.midiChannel !== undefined)
-      clipEl.setAttribute('midi-channel', String(config.midiChannel));
-    if (config.midiProgram !== undefined)
-      clipEl.setAttribute('midi-program', String(config.midiProgram));
-    return clipEl;
+    const request: Partial<ClipLinkValues> = {};
+    if (partial.start !== undefined) request.start = partial.start;
+    if (partial.duration !== undefined) request.duration = partial.duration;
+    if (partial.offset !== undefined) request.offset = partial.offset;
+    if (partial.gain !== undefined) request.gain = partial.gain;
+    if (partial.name !== undefined) request.name = partial.name;
+    if (partial.midiNotes !== undefined) request.midiNotes = partial.midiNotes;
+    if (partial.midiChannel !== undefined) request.midiChannel = partial.midiChannel;
+    if (partial.midiProgram !== undefined) request.midiProgram = partial.midiProgram;
+    this._requestClipChange(trackId, clipId, request);
   }
   // --- Playback ---
   /**
@@ -3498,8 +4250,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
     // A take is audio: it cannot land on a MIDI track (#756).
     const targetId = options?.trackId ?? this._selectedTrackId;
-    const target = targetId ? this._tracks.get(targetId) : undefined;
-    if (targetId && target?.kind === 'midi') {
+    const target = targetId
+      ? this._arrangement.getTracks().find((t) => t.id === targetId)
+      : undefined;
+    if (targetId && target && trackKind(target) === 'midi') {
       const error = new Error(
         'Cannot record onto MIDI track "' +
           target.name +
@@ -3673,91 +4427,30 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     );
   }
 
-  /** Guards the statechange handler's engine→DOM sync (Task: reorder #612)
-   *  while the observer is pushing DOM order INTO the engine — the intermediate
-   *  statechange emissions during the transaction would otherwise bounce
-   *  half-applied orders back into the DOM. */
-  _inOrderSync = false;
-
   /**
-   * DOM → engine: make the engine's track order match the light-DOM
-   * `<daw-track>` order. Single write path for reorders — editor-initiated
-   * (buttons/drag move the element) and consumer-initiated (insertBefore)
-   * mutations both land here via the MutationObserver. Element-less tracks
-   * (undo-resurrected) keep their engine positions (stable sort).
-   * Write-only-on-change: a no-op when orders already match, so the
-   * engine→DOM direction (statechange handler) converges in one pass.
+   * `<daw-track>` elements the page moved (one MutationObserver batch): each
+   * is placed after the arrangement track of the nearest `<daw-track>` before
+   * it, in DOM order, as one undo step (#848 P13). Elements whose track is
+   * not in the arrangement are left alone (a queued one enters at its DOM
+   * position). The arrangement's own order changes (an Undo) move no element.
    */
-  _syncEngineOrderToDom(): void {
-    const engine = this._engine;
-    if (!engine) return;
-    const domOrder: string[] = [...this.querySelectorAll('daw-track')].map(
-      (el) => (el as DawTrackElement).trackId
-    );
-    const engineIds: string[] = engine.getState().tracks.map((t) => t.id);
-    // The slots element-backed tracks hold, in the engine's order, refilled
-    // in DOM order; an element-less track keeps its slot. (A sort whose
-    // comparator returns 0 for element-less tracks is not transitive and can
-    // leave the order as it was, #917.)
-    const inDom = new Set(domOrder);
-    const slots = engineIds.flatMap((id, i) => (inDom.has(id) ? [i] : []));
-    const domSorted = domOrder.filter((id) => engineIds.includes(id));
-    const target = [...engineIds];
-    slots.forEach((slot, k) => {
-      target[slot] = domSorted[k];
-    });
-    if (target.every((id, i) => id === engineIds[i])) return;
-    this._inOrderSync = true;
-    try {
-      engine.beginTransaction(); // one undo step for the whole permutation
-      const current = [...engineIds];
-      for (let i = 0; i < target.length; i++) {
-        if (current[i] === target[i]) continue;
-        engine.reorderTrack(target[i], i);
-        const from = current.indexOf(target[i]);
-        current.splice(from, 1);
-        current.splice(i, 0, target[i]);
-      }
-      engine.commitTransaction();
-    } finally {
-      this._inOrderSync = false;
-    }
-    this.requestUpdate();
-  }
-
-  /**
-   * Engine → DOM: after an engine-initiated order change (undo/redo), move
-   * `<daw-track>` elements to match engine order. The resulting mutations fire
-   * the observer's _syncEngineOrderToDom, which finds the orders equal and
-   * no-ops — converges in one pass (write-only-on-change).
-   */
-  _syncDomToEngineOrder(tracks: readonly ClipTrack[]): void {
+  private _placeMovedTracks(movedIds: ReadonlySet<string>): void {
     const els = [...this.querySelectorAll('daw-track')] as DawTrackElement[];
-    if (els.length < 2) return;
-    const byId = new Map<string, DawTrackElement>(els.map((el) => [el.trackId, el]));
-    const desired = tracks
-      .map((t) => byId.get(t.id))
-      .filter((el): el is DawTrackElement => el != null);
-    if (desired.length < 2) return;
-    // Permute engine-known elements into engine order. Elements the engine
-    // hasn't seen yet (tracks still queued, waiting for an adapter or the
-    // next flush; a loading track is in the engine since #848) are never
-    // moved, so they keep their
-    // relative order among themselves (their absolute index can still shift
-    // when engine-known neighbors move around them); anchoring desired[0] at
-    // els[0] instead would promote the loaded subset to the top and reorder
-    // tracks by decode-completion order (#625).
-    const desiredSet = new Set(desired);
-    const slots = els.filter((el) => desiredSet.has(el));
-    if (desired.every((el, i) => el === slots[i])) return;
-    for (let i = 0; i < desired.length; i++) {
-      if (slots[i] === desired[i]) continue;
-      // desired[i] currently sits at a later slot (earlier ones are settled);
-      // insert it directly before the element occupying slot i.
-      slots[i].before(desired[i]);
-      const from = slots.indexOf(desired[i]);
-      slots.splice(from, 1);
-      slots.splice(i, 0, desired[i]);
+    const moved = els.filter((el) => movedIds.has(el.trackId) && this._isEntered(el.trackId));
+    if (moved.length === 0) return;
+    const arrangement = this._arrangement;
+    arrangement.beginTransaction();
+    try {
+      for (const el of moved) {
+        const others = arrangement
+          .getTracks()
+          .map((t) => t.id)
+          .filter((id) => id !== el.trackId);
+        // The index it already has changes nothing.
+        arrangement.reorderTrack(el.trackId, entryIndex(els, el.trackId, others));
+      }
+    } finally {
+      arrangement.commitTransaction();
     }
   }
 
@@ -3768,8 +4461,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   private _getOrderedTracks(): Array<[string, ClipTrack, LoadingClip[]]> {
     const rows: Array<[string, ClipTrack, LoadingClip[]]> = [];
     for (const track of this._arrangement.getTracks()) {
-      const loaded = this._engineTracks.get(track.id);
-      if (!loaded) continue;
+      const loaded = loadedTrack(
+        track,
+        this._mixOf(track.id),
+        this._arrangement.recordingTrackIds.has(track.id)
+      );
       rows.push([track.id, loaded, track.clips.filter(isLoadingClip)]);
     }
     return rows;
@@ -3781,7 +4477,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    */
   private _renderPlaceholder(
     clip: LoadingClip,
-    row: { trackId: string; trackHeight: number; descriptor?: StoredTrackDescriptor }
+    row: { trackId: string; trackHeight: number; descriptor?: RowInfo }
   ) {
     const seconds = this._placeholderSeconds(clip);
     if (seconds === null) return '';
@@ -3851,7 +4547,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
 
     // Precompute track info once for both controls column and timeline
     const orderedTracks = this._getOrderedTracks().map(([trackId, track, loading]) => {
-      const descriptor = this._tracks.get(trackId);
+      // What the template reads about the track: from the arrangement and the extras.
+      const descriptor: RowInfo = {
+        name: track.name ?? '',
+        kind: trackKind(track),
+        renderMode: this._renderModeOf(trackId),
+      };
       const firstPeaks = [...track.clips, ...loading]
         .map((c) => this._peaksData.get(c.id) ?? this._previewPeaks.get(c.id))
         .find((p) => p && p.data.length > 0);
@@ -3912,24 +4613,30 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
                       <span class="annotation-lane-name">${track.name}</span>
                     </div>`
                 )}
-                ${orderedTracks.map((t, i) => {
-                  const mix = this._mixOf(t.trackId);
-                  return html`
-                    <daw-track-controls
-                      style="height: ${t.trackHeight}px;"
-                      .trackId=${t.trackId}
-                      .trackName=${t.descriptor?.name ?? 'Untitled'}
-                      .volume=${mix.volume}
-                      .pan=${mix.pan}
-                      .muted=${mix.muted}
-                      .recording=${this._engine?.recordingTrackIds.has(t.trackId) ?? false}
-                      .soloed=${mix.soloed}
-                      .reorderable=${this.trackReordering}
-                      .trackIndex=${i}
-                      .trackCount=${orderedTracks.length}
-                    ></daw-track-controls>
-                  `;
-                })}
+                ${repeat(
+                  orderedTracks,
+                  // Keyed by track: a swap or an outside reorder must not hand
+                  // a row (and a slider gesture held in it) to another track.
+                  (t) => t.trackId,
+                  (t, i) => {
+                    const mix = this._mixOf(t.trackId);
+                    return html`
+                      <daw-track-controls
+                        style="height: ${t.trackHeight}px;"
+                        .trackId=${t.trackId}
+                        .trackName=${t.descriptor?.name ?? 'Untitled'}
+                        .volume=${mix.volume}
+                        .pan=${mix.pan}
+                        .muted=${mix.muted}
+                        .recording=${this._engine?.recordingTrackIds.has(t.trackId) ?? false}
+                        .soloed=${mix.soloed}
+                        .reorderable=${this.trackReordering}
+                        .trackIndex=${i}
+                        .trackCount=${orderedTracks.length}
+                      ></daw-track-controls>
+                    `;
+                  }
+                )}
               </div>
             </div>`
           : ''}
@@ -3970,190 +4677,199 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
               ? html`<daw-selection .startPx=${selStartPx} .endPx=${selEndPx}></daw-selection>
                   <daw-playhead></daw-playhead>`
               : ''}
-            ${orderedTracks.map((t) => {
-              const channelHeight = this.waveHeight;
-              return html`
-                <div
-                  class="track-row ${t.trackId === this._selectedTrackId ? 'selected' : ''}"
-                  style="height: ${t.trackHeight}px;"
-                  data-track-id=${t.trackId}
-                >
-                  ${t.track.clips.map((clip) => {
-                    const peakData =
-                      this._peaksData.get(clip.id) ?? this._previewPeaks.get(clip.id);
-                    // In beats mode, derive pixel positions from tick space to
-                    // match grid lines exactly. The sample→spp path introduces
-                    // 1-2px quantization error from integer sample rounding.
-                    let clipLeft: number;
-                    let width: number;
-                    if (this.scaleMode === 'beats') {
-                      // Use startTick directly when available — stable across BPM changes.
-                      // Fall back to sample→seconds→ticks for clips without startTick.
-                      const startTick =
-                        clip.startTick !== undefined
-                          ? clip.startTick
-                          : this._secondsToTicks(clip.startSample / sr);
-                      const durSec = clip.durationSamples / sr;
-                      const startSec =
-                        clip.startTick !== undefined
-                          ? this._ticksToSeconds(clip.startTick)
-                          : clip.startSample / sr;
-                      const endTick = this._secondsToTicks(startSec + durSec);
-                      clipLeft = Math.round(startTick / this.ticksPerPixel);
-                      width = Math.round(endTick / this.ticksPerPixel) - clipLeft;
-                    } else {
-                      clipLeft = Math.floor(clip.startSample / spp);
-                      width = clipPixelWidth(clip.startSample, clip.durationSamples, spp);
-                    }
-                    // Per-segment waveform rendering for variable tempo.
-                    // Uses base-scale (128) peaks directly — segments handle stretching,
-                    // so no BPM-dependent intermediate resampling needed.
-                    let clipSegments: WaveformSegment[] | undefined;
-                    let segmentChannels: Peaks[] | undefined;
-                    if (this.scaleMode === 'beats' && this.secondsToTicks) {
-                      const audioBuffer = this._clipBuffers.get(clip.id);
-                      const basePeaks = audioBuffer
-                        ? this._peakPipeline.getBaseScalePeaks(
-                            audioBuffer,
-                            this.mono,
-                            clip.offsetSamples,
-                            clip.durationSamples
-                          )
-                        : null;
-                      if (basePeaks) {
-                        const baseScale = basePeaks.scale;
-                        segmentChannels = basePeaks.peaks.data;
-                        const MIN_RENDER_STEP = 80;
-                        const stepTicks = Math.max(MIN_RENDER_STEP, Math.ceil(this.ticksPerPixel));
+            ${repeat(
+              orderedTracks,
+              (t) => t.trackId,
+              (t) => {
+                const channelHeight = this.waveHeight;
+                return html`
+                  <div
+                    class="track-row ${t.trackId === this._selectedTrackId ? 'selected' : ''}"
+                    style="height: ${t.trackHeight}px;"
+                    data-track-id=${t.trackId}
+                  >
+                    ${t.track.clips.map((clip) => {
+                      const peakData =
+                        this._peaksData.get(clip.id) ?? this._previewPeaks.get(clip.id);
+                      // In beats mode, derive pixel positions from tick space to
+                      // match grid lines exactly. The sample→spp path introduces
+                      // 1-2px quantization error from integer sample rounding.
+                      let clipLeft: number;
+                      let width: number;
+                      if (this.scaleMode === 'beats') {
+                        // Use startTick directly when available — stable across BPM changes.
+                        // Fall back to sample→seconds→ticks for clips without startTick.
+                        const startTick =
+                          clip.startTick !== undefined
+                            ? clip.startTick
+                            : this._secondsToTicks(clip.startSample / sr);
+                        const durSec = clip.durationSamples / sr;
                         const startSec =
                           clip.startTick !== undefined
                             ? this._ticksToSeconds(clip.startTick)
                             : clip.startSample / sr;
-                        const clipOffsetSec = clip.offsetSamples / sr;
-                        const segStartTick =
-                          clip.startTick !== undefined
-                            ? clip.startTick
-                            : this._secondsToTicks(startSec);
-                        const endTick = this._secondsToTicks(startSec + clip.durationSamples / sr);
-                        clipSegments = [];
-                        for (let tick = segStartTick; tick < endTick; tick += stepTicks) {
-                          const segEndTick = Math.min(tick + stepTicks, endTick);
-                          const segStartAudioSec =
-                            this._ticksToSeconds(tick) - startSec + clipOffsetSec;
-                          const segEndAudioSec =
-                            this._ticksToSeconds(segEndTick) - startSec + clipOffsetSec;
-                          // Peak indices at base scale (128) — clamped to valid range.
-                          const segStartSample = Math.round(segStartAudioSec * sr);
-                          const segEndSample = Math.round(segEndAudioSec * sr);
-                          const totalPeaks = clip.durationSamples / baseScale;
-                          clipSegments.push({
-                            peakStart: Math.max(
-                              0,
-                              (segStartSample - clip.offsetSamples) / baseScale
-                            ),
-                            peakEnd: Math.min(
-                              totalPeaks,
-                              (segEndSample - clip.offsetSamples) / baseScale
-                            ),
-                            pixelStart: (tick - segStartTick) / this.ticksPerPixel,
-                            pixelEnd: (segEndTick - segStartTick) / this.ticksPerPixel,
-                          });
+                        const endTick = this._secondsToTicks(startSec + durSec);
+                        clipLeft = Math.round(startTick / this.ticksPerPixel);
+                        width = Math.round(endTick / this.ticksPerPixel) - clipLeft;
+                      } else {
+                        clipLeft = Math.floor(clip.startSample / spp);
+                        width = clipPixelWidth(clip.startSample, clip.durationSamples, spp);
+                      }
+                      // Per-segment waveform rendering for variable tempo.
+                      // Uses base-scale (128) peaks directly — segments handle stretching,
+                      // so no BPM-dependent intermediate resampling needed.
+                      let clipSegments: WaveformSegment[] | undefined;
+                      let segmentChannels: Peaks[] | undefined;
+                      if (this.scaleMode === 'beats' && this.secondsToTicks) {
+                        const audioBuffer = this._clipBuffers.get(clip.id);
+                        const basePeaks = audioBuffer
+                          ? this._peakPipeline.getBaseScalePeaks(
+                              audioBuffer,
+                              this.mono,
+                              clip.offsetSamples,
+                              clip.durationSamples
+                            )
+                          : null;
+                        if (basePeaks) {
+                          const baseScale = basePeaks.scale;
+                          segmentChannels = basePeaks.peaks.data;
+                          const MIN_RENDER_STEP = 80;
+                          const stepTicks = Math.max(
+                            MIN_RENDER_STEP,
+                            Math.ceil(this.ticksPerPixel)
+                          );
+                          const startSec =
+                            clip.startTick !== undefined
+                              ? this._ticksToSeconds(clip.startTick)
+                              : clip.startSample / sr;
+                          const clipOffsetSec = clip.offsetSamples / sr;
+                          const segStartTick =
+                            clip.startTick !== undefined
+                              ? clip.startTick
+                              : this._secondsToTicks(startSec);
+                          const endTick = this._secondsToTicks(
+                            startSec + clip.durationSamples / sr
+                          );
+                          clipSegments = [];
+                          for (let tick = segStartTick; tick < endTick; tick += stepTicks) {
+                            const segEndTick = Math.min(tick + stepTicks, endTick);
+                            const segStartAudioSec =
+                              this._ticksToSeconds(tick) - startSec + clipOffsetSec;
+                            const segEndAudioSec =
+                              this._ticksToSeconds(segEndTick) - startSec + clipOffsetSec;
+                            // Peak indices at base scale (128) — clamped to valid range.
+                            const segStartSample = Math.round(segStartAudioSec * sr);
+                            const segEndSample = Math.round(segEndAudioSec * sr);
+                            const totalPeaks = clip.durationSamples / baseScale;
+                            clipSegments.push({
+                              peakStart: Math.max(
+                                0,
+                                (segStartSample - clip.offsetSamples) / baseScale
+                              ),
+                              peakEnd: Math.min(
+                                totalPeaks,
+                                (segEndSample - clip.offsetSamples) / baseScale
+                              ),
+                              pixelStart: (tick - segStartTick) / this.ticksPerPixel,
+                              pixelEnd: (segEndTick - segStartTick) / this.ticksPerPixel,
+                            });
+                          }
                         }
                       }
-                    }
-                    const channels: Peaks[] = segmentChannels ??
-                      peakData?.data ?? [new Int16Array(0)];
-                    const hdrH = this.clipHeaders ? this.clipHeaderHeight : 0;
-                    const chH = this.waveHeight;
-                    return html` <div
-                      class="clip-container"
-                      style="left:${clipLeft}px;top:0;width:${width}px;height:${t.trackHeight}px;"
-                      data-clip-id=${clip.id}
-                    >
-                      ${hdrH > 0
-                        ? html`<div
-                            class="clip-header"
-                            data-clip-id=${clip.id}
-                            data-track-id=${t.trackId}
-                            ?data-interactive=${this.interactiveClips}
-                          >
-                            <span>${clip.name || t.descriptor?.name || ''}</span>
-                          </div>`
-                        : ''}
-                      ${t.descriptor?.kind === 'midi'
-                        ? html`<daw-piano-roll
-                            style="position:absolute;left:0;top:${hdrH}px;"
-                            .midiNotes=${clip.midiNotes ?? []}
-                            .length=${peakData?.length ?? width}
-                            .waveHeight=${chH * channels.length}
-                            .samplesPerPixel=${this._renderSpp}
-                            .sampleRate=${this.effectiveSampleRate}
-                            .clipOffsetSeconds=${(clip.offsetSamples ?? 0) /
-                            this.effectiveSampleRate}
-                            .visibleStart=${this._viewport.visibleStart}
-                            .visibleEnd=${this._viewport.visibleEnd}
-                            .originX=${clipLeft}
-                            ?selected=${t.trackId === this._selectedTrackId}
-                          ></daw-piano-roll>`
-                        : t.descriptor?.renderMode === 'spectrogram'
-                          ? channels.map(
-                              (_chPeaks, chIdx) =>
-                                html`<daw-spectrogram
-                                  style="position:absolute;left:0;top:${hdrH +
-                                  chIdx * chH}px;height:${chH}px;width:${peakData?.length ??
-                                  width}px;"
-                                  .clipId=${clip.id}
-                                  .trackId=${t.trackId}
-                                  .channelIndex=${chIdx}
-                                  .length=${peakData?.length ?? width}
-                                  .waveHeight=${chH}
-                                  .samplesPerPixel=${this._renderSpp}
-                                  .sampleRate=${this.effectiveSampleRate}
-                                  .clipOffsetSeconds=${(clip.offsetSamples ?? 0) /
-                                  this.effectiveSampleRate}
-                                  .visibleStart=${this._viewport.visibleStart}
-                                  .visibleEnd=${this._viewport.visibleEnd}
-                                  .originX=${clipLeft}
-                                ></daw-spectrogram>`
-                            )
-                          : channels.map(
-                              (chPeaks, chIdx) =>
-                                html` <daw-waveform
-                                  style="position:absolute;left:0;top:${hdrH + chIdx * chH}px;"
-                                  .peaks=${chPeaks}
-                                  .length=${peakData?.length ?? width}
-                                  .waveHeight=${chH}
-                                  .barWidth=${this.barWidth}
-                                  .barGap=${this.barGap}
-                                  .roundedBars=${this.roundedBars}
-                                  .gain=${this.gainScaledWaveforms ? (clip.gain ?? 1) : 1}
-                                  .visibleStart=${this._viewport.visibleStart}
-                                  .visibleEnd=${this._viewport.visibleEnd}
-                                  .originX=${clipLeft}
-                                  .segments=${clipSegments}
-                                ></daw-waveform>`
-                            )}
-                      ${this.interactiveClips
-                        ? html` <div
-                              class="clip-boundary"
-                              data-boundary-edge="left"
+                      const channels: Peaks[] = segmentChannels ??
+                        peakData?.data ?? [new Int16Array(0)];
+                      const hdrH = this.clipHeaders ? this.clipHeaderHeight : 0;
+                      const chH = this.waveHeight;
+                      return html` <div
+                        class="clip-container"
+                        style="left:${clipLeft}px;top:0;width:${width}px;height:${t.trackHeight}px;"
+                        data-clip-id=${clip.id}
+                      >
+                        ${hdrH > 0
+                          ? html`<div
+                              class="clip-header"
                               data-clip-id=${clip.id}
                               data-track-id=${t.trackId}
-                            ></div>
-                            <div
-                              class="clip-boundary"
-                              data-boundary-edge="right"
-                              data-clip-id=${clip.id}
-                              data-track-id=${t.trackId}
-                            ></div>`
-                        : ''}
-                    </div>`;
-                  })}
-                  ${t.loading.map((clip) => this._renderPlaceholder(clip, t))}
-                  ${this._renderRecordingPreview(t.trackId, channelHeight)}
-                </div>
-              `;
-            })}
+                              ?data-interactive=${this.interactiveClips}
+                            >
+                              <span>${clip.name || t.descriptor?.name || ''}</span>
+                            </div>`
+                          : ''}
+                        ${t.descriptor?.kind === 'midi'
+                          ? html`<daw-piano-roll
+                              style="position:absolute;left:0;top:${hdrH}px;"
+                              .midiNotes=${clip.midiNotes ?? []}
+                              .length=${peakData?.length ?? width}
+                              .waveHeight=${chH * channels.length}
+                              .samplesPerPixel=${this._renderSpp}
+                              .sampleRate=${this.effectiveSampleRate}
+                              .clipOffsetSeconds=${(clip.offsetSamples ?? 0) /
+                              this.effectiveSampleRate}
+                              .visibleStart=${this._viewport.visibleStart}
+                              .visibleEnd=${this._viewport.visibleEnd}
+                              .originX=${clipLeft}
+                              ?selected=${t.trackId === this._selectedTrackId}
+                            ></daw-piano-roll>`
+                          : t.descriptor?.renderMode === 'spectrogram'
+                            ? channels.map(
+                                (_chPeaks, chIdx) =>
+                                  html`<daw-spectrogram
+                                    style="position:absolute;left:0;top:${hdrH +
+                                    chIdx * chH}px;height:${chH}px;width:${peakData?.length ??
+                                    width}px;"
+                                    .clipId=${clip.id}
+                                    .trackId=${t.trackId}
+                                    .channelIndex=${chIdx}
+                                    .length=${peakData?.length ?? width}
+                                    .waveHeight=${chH}
+                                    .samplesPerPixel=${this._renderSpp}
+                                    .sampleRate=${this.effectiveSampleRate}
+                                    .clipOffsetSeconds=${(clip.offsetSamples ?? 0) /
+                                    this.effectiveSampleRate}
+                                    .visibleStart=${this._viewport.visibleStart}
+                                    .visibleEnd=${this._viewport.visibleEnd}
+                                    .originX=${clipLeft}
+                                  ></daw-spectrogram>`
+                              )
+                            : channels.map(
+                                (chPeaks, chIdx) =>
+                                  html` <daw-waveform
+                                    style="position:absolute;left:0;top:${hdrH + chIdx * chH}px;"
+                                    .peaks=${chPeaks}
+                                    .length=${peakData?.length ?? width}
+                                    .waveHeight=${chH}
+                                    .barWidth=${this.barWidth}
+                                    .barGap=${this.barGap}
+                                    .roundedBars=${this.roundedBars}
+                                    .gain=${this.gainScaledWaveforms ? (clip.gain ?? 1) : 1}
+                                    .visibleStart=${this._viewport.visibleStart}
+                                    .visibleEnd=${this._viewport.visibleEnd}
+                                    .originX=${clipLeft}
+                                    .segments=${clipSegments}
+                                  ></daw-waveform>`
+                              )}
+                        ${this.interactiveClips
+                          ? html` <div
+                                class="clip-boundary"
+                                data-boundary-edge="left"
+                                data-clip-id=${clip.id}
+                                data-track-id=${t.trackId}
+                              ></div>
+                              <div
+                                class="clip-boundary"
+                                data-boundary-edge="right"
+                                data-clip-id=${clip.id}
+                                data-track-id=${t.trackId}
+                              ></div>`
+                          : ''}
+                      </div>`;
+                    })}
+                    ${t.loading.map((clip) => this._renderPlaceholder(clip, t))}
+                    ${this._renderRecordingPreview(t.trackId, channelHeight)}
+                  </div>
+                `;
+              }
+            )}
           </div>
         </div>
       </div>

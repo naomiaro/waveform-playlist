@@ -20,6 +20,8 @@ How a question is put to the maintainer (one lettered question, its own message)
 
 - **"As today" in a design is a claim about the old code: read or run it before writing it.** #843's design said a setter given the value a track already has "does nothing, as today"; before #843 it bumped `mixerVersion`, announced and emitted `statechange`. The implementer found it, and the choice (silent / notify) went to the maintainer mid-build.
 
+- **A ruling on one call is a question about its siblings.** When the maintainer decides what one operation does in a situation (an `addClip` at a swap), list every other operation that meets the same situation (`addTrack`, `loadFiles`, `loadMidi`, the dropped-file path; the Undo and Redo of it; the refused case) and put each one in the same question. On #919 side agents found three such siblings after the ruling was built.
+
 ## Removing, moving and renaming
 
 - **Removing a public field: trace its writers as well as its readers, and report every public surface it reaches before removing it.** `ClipTrack.effects` (#752) had two readers in the Tone adapter, but also a writer (`AudioTrackConfig.effects`, copied onto the track by `buildTrackFromConfig`; both removed since, with #812) and a type that existed only for it (core's `TrackEffectsFunction`). Removing the field removed a working option of `useAudioTracks`, which the maintainer had not been asked about and which needed a replacement (`AudioTrackConfig.id`). When a removal turns out to reach a second public surface, stop and say so, with what replaces it.

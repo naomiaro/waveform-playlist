@@ -17,6 +17,7 @@ For measuring a page from an ad-hoc script or an MCP browser (render counts, aud
 - **A fresh worktree fails 18 MediaElement e2e tests** (the page shows "WaveformData.create(): This waveform data version not supported"): `/examples/media-element` loads its audio and `.dat` from `/waveform-playlist/storybook/media/…`, which exists only after `pnpm --filter website build:storybook` writes the git-ignored `website/static/storybook/`. Build it, or `ln -s <main checkout>/website/static/storybook website/static/storybook` for the run and `rm` it afterwards.
 - **`npx playwright test <spec>` without `PORT` starts its own server on 3000** and crashes a Docusaurus server already running on another port (shared rspack cache). With my own server up, always `PORT=3077 npx playwright test …` / `PORT=3077 pnpm test`.
 - Always rebuild (`pnpm build`) after switching branches before running tests — stale artifacts cause false failures
+- **A few specs against a server of your own, without the suite's startup:** a temporary `playwright.tmp.config.ts` at the repo root, `import base from './playwright.config'; export default { ...base, webServer: undefined, globalSetup: undefined }`, then `DAWCORE_NATIVE_PORT=<port> npx playwright test --config playwright.tmp.config.ts <spec> -g …`. React specs in the same file fail without the Docusaurus server; delete the config afterwards.
 
 ## Dev servers
 

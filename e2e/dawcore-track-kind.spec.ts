@@ -30,12 +30,13 @@ test.describe('dawcore track kinds', () => {
       // addTrack resolves with the track id once it has entered (#848).
       const trackId = await editor.addTrack({ name: 'Keys', midi: { notes } });
       await editor.updateComplete;
-      const track = [...editor.querySelectorAll('daw-track')].find(
+      // No element (#848 PR 3): the track is in the arrangement only.
+      const elements = [...editor.querySelectorAll('daw-track')].filter(
         (el: any) => el.trackId === trackId
-      ) as HTMLElement;
+      ).length;
       const entry = editor.tracks.find((t: any) => t.trackId === trackId);
       return {
-        attribute: track.getAttribute('kind'),
+        elements,
         kind: entry.kind,
         renderMode: entry.renderMode,
         engineKind: editor.engine.getState().tracks.find((t: any) => t.id === trackId).kind,
@@ -43,7 +44,7 @@ test.describe('dawcore track kinds', () => {
     }, NOTES);
 
     expect(result).toEqual({
-      attribute: 'midi',
+      elements: 0,
       kind: 'midi',
       renderMode: 'waveform',
       engineKind: 'midi',

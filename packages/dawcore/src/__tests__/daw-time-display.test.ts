@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { probeListeners } from './helpers/listener-probe';
 import '../index';
 import type { DawTimeDisplayElement } from '../elements/daw-time-display';
 
@@ -107,5 +108,26 @@ describe('daw-time-display without a target', () => {
     display.remove();
     await new Promise((r) => requestAnimationFrame(() => r(undefined)));
     expect(warn).not.toHaveBeenCalled();
+  });
+});
+
+describe('<daw-time-display>: listeners of a connection (D8, #848)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.body.innerHTML = '';
+  });
+
+  it('its listeners go when it disconnects and come back on a reconnect', () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const el = document.createElement('daw-time-display');
+    const onDocument = probeListeners(document);
+    document.body.appendChild(el);
+    expect(onDocument.live()).toBe(2);
+    el.remove();
+    expect(onDocument.live()).toBe(0);
+    document.body.appendChild(el);
+    expect(onDocument.live()).toBe(2);
+    el.remove();
+    expect(onDocument.live()).toBe(0);
   });
 });

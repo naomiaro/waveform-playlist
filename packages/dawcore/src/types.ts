@@ -69,6 +69,22 @@ export type TrackMixFields = 'volume' | 'pan' | 'muted' | 'soloed';
  */
 export type StoredTrackDescriptor = Omit<TrackDescriptor, TrackMixFields>;
 
+/**
+ * What `<daw-editor>` keeps per track that the arrangement has no field for
+ * (internal, #848): how the track is drawn, the `<daw-track src>` shorthand
+ * as declared, and each clip's `peaks-src`. Names, times, gains and the mix
+ * are read from the arrangement; nothing here is written back to it.
+ */
+export interface TrackExtras {
+  kind: TrackKind;
+  renderMode: TrackRenderMode;
+  spectrogramConfig?: SpectrogramConfig | null;
+  /** The `<daw-track src>` shorthand as declared ('' when none). */
+  src: string;
+  /** A clip's `peaks-src`, by clip id. */
+  peaksSrc: ReadonlyMap<string, string>;
+}
+
 /** A `TrackDescriptor` plus its `trackId` — the shape returned by `editor.tracks`
  *  so consumers can map a track's name to the `trackId` the per-track APIs
  *  (`addTrackEffect`, `removeTrack`, `updateTrack`, …) are keyed by. */
@@ -130,6 +146,17 @@ export type ClipDescriptor = DomClipDescriptor | DropClipDescriptor;
  */
 export function isDomClip(desc: ClipDescriptor): desc is DomClipDescriptor {
   return desc.kind === 'dom';
+}
+
+/**
+ * Options of `addTrack`, `addClip` and `loadFiles` (#848). `signal` cancels
+ * the call: it rejects with the signal's `reason`, and what it added is
+ * taken out for good (see each method), with no undo step left. A Redo list
+ * its arrival cleared stays cleared, as after any edit. A signal already
+ * aborted rejects at once and adds nothing.
+ */
+export interface EditorCallOptions {
+  signal?: AbortSignal;
 }
 
 /**

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ScrollSyncController } from '../controllers/scroll-sync-controller';
+import { probeListeners } from './helpers/listener-probe';
 
 const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => r()));
 
@@ -413,5 +414,44 @@ describe('ScrollSyncController', () => {
 
     expect(sa.scrollLeft).toBe(0);
     expect(wheel.defaultPrevented).toBe(false);
+  });
+
+  describe('its listeners (D8, #848)', () => {
+    it('hostDisconnected removes the scroll and every wheel listener', async () => {
+      const controller = makeControllerMulti(host);
+      const sa = probeListeners(q(host, '.scroll-area'));
+      const controls = probeListeners(q(host, '.controls-viewport'));
+      const ruler = probeListeners(q(host, '.ruler-viewport'));
+      controller.hostConnected();
+      await nextFrame();
+      expect([sa.live(), controls.live(), ruler.live()]).toEqual([1, 1, 1]);
+      controller.hostDisconnected();
+      expect([sa.live(), controls.live(), ruler.live()]).toEqual([0, 0, 0]);
+    });
+
+    it('a replaced scroll container keeps no listener', async () => {
+      const controller = makeController(host);
+      const old = probeListeners(q(host, '.scroll-area'));
+      controller.hostConnected();
+      await nextFrame();
+      q(host, '.scroll-area').remove();
+      const next = document.createElement('div');
+      next.className = 'scroll-area';
+      q(host, '.body').appendChild(next);
+      controller.sync();
+      expect(old.live()).toBe(0);
+    });
+
+    it('a scroll container removed with no replacement keeps no listener, nor do the wheel targets', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const controller = makeController(host);
+      const sa = probeListeners(q(host, '.scroll-area'));
+      const controls = probeListeners(q(host, '.controls-viewport'));
+      controller.hostConnected();
+      await nextFrame();
+      q(host, '.scroll-area').remove();
+      controller.sync();
+      expect([sa.live(), controls.live()]).toEqual([0, 0]);
+    });
   });
 });

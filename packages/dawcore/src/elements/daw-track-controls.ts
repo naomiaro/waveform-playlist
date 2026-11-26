@@ -36,6 +36,10 @@ export class DawTrackControlsElement extends LitElement {
   private _detachGestures: Array<() => void> = [];
 
   static styles = css`
+    /* The hidden attribute hides the element: :host sets display (modern-web-guidance custom-elements). */
+    :host([hidden]) {
+      display: none;
+    }
     :host {
       display: flex;
       flex-direction: column;

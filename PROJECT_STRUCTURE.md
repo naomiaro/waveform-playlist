@@ -338,6 +338,7 @@ const clip = createClipFromSeconds({
   │   ├── useMergedTheme.ts             # the theme prop merged over defaultTheme
   │   ├── useTrimPreview.ts             # the clip trim preview source and the stable function that draws the previewed clip (internal contexts)
   │   ├── dragGuard.ts                  # WaveformPlaylistProvider: the drags in progress (a counter), during which undo and redo do nothing (internal DragGuardContext)
+  │   ├── DragWatch.tsx                 # inside ClipInteractionProvider: a change to the arrangement made elsewhere cancels a drag whose subject it changed (#848)
   │   └── useRequiredContext.ts         # a throwing context read (the providers' hooks use useSlot in contexts/playlistContexts.ts)
   ├── hooks/                            # Custom hooks
   │   ├── useAnimationFrameLoop.ts      # Shared rAF loop for providers
@@ -484,10 +485,10 @@ The browser package includes utilities for loading pre-computed waveform data in
 **Location:** `packages/browser/src/waveformDataLoader.ts`
 
 **Functions:**
-- `loadWaveformData(src)` - Load .dat or .json waveform file, returns WaveformData instance
+- `loadWaveformData(src, options?)` - Load .dat or .json waveform file, returns WaveformData instance (`options.signal` aborts the fetch)
 - `waveformDataToPeaks(waveformData, channelIndex)` - Convert to our Peaks format (Int8Array/Int16Array)
-- `loadPeaksFromWaveformData(src, channelIndex)` - Combined load + convert
-- `getWaveformDataMetadata(src)` - Get metadata without full conversion
+- `loadPeaksFromWaveformData(src, channelIndex, options?)` - Combined load + convert
+- `getWaveformDataMetadata(src, options?)` - Get metadata without full conversion
 
 **Generating BBC Peaks:**
 ```bash
@@ -702,7 +703,14 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
   - `ClipPointerHandler` (`interactions/clip-pointer-handler.ts`) — Move (header drag) and trim (boundary drag) with engine delegation
   - `splitAtPlayhead` (`interactions/split-handler.ts`) — Split clip at current playhead position (S key)
   - `clip-peak-sync.ts` — Regenerates peaks after split/trim via `_syncPeaksForChangedClips`
-  - Move uses incremental deltas with `skipAdapter` (60fps); trim accumulates delta and calls engine once on drop
+  - `abort.ts` — cancellation: `AbortError`s that name their cause, one `AbortController` per arrangement while it is played (`PlaySignals`; a swap aborts the waits of the one leaving), `untilAborted` (#848)
+  - `clip-rehome.ts` — A `<daw-clip>` the page moved into another `<daw-track>`: its clip moves there in one undo step; a track of the other kind refuses it (#848)
+  - Move and trim preview in the view and call the engine once on release (#848: no transaction, nothing written during the drag)
+  - `drag-watch.ts` — During a clip or track drag, a change to the arrangement made elsewhere cancels the drag when it changed what is dragged (#848)
+- **Arrangement (#848):** `editor.arrangement` is the one owner of the tracks (its own, declared by the `<daw-track>` children, or one the app hands in)
+  - `arrangement-view.ts` — rows, `editor.tracks`, the mix and an export read from the arrangement (no copies)
+  - `arrangement-swap.ts` — handing an arrangement in or back: the engine rebuilt on the kept adapter, effects chains of tracks no longer held disposed, `daw-track-ready` announced
+  - `element-links.ts` — `<daw-track>` / `<daw-clip>` linked by id: pending, live (properties read the arrangement, a set is one undo step) or detached (`:state(detached)`)
 - **Effects Chain (`src/effects/`):**
   - `effects-chain-controller.ts` — `EffectsChainController`, an ordered effect chain wired between owned input/output gain nodes; chain operations (add/remove/move/bypass) are kind-agnostic (`'native' | 'wam'`)
   - `effect-registry.ts` — the `native-*` built-in effects (BaseAudioContext nodes), registered on import through the shared registry in `@waveform-playlist/core` (`packages/core/src/effects/registry.ts`: `registerEffect` / `getEffectDefinitions` / `prepareEffect` / `createEffectInstance`, also used by the React effects hooks)

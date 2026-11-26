@@ -1,6 +1,7 @@
 // #756: a track holds one kind of clip. <daw-track kind="audio|midi"> declares
 // it; a clip of the other kind is not added and is reported.
 import { describe, it, expect, beforeAll, vi, beforeEach, afterEach } from 'vitest';
+import { appendTrackElement } from './helpers/editor-harness';
 import {
   makeAudioBuffer,
   makeFakeAdapter,
@@ -10,6 +11,10 @@ import {
   stubFetch,
   stubPeakPipeline,
 } from './helpers/editor-harness';
+
+/** A track as it is played (loaded clips, current mix), read from the arrangement (#848). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const played = (editor: any, id: string) => editor._loadedTracks().find((t: any) => t.id === id);
 
 beforeAll(async () => {
   await import('../elements/daw-editor');
@@ -220,10 +225,7 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
 
   it('changing kind after the track has loaded is ignored with a warning', async () => {
     const { editor } = makeEditor();
-    const trackId = await editor.addTrack({ name: 'Keys', midi: { notes: NOTES } });
-    const track = [...editor.querySelectorAll('daw-track')].find(
-      (t: any) => t.trackId === trackId
-    ) as any;
+    const track = await appendTrackElement(editor, { name: 'Keys', midi: { notes: NOTES } });
 
     track.kind = 'audio';
     await track.updateComplete;
@@ -234,9 +236,10 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
         .mocked(console.warn)
         .mock.calls.filter(([message]) => String(message).includes('kind cannot change')).length;
     expect(kindWarnings()).toBe(1);
-    // The element is put back (in a microtask), so it says what the editor holds...
-    await vi.waitFor(() => expect(track.kind).toBe('midi'));
+    // The property is live (#848): it reads the track's kind, and a refused
+    // set writes nothing, the attribute included...
     await track.updateComplete;
+    expect(track.kind).toBe('midi');
     expect(track.getAttribute('kind')).toBe('midi');
 
     // ...and an unrelated later change does not warn again.
@@ -276,7 +279,7 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
     });
 
     expect(clipErrors).toEqual([]);
-    const after = editor._engineTracks.get(trackId).clips[0];
+    const after = played(editor, trackId).clips[0];
     expect(after.startSample).toBe(48000);
     expect(after.audioBuffer).toBe(buffer);
     expect(after.midiNotes).toBeUndefined();
@@ -299,30 +302,36 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
 
   it('updateTrack on a track without an element checks the render mode too', () => {
     const { editor } = makeEditor();
-    editor._reconcileDescriptorsWithEngineTracks([
-      { id: 'a', kind: 'audio', name: 'Gtr', clips: [], volume: 1, pan: 0 },
-    ]);
+    // In the arrangement with nothing of the editor's (as after an undo, #848).
+    editor._arrangement.addTrack({
+      id: 'a',
+      kind: 'audio',
+      name: 'Gtr',
+      clips: [],
+      volume: 1,
+      pan: 0,
+      muted: false,
+      soloed: false,
+    });
 
     editor.updateTrack('a', { renderMode: 'piano-roll' });
 
-    // The descriptor: this track is not in the arrangement, so editor.tracks
-    // (the arrangement's tracks since #848) does not list it.
-    expect(editor._tracks.get('a').renderMode).toBe('waveform');
+    const modeOf = () =>
+      editor.tracks.find((t: { trackId: string }) => t.trackId === 'a').renderMode;
+    expect(modeOf()).toBe('waveform');
     expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('set kind="midi"'));
 
     editor.updateTrack('a', { renderMode: 'spectrogram' });
-    expect(editor._tracks.get('a').renderMode).toBe('spectrogram');
+    expect(modeOf()).toBe('spectrogram');
   });
 
-  it('an undo-restored MIDI track gets a MIDI descriptor', () => {
+  it('an undo-restored MIDI track is listed as a MIDI track (#848: read from the arrangement)', () => {
     const { editor } = makeEditor();
-    editor._reconcileDescriptorsWithEngineTracks([
-      { id: 'm', kind: 'midi', name: 'Keys', clips: [], volume: 1, pan: 0 },
-      { id: 'a', kind: 'audio', name: 'Gtr', clips: [], volume: 1, pan: 0 },
-    ]);
+    const base = { clips: [], volume: 1, pan: 0, muted: false, soloed: false };
+    editor._arrangement.addTrack({ ...base, id: 'm', kind: 'midi', name: 'Keys' });
+    editor._arrangement.addTrack({ ...base, id: 'a', kind: 'audio', name: 'Gtr' });
 
-    // The synthesized descriptors (these tracks are not in the arrangement).
-    const byName = Object.fromEntries([...editor._tracks.values()].map((t: any) => [t.name, t]));
+    const byName = Object.fromEntries(editor.tracks.map((t: { name: string }) => [t.name, t]));
     expect(byName.Keys).toMatchObject({ kind: 'midi', renderMode: 'waveform' });
     expect(byName.Gtr).toMatchObject({ kind: 'audio', renderMode: 'waveform' });
   });

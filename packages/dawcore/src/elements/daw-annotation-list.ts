@@ -60,6 +60,10 @@ export class DawAnnotationListElement extends LitElement {
   private _cancelling = false;
 
   static styles = css`
+    /* The hidden attribute hides the element: :host sets display (modern-web-guidance custom-elements). */
+    :host([hidden]) {
+      display: none;
+    }
     :host {
       display: block;
       max-height: var(--daw-annotation-list-max-height, 240px);
@@ -131,18 +135,23 @@ export class DawAnnotationListElement extends LitElement {
     }
   }
 
+  /** The listeners of this connection, aborted in disconnectedCallback. */
+  private _listeners: AbortController | null = null;
+
   connectedCallback() {
     super.connectedCallback();
-    document.addEventListener('daw-annotation-select', this._onSelect as EventListener);
-    document.addEventListener('daw-timeupdate', this._onTimeUpdate as EventListener);
-    document.addEventListener('daw-stop', this._onStop as EventListener);
+    this._listeners?.abort();
+    this._listeners = new AbortController();
+    const { signal } = this._listeners;
+    document.addEventListener('daw-annotation-select', this._onSelect as EventListener, { signal });
+    document.addEventListener('daw-timeupdate', this._onTimeUpdate as EventListener, { signal });
+    document.addEventListener('daw-stop', this._onStop as EventListener, { signal });
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    document.removeEventListener('daw-annotation-select', this._onSelect as EventListener);
-    document.removeEventListener('daw-timeupdate', this._onTimeUpdate as EventListener);
-    document.removeEventListener('daw-stop', this._onStop as EventListener);
+    this._listeners?.abort();
+    this._listeners = null;
     this._observer?.disconnect();
     this._observer = null;
     this._observedTrack = null;

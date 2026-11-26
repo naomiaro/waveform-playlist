@@ -161,14 +161,15 @@ describe('splitAtPlayhead', () => {
   describe('successful split', () => {
     it('returns true and dispatches daw-clip-split when split succeeds', () => {
       const originalClipId = 'clip-original';
-      const leftClipId = 'clip-left';
+      // The left half keeps the original's id (#848); the right half is new.
+      const leftClipId = originalClipId;
       const rightClipId = 'clip-right';
 
       // clip spans 0..96000 (2 seconds); playhead at 1.0s → atSample=48000
       const originalClip = makeClip(originalClipId, 0, 96000);
       const trackBefore = makeTrack('track-1', [originalClip]);
 
-      // After split: two new clips
+      // After split: the left half under the original id, one new clip
       const leftClip = makeClip(leftClipId, 0, 48000);
       const rightClip = makeClip(rightClipId, 48000, 48000);
       const trackAfter = makeTrack('track-1', [leftClip, rightClip]);
@@ -205,12 +206,12 @@ describe('splitAtPlayhead', () => {
       });
     });
 
-    it('assigns left/right correctly based on startSample (lower = left)', () => {
+    it('the left half is the clip that kept the original id, wherever it sits in the array (#848)', () => {
       const originalClipId = 'clip-original';
 
-      // Intentionally return right clip first (higher startSample) to verify sorting
+      // Intentionally return the right clip first in the array
       const rightClip = makeClip('clip-right', 48000, 48000);
-      const leftClip = makeClip('clip-left', 0, 48000);
+      const leftClip = makeClip(originalClipId, 0, 48000);
 
       const originalClip = makeClip(originalClipId, 0, 96000);
       const trackBefore = makeTrack('track-1', [originalClip]);
@@ -233,7 +234,7 @@ describe('splitAtPlayhead', () => {
       splitAtPlayhead(host);
 
       const event = host.events[0];
-      expect(event.detail.leftClipId).toBe('clip-left');
+      expect(event.detail.leftClipId).toBe(originalClipId);
       expect(event.detail.rightClipId).toBe('clip-right');
     });
 
@@ -242,7 +243,7 @@ describe('splitAtPlayhead', () => {
       const clip = makeClip('clip-1', 0, 176400); // 4 seconds at 44100
       const track = makeTrack('track-1', [clip]);
 
-      const leftClip = makeClip('clip-left', 0, 88200);
+      const leftClip = makeClip('clip-1', 0, 88200);
       const rightClip = makeClip('clip-right', 88200, 88200);
       const trackAfter = makeTrack('track-1', [leftClip, rightClip]);
 
@@ -269,7 +270,7 @@ describe('splitAtPlayhead', () => {
       const clip = makeClip('clip-1', 0, 96000);
       const track = makeTrack('track-1', [clip]);
 
-      const leftClip = makeClip('clip-left', 0, 24000);
+      const leftClip = makeClip('clip-1', 0, 24000);
       const rightClip = makeClip('clip-right', 24000, 72000);
       const trackAfter = makeTrack('track-1', [leftClip, rightClip]);
 
@@ -352,7 +353,7 @@ describe('splitAtPlayhead', () => {
     const clip = makeClip('clip-1', 0, 96000);
     const track = makeTrack('track-1', [clip]);
 
-    const leftClip = makeClip('clip-left', 0, 24000);
+    const leftClip = makeClip('clip-1', 0, 24000);
     const rightClip = makeClip('clip-right', 24000, 72000);
     const trackAfter = makeTrack('track-1', [leftClip, rightClip]);
 
@@ -383,7 +384,7 @@ describe('splitAtPlayhead', () => {
     const clip = makeClip('clip-1', 0, 96000);
     const track = makeTrack('track-1', [clip]);
 
-    const leftClip = makeClip('clip-left', 0, 24000);
+    const leftClip = makeClip('clip-1', 0, 24000);
     const rightClip = makeClip('clip-right', 24000, 72000);
     const trackAfter = makeTrack('track-1', [leftClip, rightClip]);
 

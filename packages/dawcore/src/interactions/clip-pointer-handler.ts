@@ -1,5 +1,7 @@
 import { snapTickToGrid } from '@waveform-playlist/core';
-import type { SnapTo, MeterEntry } from '@waveform-playlist/core';
+import type { AudioClip, SnapTo, MeterEntry } from '@waveform-playlist/core';
+import { constrainClipDrag } from '@waveform-playlist/engine';
+import type { DraggedClip } from './drag-watch';
 import { DRAG_THRESHOLD } from './constants';
 
 /** Snapshot of a clip's bounds for trim constraint computation. */
@@ -12,15 +14,11 @@ export interface ClipBounds {
 
 /** Narrow engine contract for clip move/trim interactions. */
 export interface ClipEngineContract {
-  moveClip(trackId: string, clipId: string, deltaSamples: number, skipAdapter?: boolean): number;
-  trimClip(
-    trackId: string,
-    clipId: string,
-    boundary: 'left' | 'right',
-    deltaSamples: number,
-    skipAdapter?: boolean
-  ): void;
-  updateTrack(trackId: string): void;
+  /** Move a clip; returns the delta actually applied. One undo step. */
+  moveClip(trackId: string, clipId: string, deltaSamples: number): number;
+  trimClip(trackId: string, clipId: string, boundary: 'left' | 'right', deltaSamples: number): void;
+  /** The loaded clips of each track (a move collides with them, as `moveClip` does). */
+  getState(): { tracks: readonly { id: string; clips: readonly AudioClip[] }[] };
   /** Get a clip's full bounds for trim constraint computation. */
   getClipBounds(trackId: string, clipId: string): ClipBounds | null;
   /** Constrain a trim delta using the engine's collision/bounds logic. */
@@ -30,12 +28,6 @@ export interface ClipEngineContract {
     boundary: 'left' | 'right',
     deltaSamples: number
   ): number;
-  /** Begin a transaction — groups mutations into one undo step. */
-  beginTransaction(): void;
-  /** Commit the transaction — pushes one undo step for all grouped mutations. */
-  commitTransaction(): void;
-  /** Abort the transaction — restores pre-transaction state without pushing to undo. */
-  abortTransaction(): void;
 }
 
 /** Peak data returned by reextractClipPeaks for imperative waveform updates. */
@@ -81,11 +73,14 @@ type DragMode = 'move' | 'trim-left' | 'trim-right';
  * Handles pointer interactions for clip move and trim drag operations.
  * Converts pixel deltas to sample deltas and delegates to the engine.
  *
- * Move: sends incremental deltas per-frame with skipAdapter=true (engine shifts
- *   startSample additively without touching audio adapter). Adapter synced once
- *   via updateTrack() at drag end.
- * Trim: updates clip container CSS imperatively during drag for visual feedback,
- *   then applies cumulative delta to engine once at drag end.
+ * Both show the drag in the view and change the arrangement once, on release
+ * (#848): nothing is written while the pointer moves, so an arrangement change
+ * during a drag always came from outside.
+ *
+ * Move: the clip container's `left` follows the pointer, constrained by the
+ *   track's other loaded clips as `moveClip` will be; one `moveClip` on release.
+ * Trim: updates clip container CSS and peaks imperatively during drag, then
+ *   applies the cumulative delta to the engine once on release.
  */
 export class ClipPointerHandler {
   private _host: ClipPointerHost;
@@ -103,6 +98,9 @@ export class ClipPointerHandler {
   private _originalOffsetSamples = 0;
   private _originalDurationSamples = 0;
   private _originalStartSample = 0;
+  // Move: the dragged clip and the track's loaded clips, sorted, at drag start
+  private _moveClip: AudioClip | null = null;
+  private _moveSorted: AudioClip[] = [];
 
   constructor(host: ClipPointerHost) {
     this._host = host;
@@ -134,6 +132,19 @@ export class ClipPointerHandler {
     return Math.round(totalDeltaPx * h.renderSamplesPerPixel);
   }
 
+  /** A sample delta from `anchorSample` in pixels: in tick space in beats mode,
+   *  so the drawn position does not drift from the sample round-trip. */
+  private _samplesToPx(anchorSample: number, deltaSamples: number): number {
+    const h = this._host;
+    if (h.scaleMode === 'beats') {
+      const anchorSec = anchorSample / h.effectiveSampleRate;
+      const anchorTick = h._secondsToTicks(anchorSec);
+      const newTick = h._secondsToTicks(anchorSec + deltaSamples / h.effectiveSampleRate);
+      return Math.round((newTick - anchorTick) / h.ticksPerPixel);
+    }
+    return Math.round(deltaSamples / h.renderSamplesPerPixel);
+  }
+
   /** Returns true if a drag interaction is currently in progress. */
   get isActive(): boolean {
     return this._mode !== null;
@@ -144,6 +155,23 @@ export class ClipPointerHandler {
   get isDragging(): boolean {
     return this._isDragging;
   }
+
+  /**
+   * The clip being dragged (past the threshold) with its bounds at the drag's
+   * start, or null; null too while the release makes its one arrangement
+   * call, so that call is not taken for an outside change (#848).
+   */
+  get draggedClip(): DraggedClip | null {
+    if (!this._isDragging || this._committing) return null;
+    return {
+      trackId: this._trackId,
+      clipId: this._clipId,
+      startSample: this._originalStartSample,
+      durationSamples: this._originalDurationSamples,
+      offsetSamples: this._originalOffsetSamples,
+    };
+  }
+  private _committing = false;
 
   /**
    * Attempts to handle a pointerdown event on the given target element.
@@ -199,11 +227,10 @@ export class ClipPointerHandler {
 
   /**
    * The press has become a drag (the pointer passed the threshold): take the
-   * clip's bounds and open the transaction now, not at the press. An undo
-   * made during the press (it is not a drag, so undo works) then has no
-   * transaction to abort, and the drag that follows starts from the clip as
-   * the undo left it, one undo step (#848, review of #915). Returns false
-   * when the clip is gone (the undo removed it): the press is dropped.
+   * clip's bounds now, not at the press, so a drag after an undo made during
+   * the press starts from the clip as the undo left it (#848, review of
+   * #915). Returns false when the clip is gone (the undo removed it): the
+   * press is dropped.
    */
   private _startDrag(): boolean {
     const engine = this._host.engine;
@@ -216,16 +243,19 @@ export class ClipPointerHandler {
       this._originalStartSample = bounds.startSample;
       this._originalOffsetSamples = bounds.offsetSamples;
       this._originalDurationSamples = bounds.durationSamples;
-      // Group all drag mutations into one undo step
-      engine.beginTransaction();
+      if (this._mode === 'move') {
+        const track = engine.getState().tracks.find((t) => t.id === trackId);
+        const clip = track?.clips.find((c) => c.id === clipId) ?? null;
+        if (!track || !clip) return false;
+        this._moveClip = clip;
+        this._moveSorted = [...track.clips].sort((a, b) => a.startSample - b.startSample);
+      }
     } else {
-      console.warn(
-        '[dawcore] drag start: engine unavailable, drag mutations will not be grouped for undo'
-      );
+      console.warn('[dawcore] drag start: engine unavailable, the drag will not be applied');
     }
 
-    // For trim: snapshot the clip container's current position/width
-    if (this._mode === 'trim-left' || this._mode === 'trim-right') {
+    // Snapshot the clip container's current position/width for the preview
+    {
       const container = this._host.shadowRoot?.querySelector(
         `.clip-container[data-clip-id="${clipId}"]`
       ) as HTMLElement | null;
@@ -234,7 +264,7 @@ export class ClipPointerHandler {
         this._originalLeft = parseFloat(container.style.left) || 0;
         this._originalWidth = parseFloat(container.style.width) || 0;
       } else {
-        console.warn('[dawcore] clip container not found for trim visual feedback: ' + clipId);
+        console.warn('[dawcore] clip container not found for drag visual feedback: ' + clipId);
       }
     }
     return true;
@@ -265,15 +295,19 @@ export class ClipPointerHandler {
     if (!engine) return;
 
     if (this._mode === 'move') {
-      // Move: compute total snapped delta from original position, then derive
-      // the incremental from what's already been applied to the engine.
-      // Anchor = clip start position (move shifts the whole clip)
+      // Move: snap the clip start, constrain against the track's clips as
+      // moveClip will on release, and draw the clip there. Nothing is written.
       const totalSnappedDelta = this._snapDeltaToSamples(totalDeltaPx, this._originalStartSample);
-      const incrementalDeltaSamples = totalSnappedDelta - this._cumulativeDeltaSamples;
-      if (incrementalDeltaSamples !== 0) {
-        // Track constrained delta (not raw) so undo transactions are accurate
-        const applied = engine.moveClip(this._trackId, this._clipId, incrementalDeltaSamples, true);
-        this._cumulativeDeltaSamples += applied;
+      const clip = this._moveClip;
+      const index = clip ? this._moveSorted.indexOf(clip) : -1;
+      const delta =
+        clip && index !== -1
+          ? constrainClipDrag(clip, totalSnappedDelta, this._moveSorted, index)
+          : totalSnappedDelta;
+      this._cumulativeDeltaSamples = delta;
+      if (this._clipContainer) {
+        const deltaPx = this._samplesToPx(this._originalStartSample, delta);
+        this._clipContainer.style.left = this._originalLeft + deltaPx + 'px';
       }
     } else {
       // Trim: constrain delta using engine's full collision/bounds logic,
@@ -293,19 +327,7 @@ export class ClipPointerHandler {
         boundary,
         rawDeltaSamples
       );
-      // Convert sample delta to pixels — use tick space in beats mode
-      // to avoid quantization drift from the sample round-trip.
-      let deltaPx: number;
-      if (this._host.scaleMode === 'beats') {
-        const h = this._host;
-        const anchorSec = anchor / h.effectiveSampleRate;
-        const anchorTick = h._secondsToTicks(anchorSec);
-        const newSec = anchorSec + deltaSamples / h.effectiveSampleRate;
-        const newTick = h._secondsToTicks(newSec);
-        deltaPx = Math.round((newTick - anchorTick) / h.ticksPerPixel);
-      } else {
-        deltaPx = Math.round(deltaSamples / this._host.renderSamplesPerPixel);
-      }
+      const deltaPx = this._samplesToPx(anchor, deltaSamples);
 
       this._cumulativeDeltaSamples = deltaSamples;
 
@@ -357,37 +379,45 @@ export class ClipPointerHandler {
 
     try {
       if (!this._isDragging || this._cumulativeDeltaSamples === 0) {
-        // Restore original CSS if trim drag didn't produce a delta
-        this._restoreTrimVisual();
+        // Restore original CSS if the drag didn't produce a delta
+        this._restoreVisual();
         return;
       }
 
       const engine = this._host.engine;
+      this._committing = true;
 
       if (this._mode === 'move') {
-        // Sync adapter once on drop (skipped during drag for performance)
+        // Back to where the clip was drawn; the re-render after the move puts it there.
+        this._restoreVisual();
         if (engine) {
-          engine.updateTrack(this._trackId);
-          this._host.dispatchEvent(
-            new CustomEvent('daw-clip-move', {
-              bubbles: true,
-              composed: true,
-              detail: {
-                trackId: this._trackId,
-                clipId: this._clipId,
-                deltaSamples: this._cumulativeDeltaSamples,
-              },
-            })
+          // The one arrangement call of the drag: an undo step.
+          const applied = engine.moveClip(
+            this._trackId,
+            this._clipId,
+            this._cumulativeDeltaSamples
           );
+          if (applied !== 0) {
+            this._host.dispatchEvent(
+              new CustomEvent('daw-clip-move', {
+                bubbles: true,
+                composed: true,
+                detail: {
+                  trackId: this._trackId,
+                  clipId: this._clipId,
+                  deltaSamples: applied,
+                },
+              })
+            );
+          }
         } else {
           console.warn(
-            '[dawcore] engine unavailable at move drop — audio may be out of sync for track ' +
-              this._trackId
+            '[dawcore] engine unavailable at move drop — move not applied for clip ' + this._clipId
           );
         }
       } else {
         // Restore visual before engine applies — Lit will re-render with correct values
-        this._restoreTrimVisual();
+        this._restoreVisual();
 
         // Trim: apply cumulative delta to engine in one shot (adapter updated internally)
         const boundary = this._mode === 'trim-left' ? 'left' : 'right';
@@ -412,16 +442,7 @@ export class ClipPointerHandler {
         }
       }
     } finally {
-      // A drag opened a transaction: commit it if mutations occurred, abort
-      // it if not (abort does NOT push to undo stack or clear redo stack). A
-      // click never opened one.
-      if (this._isDragging) {
-        if (this._cumulativeDeltaSamples !== 0) {
-          this._host.engine?.commitTransaction();
-        } else {
-          this._host.engine?.abortTransaction();
-        }
-      }
+      this._committing = false;
       this._reset();
     }
   }
@@ -430,20 +451,13 @@ export class ClipPointerHandler {
    *
    * pointercancel fires INSTEAD of pointerup on touch interruption, pen
    * leaving hover range, or OS gestures. Without this handler the drag stays
-   * armed (hover keeps moving the clip), the engine transaction stays open
-   * (every later edit becomes un-undoable until some drag commits), and the
-   * per-frame skipAdapter moveClip mutations are never synced or rolled back
-   * (waveform and audio permanently disagree). */
+   * armed (hover keeps moving the clip). The drag wrote nothing to the
+   * arrangement, so reverting is putting the view back. */
   onPointerCancel(_e: PointerEvent): void {
     if (this._mode === null) return;
     try {
-      // Undo the trim CSS preview; move mutations are rolled back by
-      // abortTransaction below (restores the pre-drag snapshot and rebuilds
-      // the adapter when mutations occurred).
-      this._restoreTrimVisual();
+      this._restoreVisual();
     } finally {
-      // Only a drag opened a transaction; a press that never moved did not.
-      if (this._isDragging) this._host.engine?.abortTransaction();
       this._reset();
     }
   }
@@ -468,11 +482,11 @@ export class ClipPointerHandler {
   }
 
   /** Restore clip container CSS AND waveform peaks to original values after
-   * a trim visual preview. Peaks matter: the drag wrote re-extracted peak
+   * a drag's visual preview. Peaks matter: a trim wrote re-extracted peak
    * arrays imperatively onto the <daw-waveform> elements (bypassing Lit), and
-   * a cancelled/zero-delta trim makes no engine mutation — so no statechange
+   * a cancelled/zero-delta drag makes no engine mutation — so no statechange
    * re-render will ever repair them. */
-  private _restoreTrimVisual(): void {
+  private _restoreVisual(): void {
     if (this._clipContainer) {
       this._clipContainer.style.left = this._originalLeft + 'px';
       this._clipContainer.style.width = this._originalWidth + 'px';
@@ -506,5 +520,7 @@ export class ClipPointerHandler {
     this._originalOffsetSamples = 0;
     this._originalDurationSamples = 0;
     this._originalStartSample = 0;
+    this._moveClip = null;
+    this._moveSorted = [];
   }
 }

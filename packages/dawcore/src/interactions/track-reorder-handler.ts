@@ -7,6 +7,8 @@
  * touch, and pen uniformly.
  */
 
+import type { DraggedTrack } from './drag-watch';
+
 export interface TrackReorderHost {
   readonly isConnected: boolean;
   shadowRoot: ShadowRoot | null;
@@ -30,6 +32,8 @@ export class TrackReorderHandler {
   private _fromIndex = 0;
   private _targetIndex = 0;
   private _gripEl: HTMLElement | null = null;
+  /** The grip's listeners of the drag in progress: one controller per drag. */
+  private _gesture: AbortController | null = null;
 
   constructor(host: TrackReorderHost) {
     this._host = host;
@@ -67,8 +71,8 @@ export class TrackReorderHandler {
     this._gripEl = gripEl;
 
     // Waveform-lane parity (drag-preview spec): snapshot the shadow timeline's
-    // .track-row lanes by trackId. Transform-only mirroring — lane DOM order
-    // never changes, so the editor's MutationObserver order-sync never fires.
+    // .track-row lanes by trackId. Transform-only mirroring: the lanes' DOM
+    // order does not change during the drag; the release is one reorderTrack.
     const timeline = this._host.shadowRoot?.querySelector('.timeline');
     const laneEls = timeline ? ([...timeline.querySelectorAll('.track-row')] as HTMLElement[]) : [];
     this._lanes = this._rows.map((r) => {
@@ -99,10 +103,18 @@ export class TrackReorderHandler {
     } catch {
       // Fabricated pointerIds (tests) can't be captured — listeners still work.
     }
-    gripEl.addEventListener('pointermove', this._onPointerMove);
-    gripEl.addEventListener('pointerup', this._onPointerUp);
-    gripEl.addEventListener('pointercancel', this._onPointerCancel);
+    this._gesture = new AbortController();
+    const { signal } = this._gesture;
+    gripEl.addEventListener('pointermove', this._onPointerMove, { signal });
+    gripEl.addEventListener('pointerup', this._onPointerUp, { signal });
+    gripEl.addEventListener('pointercancel', this._onPointerCancel, { signal });
   };
+
+  /** The dragged track and the order of the rows at the grab (#848), or null. */
+  get draggedTrack(): DraggedTrack | null {
+    if (this._trackId === null) return null;
+    return { trackId: this._trackId, order: this._rows.map((r) => r.trackId) };
+  }
 
   /** True from the grab until the drag ends or is cancelled. */
   get isActive(): boolean {
@@ -209,9 +221,8 @@ export class TrackReorderHandler {
     this._lanes = [];
     const grip = this._gripEl;
     if (grip) {
-      grip.removeEventListener('pointermove', this._onPointerMove);
-      grip.removeEventListener('pointerup', this._onPointerUp);
-      grip.removeEventListener('pointercancel', this._onPointerCancel);
+      this._gesture?.abort();
+      this._gesture = null;
       try {
         grip.releasePointerCapture(this._pointerId);
       } catch {

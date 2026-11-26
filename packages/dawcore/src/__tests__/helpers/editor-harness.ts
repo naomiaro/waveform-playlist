@@ -242,3 +242,94 @@ export function stubPeakPipeline(editor: DawEditorElement): Record<string, Mock>
   (editor as unknown as { _peakPipeline: unknown })._peakPipeline = pipeline;
   return pipeline;
 }
+
+/** A clip of `appendTrackElement`'s config (the shape `editor.addTrack` takes). */
+interface ElementClipConfig {
+  src?: string;
+  peaksSrc?: string;
+  start?: number;
+  duration?: number;
+  offset?: number;
+  gain?: number;
+  name?: string;
+  fadeIn?: number;
+  fadeOut?: number;
+  fadeType?: string;
+  midiNotes?: unknown[];
+  midiChannel?: number;
+  midiProgram?: number;
+}
+
+/**
+ * Append a `<daw-track>` (with `<daw-clip>` children) built from a track
+ * config and wait for it to enter the arrangement: the page markup that
+ * `editor.addTrack()` made until #848 PR 3 (it makes no element since).
+ * Resolves with the element. A page track that enters into an empty history
+ * is not an undo step (the page-load rule).
+ */
+export async function appendTrackElement(
+  editor: HTMLElement,
+  config: {
+    name?: string;
+    volume?: number;
+    pan?: number;
+    muted?: boolean;
+    soloed?: boolean;
+    kind?: 'audio' | 'midi';
+    renderMode?: string;
+    clips?: ElementClipConfig[];
+    midi?: { notes: unknown[]; channel?: number; program?: number };
+  } = {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const trackEl = document.createElement('daw-track') as any;
+  if (config.name !== undefined) trackEl.setAttribute('name', config.name);
+  if (config.volume !== undefined) trackEl.setAttribute('volume', String(config.volume));
+  if (config.pan !== undefined) trackEl.setAttribute('pan', String(config.pan));
+  if (config.muted) trackEl.setAttribute('muted', '');
+  if (config.soloed) trackEl.setAttribute('soloed', '');
+  const kind = config.kind ?? (config.midi ? 'midi' : undefined);
+  if (kind) trackEl.setAttribute('kind', kind);
+  if (config.renderMode) trackEl.setAttribute('render-mode', config.renderMode);
+  const clips = [...(config.clips ?? [])];
+  if (config.midi) {
+    clips.push({
+      midiNotes: config.midi.notes,
+      midiChannel: config.midi.channel,
+      midiProgram: config.midi.program,
+    });
+  }
+  for (const c of clips) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const clipEl = document.createElement('daw-clip') as any;
+    const attrs: [string, unknown][] = [
+      ['src', c.src],
+      ['peaks-src', c.peaksSrc],
+      ['start', c.start],
+      ['duration', c.duration],
+      ['offset', c.offset],
+      ['gain', c.gain],
+      ['name', c.name],
+      ['fade-in', c.fadeIn],
+      ['fade-out', c.fadeOut],
+      ['fade-type', c.fadeType],
+      ['midi-channel', c.midiChannel],
+      ['midi-program', c.midiProgram],
+    ];
+    for (const [name, value] of attrs) {
+      if (value !== undefined) clipEl.setAttribute(name, String(value));
+    }
+    if (c.midiNotes !== undefined) clipEl.midiNotes = c.midiNotes;
+    trackEl.appendChild(clipEl);
+  }
+  editor.appendChild(trackEl);
+  const internals = editor as unknown as {
+    _arrangement: { getTracks(): readonly { id: string }[] };
+  };
+  for (let i = 0; i < 50; i++) {
+    if (internals._arrangement.getTracks().some((t) => t.id === trackEl.trackId)) return trackEl;
+    await tick();
+  }
+  throw new Error('appendTrackElement: the track did not enter (no adapter?)');
+}

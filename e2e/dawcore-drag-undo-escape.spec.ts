@@ -171,7 +171,8 @@ test.describe('dawcore: undo and Escape during a drag (#848)', () => {
 
     const p = await pressHeader(page);
     await moveTo(page, p.x, p.y, 60);
-    await expect.poll(() => startPx(page)).toBe(start + 60);
+    // A drag writes nothing until its release (#848 PR 3): only the view moved.
+    expect(await startPx(page)).toBe(start);
     await page.keyboard.press('Escape');
     await expect.poll(() => startPx(page)).toBe(start);
     await page.mouse.up();

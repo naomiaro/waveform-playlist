@@ -6,12 +6,13 @@ export type {
   ClipBounds,
   CreateArrangementOptions,
   MixerChangeOptions,
+  RemoveClipOptions,
   RemoveTrackOptions,
   AddTrackOptions,
 } from './types';
 export type { TrackMixerValues } from './mixer';
 export type { ArrangementSourceState, ArrangementSourcesValue } from './sources';
-export { attachDecodeContext } from './attach';
+export { attachDecodeContext, isArrangement } from './attach';
 export { defaultLoadSource } from './loadSource';
 export type { LoadSource } from './loadSource';
 

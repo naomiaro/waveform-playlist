@@ -12,6 +12,8 @@ export class DawRecordButtonElement extends DawTransportButton {
 
   @state() private _isRecording = false;
   private _targetRef: HTMLElement | null = null;
+  /** The listeners on `_targetRef`, aborted when the target changes or the button disconnects. */
+  private _targetListeners: AbortController | null = null;
   private _onStart = () => {
     this._isRecording = true;
   };
@@ -61,16 +63,17 @@ export class DawRecordButtonElement extends DawTransportButton {
     this._cleanupListeners();
     if (!target) return;
     this._targetRef = target;
-    target.addEventListener('daw-recording-start', this._onStart);
-    target.addEventListener('daw-recording-complete', this._onComplete);
-    target.addEventListener('daw-recording-error', this._onError);
+    this._targetListeners = new AbortController();
+    const { signal } = this._targetListeners;
+    target.addEventListener('daw-recording-start', this._onStart, { signal });
+    target.addEventListener('daw-recording-complete', this._onComplete, { signal });
+    target.addEventListener('daw-recording-error', this._onError, { signal });
   }
 
   private _cleanupListeners() {
     if (this._targetRef) {
-      this._targetRef.removeEventListener('daw-recording-start', this._onStart);
-      this._targetRef.removeEventListener('daw-recording-complete', this._onComplete);
-      this._targetRef.removeEventListener('daw-recording-error', this._onError);
+      this._targetListeners?.abort();
+      this._targetListeners = null;
       this._targetRef = null;
     }
   }

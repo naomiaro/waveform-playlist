@@ -16,7 +16,13 @@ import type { ArrangementChange, ArrangementVersions } from './arrangement/Arran
 import type { AddTrackOptions, ClipBounds, MixerChangeOptions } from './arrangement';
 import { attachDecodeContext, attachTimeBase, isArrangement } from './arrangement/attach';
 import { calculateDuration, findClosestZoomIndex } from './operations/timelineOperations';
-import type { PlayoutAdapter, EngineState, EngineEvents, PlaylistEngineOptions } from './types';
+import type {
+  PlayoutAdapter,
+  EngineState,
+  EngineEvents,
+  PlaylistEngineOptions,
+  EngineDisposeOptions,
+} from './types';
 
 const DEFAULT_SAMPLE_RATE = 48000;
 const DEFAULT_SAMPLES_PER_PIXEL = 1024;
@@ -604,8 +610,10 @@ export class PlaylistEngine {
   // Lifecycle
   // ---------------------------------------------------------------------------
 
-  dispose(): void {
+  dispose(options: EngineDisposeOptions = {}): void {
     if (this._disposed) return;
+    // The adapter outlives this engine: stop what it plays first.
+    if (options.keepAdapter && this._isPlaying) this.stop();
     this._disposed = true;
     this._stopFollowingArrangement();
     this._detachFromArrangement();
@@ -614,7 +622,11 @@ export class PlaylistEngine {
     this._isPlaying = false;
     this._adapter?.onPlaybackEnded?.(null);
     try {
-      this._adapter?.dispose();
+      // A kept adapter is emptied: the next engine may have nothing to send
+      // (an empty arrangement sends no setTracks), and this one's tracks must
+      // not go on playing through it (#848).
+      if (options.keepAdapter) this._adapter?.setTracks([]);
+      else this._adapter?.dispose();
     } catch (err) {
       console.warn('[waveform-playlist/engine] Error disposing adapter:', err);
     }

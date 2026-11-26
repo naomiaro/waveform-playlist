@@ -4,6 +4,7 @@ import '../elements/daw-annotation-track';
 import { AnnotationDragHandler } from '../interactions/annotation-drag';
 import type { DawAnnotationTrackElement } from '../elements/daw-annotation-track';
 import type { SnapTo } from '@waveform-playlist/core';
+import { probeListeners } from './helpers/listener-probe';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
@@ -111,7 +112,7 @@ describe('AnnotationDragHandler', () => {
 
   it('cancel restores the boundaries from the start of the drag (#848)', () => {
     const boundary = lane.querySelector('.annotation-boundary') as HTMLElement;
-    const removeListener = vi.spyOn(boundary, 'removeEventListener');
+    const probe = probeListeners(boundary);
     expect(handler.isActive).toBe(false);
     handler.onPointerDown(fakePointer(boundary, 300), track);
     expect(handler.isActive).toBe(true);
@@ -120,7 +121,38 @@ describe('AnnotationDragHandler', () => {
     handler.cancel();
     expect(track.annotations[0].end).toBeCloseTo(3);
     expect(handler.isActive).toBe(false);
-    expect(removeListener).toHaveBeenCalledWith('pointermove', handler._onPointerMove);
+    expect(probe.live()).toBe(0);
+  });
+
+  it('a drag removes its listeners on pointerup and on pointercancel (D8)', () => {
+    const boundary = lane.querySelector('.annotation-boundary') as HTMLElement;
+    const probe = probeListeners(boundary);
+    handler.onPointerDown(fakePointer(boundary, 300), track);
+    expect(probe.live()).toBe(3);
+    handler._onPointerUp(fakePointer(boundary, 300));
+    expect(probe.live()).toBe(0);
+    handler.onPointerDown(fakePointer(boundary, 300), track);
+    handler._onPointerCancel(fakePointer(boundary, 300));
+    expect(probe.live()).toBe(0);
+  });
+
+  it('a second press during a drag keeps one set of listeners, removed when it ends (D8)', () => {
+    const boundary = lane.querySelector('.annotation-boundary') as HTMLElement;
+    const box = lane.querySelector('.annotation-box') as HTMLElement;
+    const onBoundary = probeListeners(boundary);
+    const onBox = probeListeners(box);
+    handler.onPointerDown(fakePointer(boundary, 300), track);
+    handler.onPointerDown(fakePointer(boundary, 300, { pointerId: 2 }), track);
+    expect(onBoundary.live()).toBe(3);
+    handler._onPointerUp(fakePointer(boundary, 300, { pointerId: 2 }));
+    expect(onBoundary.live()).toBe(0);
+    // A second press on another element: the first element keeps none.
+    handler.onPointerDown(fakePointer(boundary, 300), track);
+    handler.onPointerDown(fakePointer(box, 150, { pointerId: 2 }), track);
+    expect(onBoundary.live()).toBe(0);
+    expect(onBox.live()).toBe(3);
+    handler._onPointerUp(fakePointer(box, 151, { pointerId: 2 }));
+    expect(onBox.live()).toBe(0);
   });
 
   it('box click (under drag threshold) selects and seeks', () => {

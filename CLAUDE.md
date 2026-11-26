@@ -122,20 +122,21 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 
 Task-specific notes live in project skills (`.claude/skills/<name>/SKILL.md`), loaded when the task calls for them. This file keeps what applies to every session. A learning goes into the skill it belongs to, or into the package's notes when it is about one package; into this file only when it applies whatever the task.
 
-| Skill                  | Load it when                                                               |
-| ---------------------- | -------------------------------------------------------------------------- |
-| `state-ownership`      | designing, planning or reviewing a change that adds, moves or shares state |
-| `translatable-strings` | a React component draws or announces text                                  |
-| `design-proposals`     | proposing a design, a fix or an option; removing or moving anything public |
-| `react-patterns`       | writing or reviewing effects, contexts, stores, provider values            |
-| `dnd-kit`              | any code that uses @dnd-kit; a drag that misbehaves; issue #796            |
-| `unit-testing`         | writing or debugging a vitest test                                         |
-| `mutation-testing`     | checking that new tests can fail                                           |
-| `e2e-playwright`       | writing, running or debugging a Playwright spec                            |
-| `browser-probes`       | measuring a page from a script or an MCP browser                           |
-| `review-rounds`        | briefing a review, audit or documentation agent                            |
-| `dependency-updates`   | Dependabot alerts, `pnpm update`, overrides, adding or removing a peer     |
-| `release`              | versioning, publishing, the GitHub release                                 |
+| Skill                  | Load it when                                                                                       |
+| ---------------------- | -------------------------------------------------------------------------------------------------- |
+| `state-ownership`      | designing, planning or reviewing a change that adds, moves or shares state                         |
+| `translatable-strings` | a React component draws or announces text                                                          |
+| `design-proposals`     | proposing a design, a fix or an option; removing or moving anything public                         |
+| `react-patterns`       | writing or reviewing effects, contexts, stores, provider values                                    |
+| `dnd-kit`              | any code that uses @dnd-kit; a drag that misbehaves; issue #796                                    |
+| `unit-testing`         | writing or debugging a vitest test                                                                 |
+| `mutation-testing`     | checking that new tests can fail                                                                   |
+| `e2e-playwright`       | writing, running or debugging a Playwright spec                                                    |
+| `browser-probes`       | measuring a page from a script or an MCP browser                                                   |
+| `web-component-design` | designing or changing a dawcore element: attributes, properties, children, lifecycle, cancellation |
+| `review-rounds`        | briefing a review, audit or documentation agent                                                    |
+| `dependency-updates`   | Dependabot alerts, `pnpm update`, overrides, adding or removing a peer                             |
+| `release`              | versioning, publishing, the GitHub release                                                         |
 
 ---
 

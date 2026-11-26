@@ -1,4 +1,9 @@
 import { describe, it, expect, beforeAll, vi, beforeEach, afterEach } from 'vitest';
+import { appendTrackElement } from './helpers/editor-harness';
+
+/** A track as it is played (loaded clips, current mix), read from the arrangement (#848). */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const played = (editor: any, id: string) => editor._loadedTracks().find((t: any) => t.id === id);
 
 beforeAll(async () => {
   await import('../elements/daw-editor');
@@ -25,9 +30,9 @@ afterEach(() => {
 });
 
 /** The `<daw-track>` element `editor.addTrack()` appended, from the id it resolved with. */
-async function addTrackElement(editor: any, config: unknown): Promise<any> {
-  const trackId: string = await editor.addTrack(config);
-  return [...editor.querySelectorAll('daw-track')].find((t: any) => t.trackId === trackId);
+/** A <daw-track> the page declares (addTrack makes no element since #848). */
+async function addTrackElement(editor: any, config: object): Promise<any> {
+  return appendTrackElement(editor, config);
 }
 
 function makeMockAdapter() {
@@ -252,8 +257,8 @@ describe('<daw-editor> MIDI loading', () => {
       bits: 16,
     });
 
-    // Populate _engineTracks with an audio clip so _applyClipUpdate can find it
-    editor._engineTracks = new Map(editor._engineTracks).set(trackId, {
+    // The audio clip in the arrangement, so _applyClipUpdate finds it (#848)
+    editor._arrangement.addTrack({
       id: trackId,
       kind: 'audio',
       name: 'Test',
@@ -271,20 +276,8 @@ describe('<daw-editor> MIDI loading', () => {
           sourceDurationSamples: 48000,
           sampleRate: 48000,
           gain: 1,
-          midiNotes: undefined,
         },
       ],
-    });
-    editor._tracks = new Map(editor._tracks).set(trackId, {
-      name: 'Test',
-      src: '',
-      volume: 1,
-      pan: 0,
-      muted: false,
-      soloed: false,
-      kind: 'audio',
-      renderMode: 'waveform',
-      clips: [],
     });
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const errors: any[] = [];
@@ -308,7 +301,7 @@ describe('<daw-editor> MIDI loading', () => {
     expect(errors[0]).toMatchObject({ trackId, clipId });
     expect(String(errors[0].error.message)).toMatch(/MIDI clip.*audio track "Test".*kind="midi"/);
     // Nothing changed: still the audio clip, with its caches.
-    const clipAfter = editor._engineTracks.get(trackId).clips[0];
+    const clipAfter = played(editor, trackId).clips[0];
     expect(clipAfter.audioBuffer).toBe(fakeBuffer);
     expect(clipAfter.midiNotes).toBeUndefined();
     expect(editor._clipBuffers.has(clipId)).toBe(true);
@@ -319,7 +312,7 @@ describe('<daw-editor> MIDI loading', () => {
     document.body.removeChild(editor);
   });
 
-  it('updateTrack({ renderMode }) sets render-mode attribute on DOM track', async () => {
+  it('updateTrack({ renderMode }) changes how the track is drawn, not its attribute (#848)', async () => {
     const editor = document.createElement('daw-editor') as any;
     editor.adapter = makeMockAdapter();
     document.body.appendChild(editor);
@@ -329,7 +322,8 @@ describe('<daw-editor> MIDI loading', () => {
 
     editor.updateTrack(track.trackId, { renderMode: 'spectrogram' });
     await track.updateComplete;
-    expect(track.getAttribute('render-mode')).toBe('spectrogram');
+    expect(track.getAttribute('render-mode')).toBeNull();
+    expect(editor.tracks[0].renderMode).toBe('spectrogram');
     document.body.removeChild(editor);
   });
 

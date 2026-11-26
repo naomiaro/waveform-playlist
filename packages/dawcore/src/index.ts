@@ -87,6 +87,7 @@ export type {
   TrackRenderMode,
   TrackConfig,
   ClipConfig,
+  EditorCallOptions,
 } from './types';
 export { isDomClip } from './types';
 export type { PointerEngineContract } from './interactions/pointer-handler';

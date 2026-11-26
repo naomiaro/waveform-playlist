@@ -8,7 +8,6 @@ import { carveClipRange, createClip, isLoadingClip } from '@waveform-playlist/co
 import type { Arrangement } from '@waveform-playlist/engine';
 import type { PeakPipeline } from '../workers/peakPipeline';
 import type { DawErrorDetail, DawRecordingClipAddDetail } from '../events';
-import type { StoredTrackDescriptor, ClipDescriptor } from '../types';
 
 export interface RecordingClipHost {
   readonly samplesPerPixel: number;
@@ -19,7 +18,6 @@ export interface RecordingClipHost {
   readonly mono: boolean;
   readonly isConnected: boolean;
   readonly effectiveSampleRate: number;
-  _tracks: Map<string, StoredTrackDescriptor>;
   /** The take goes into the editor's arrangement (#848); the engine follows it. */
   _arrangement: Arrangement;
   _peaksData: Map<string, PeakData>;
@@ -101,34 +99,6 @@ export function addRecordedClip(
           clip,
         ],
       }));
-      // Keep _tracks in sync so public API and track controls reflect the clip
-      const desc = host._tracks.get(trackId);
-      if (desc) {
-        const sr = host.effectiveSampleRate;
-        const clipDesc: ClipDescriptor = {
-          kind: 'drop',
-          // The take has no <daw-clip> element — the engine id is the only
-          // handle updateClip()/removeClip() can address it by (#659).
-          clipId: clip.id,
-          src: '',
-          peaksSrc: '',
-          start: startSample / sr,
-          duration: durSamples / sr,
-          offset: 0,
-          gain: 1,
-          name: clipName ?? 'Recording',
-          fadeIn: 0,
-          fadeOut: 0,
-          fadeType: 'linear',
-          midiNotes: null,
-          midiChannel: null,
-          midiProgram: null,
-        };
-        host._tracks = new Map(host._tracks).set(trackId, {
-          ...desc,
-          clips: [...desc.clips, clipDesc],
-        });
-      }
       // daw-recording-complete fires BEFORE the clip exists (it is
       // cancelable), so it cannot carry the id. This follow-up fires once
       // the clip is in the engine and addressable (#659).

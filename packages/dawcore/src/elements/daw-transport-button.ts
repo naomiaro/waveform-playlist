@@ -41,14 +41,20 @@ export class DawTransportButton extends LitElement {
     return targetSupports(target, required);
   }
 
+  /** The host's capability listeners, one controller per connection. */
+  private _capabilityListeners: AbortController | null = null;
+
   connectedCallback() {
     super.connectedCallback();
+    this._capabilityListeners?.abort();
+    this._capabilityListeners = new AbortController();
+    const { signal } = this._capabilityListeners;
     // Disabled inner buttons swallow clicks — listen on the host so an
     // unsupported control still explains itself on first interaction.
-    this.addEventListener('pointerdown', this._onCapabilityPointerDown);
+    this.addEventListener('pointerdown', this._onCapabilityPointerDown, { signal });
     // A target that became resolvable since the last render should
     // re-evaluate before the click lands.
-    this.addEventListener('pointerenter', this._onCapabilityPointerEnter);
+    this.addEventListener('pointerenter', this._onCapabilityPointerEnter, { signal });
     // The transport `for` id resolves after connect (target may upgrade
     // later) — re-render once it's resolvable so disabled state is accurate.
     requestAnimationFrame(() => {
@@ -59,8 +65,8 @@ export class DawTransportButton extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    this.removeEventListener('pointerdown', this._onCapabilityPointerDown);
-    this.removeEventListener('pointerenter', this._onCapabilityPointerEnter);
+    this._capabilityListeners?.abort();
+    this._capabilityListeners = null;
   }
 
   private _onCapabilityPointerEnter = () => {

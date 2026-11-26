@@ -16,7 +16,8 @@ export interface ClipPeakSyncHost {
 
 /**
  * Regenerate peaks for clips that are new or whose offset/duration changed.
- * Handles split (new clip IDs) and trim (same ID, changed bounds).
+ * Handles split (the left half keeps its id with a shorter duration, the
+ * right half is a new id; #848) and trim (same ID, changed bounds).
  *
  * Called from the statechange handler when tracksVersion changes.
  */
@@ -83,7 +84,7 @@ export function syncPeaksForChangedClips(
   }
 
   // Clean up orphaned entries for clip IDs no longer in any track
-  // (e.g., the original clip after a split is replaced by two new clips)
+  // (e.g., a clip removed, or a whole track undone away)
   cleanupOrphanedClipData(host, currentClipIds);
 }
 

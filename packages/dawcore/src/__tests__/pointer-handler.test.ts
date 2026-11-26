@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { PointerHandler } from '../interactions/pointer-handler';
 import type { PointerHandlerHost, PointerEngineContract } from '../interactions/pointer-handler';
+import { probeListeners } from './helpers/listener-probe';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -576,5 +577,77 @@ describe('PointerHandler.cancelClipDrag (#848)', () => {
   it('cancelClipDrag returns false when no clip drag is armed', () => {
     const handler = new PointerHandler(createMockHost());
     expect(handler.cancelClipDrag()).toBe(false);
+  });
+});
+
+describe('PointerHandler: the timeline listeners of a press (D8, #848)', () => {
+  function clipSetup() {
+    const clipHandler = {
+      tryHandle: vi.fn().mockReturnValue(true),
+      onPointerMove: vi.fn(),
+      onPointerUp: vi.fn(),
+      onPointerCancel: vi.fn(),
+      isActive: true,
+    };
+    const host = createMockHost({ _clipHandler: clipHandler });
+    const handler = new PointerHandler(host);
+    const timeline = host.shadowRoot!.querySelector('.timeline')! as HTMLElement;
+    const clipHeader = document.createElement('div');
+    clipHeader.classList.add('clip-header');
+    timeline.appendChild(clipHeader);
+    const probe = probeListeners(timeline);
+    timeline.addEventListener('pointerdown', handler.onPointerDown as EventListener);
+    return { handler, timeline, clipHeader, probe };
+  }
+
+  function seekSetup() {
+    const host = createMockHost();
+    const handler = new PointerHandler(host);
+    const timeline = host.shadowRoot!.querySelector('.timeline')! as HTMLElement;
+    const probe = probeListeners(timeline);
+    return { handler, timeline, probe };
+  }
+
+  it('a seek press removes its listeners on pointerup', () => {
+    const { handler, timeline, probe } = seekSetup();
+    handler.onPointerDown(pointerEvent('pointerdown', { clientX: 100 }));
+    expect(probe.live()).toBe(3);
+    timeline.dispatchEvent(pointerEvent('pointerup', { clientX: 100 }));
+    expect(probe.live()).toBe(0);
+  });
+
+  it('a seek press removes its listeners on pointercancel', () => {
+    const { handler, timeline, probe } = seekSetup();
+    handler.onPointerDown(pointerEvent('pointerdown', { clientX: 100 }));
+    timeline.dispatchEvent(pointerEvent('pointercancel', { clientX: 100 }));
+    expect(probe.live()).toBe(0);
+  });
+
+  it('a second seek press before the release keeps one set of listeners, removed on pointerup', () => {
+    const { handler, timeline, probe } = seekSetup();
+    handler.onPointerDown(pointerEvent('pointerdown', { clientX: 100 }));
+    handler.onPointerDown(pointerEvent('pointerdown', { clientX: 120 }));
+    expect(probe.live()).toBe(3);
+    timeline.dispatchEvent(pointerEvent('pointerup', { clientX: 120 }));
+    expect(probe.live()).toBe(0);
+  });
+
+  it('a clip drag removes its listeners on pointerup', () => {
+    const { timeline, clipHeader, probe } = clipSetup();
+    clipHeader.dispatchEvent(pointerEvent('pointerdown', { clientX: 150 }));
+    expect(probe.live()).toBe(4); // pointerdown + the drag's three
+    timeline.dispatchEvent(pointerEvent('pointerup', { clientX: 170 }));
+    expect(probe.live()).toBe(1);
+  });
+
+  it('a clip drag removes its listeners on pointercancel and on cancelClipDrag', () => {
+    const first = clipSetup();
+    first.clipHeader.dispatchEvent(pointerEvent('pointerdown', { clientX: 150 }));
+    first.timeline.dispatchEvent(pointerEvent('pointercancel', { clientX: 150 }));
+    expect(first.probe.live()).toBe(1);
+    const second = clipSetup();
+    second.clipHeader.dispatchEvent(pointerEvent('pointerdown', { clientX: 150 }));
+    second.handler.cancelClipDrag();
+    expect(second.probe.live()).toBe(1);
   });
 });

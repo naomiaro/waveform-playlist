@@ -548,20 +548,7 @@ describe('clips appended while a track loads or waits (#848)', () => {
 
 // Review of #917: each test reproduces a finding of the first round.
 describe('review fixes (#917)', () => {
-  it('M1: a track that connects during a drag enters when the drag ends, not inside it', async () => {
-    const editor = await mount(makeFakeAdapter(), MIDI_TRACK);
-    let dragging = true;
-    Object.defineProperty(editor, '_dragInProgress', { get: () => dragging, configurable: true });
-    editor.insertAdjacentHTML('beforeend', MIDI_TRACK.replace('Keys', 'Late'));
-    await tick(2);
-    expect(names(editor)).toEqual(['Keys']);
-    dragging = false;
-    window.dispatchEvent(new Event('pointerup'));
-    await tick(2);
-    expect(names(editor)).toEqual(['Keys', 'Late']);
-  });
-
-  it('M2: a DOM reorder with an element-less track in between reorders the rows', async () => {
+  it('M2: reorderTrack with an element-less track in between moves to that arrangement index (#848)', async () => {
     const editor = await mount(
       makeFakeAdapter(),
       MIDI_TRACK.replace('Keys', 'A') +
@@ -575,7 +562,8 @@ describe('review fixes (#917)', () => {
     const c = editor._arrangement.getTracks()[2].id;
     editor.reorderTrack(c, 0);
     await tick();
-    expect(names(editor)).toEqual(['C', 'B', 'A']);
+    // An index in the arrangement's order, the element-less track included.
+    expect(names(editor)).toEqual(['C', 'A', 'B']);
   });
 
   it('M3: a reparent with the adapter set at once does not add an undone track again', async () => {
@@ -793,9 +781,12 @@ describe('review fixes, round 3 (#917)', () => {
       html: '<daw-track name="T"></daw-track>',
     })) as any;
     const trackId = editor.tracks[0].trackId;
-    const outcome = pending(editor.addClip(trackId, { src: '/a.wav', duration: 1 }));
+    const added = editor.addClip(trackId, { src: '/a.wav', duration: 1 });
+    const outcome = pending(added);
     await tick(2);
-    editor.querySelector('daw-clip').remove();
+    // addClip makes no <daw-clip> (#848): removeClip takes it off the queued track.
+    const clipId = editor.tracks[0].clips[0].clipId;
+    editor.removeClip(trackId, clipId);
     expect(await outcome).toMatch(/removed before/);
   });
 
@@ -858,13 +849,14 @@ describe('review fixes, round 4 (#917)', () => {
     expect(await outcome).toMatch(/not in the editor|removed before/);
   });
 
-  it('addClip then its <daw-clip> removed from the DOM in the same task rejects', async () => {
+  it('addClip then removeClip of that clip in the same task rejects (#848: no <daw-clip>)', async () => {
     stubFetch({ '/a.wav': 'ok', '/b.wav': 'ok' });
     const editor = await mount(makeFakeAdapter(), audioTrack('A', '/a.wav'));
     await settle(editor);
     const trackId = editor._arrangement.getTracks()[0].id;
     const outcome = pending(editor.addClip(trackId, { src: '/b.wav', duration: 1 }));
-    editor.querySelector('daw-track').lastElementChild.remove();
+    const added = editor._arrangement.getTracks()[0].clips.at(-1);
+    editor.removeClip(trackId, added.id);
     expect(await outcome).toMatch(/removed before/);
   });
 });
