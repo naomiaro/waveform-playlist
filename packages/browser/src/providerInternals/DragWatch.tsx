@@ -96,17 +96,30 @@ export const DragWatch: React.FC = () => {
   // render per change (skill react-patterns).
   const snapshotRef = React.useRef<DragSnapshot | null>(null);
 
-  useDragDropMonitor({
-    onDragStart: (event: DragStartEvent) => {
-      snapshotRef.current = dragSnapshot(
-        arrangement,
-        event.operation.source?.data as DragData | undefined
-      );
-    },
-    onDragEnd: () => {
-      snapshotRef.current = null;
-    },
-  });
+  // One handlers object for the component's lifetime: dnd-kit re-subscribes
+  // the monitor whenever the object changes, and a re-subscription would put
+  // this dragend listener after the provider's, so the release's own commit
+  // would reach the arrangement listener with the snapshot still set (review
+  // of #919). Subscribed once on mount, it runs before the provider's.
+  const arrangementRef = React.useRef(arrangement);
+  React.useLayoutEffect(() => {
+    arrangementRef.current = arrangement;
+  }, [arrangement]);
+  const handlers = React.useMemo(
+    () => ({
+      onDragStart: (event: DragStartEvent) => {
+        snapshotRef.current = dragSnapshot(
+          arrangementRef.current,
+          event.operation.source?.data as DragData | undefined
+        );
+      },
+      onDragEnd: () => {
+        snapshotRef.current = null;
+      },
+    }),
+    []
+  );
+  useDragDropMonitor(handlers);
 
   React.useEffect(() => {
     // Without a manager there is no drag to cancel.

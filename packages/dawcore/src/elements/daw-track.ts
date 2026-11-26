@@ -148,14 +148,33 @@ export class DawTrackElement extends LitElement {
 
   /**
    * What the track holds: `'audio'` (default) or `'midi'`. Every `<daw-clip>`
-   * child must be of this kind (#756). Set it before the track connects:
-   * the editor reads it when it loads the track.
+   * child must be of this kind (#756). Set it before the track enters: the
+   * editor reads it then. Live (#848): once the track has entered, it reads
+   * the track's kind, which cannot change; a later change keeps the attribute
+   * (the page's declaration) and warns.
    */
   @property({ reflect: true, noAccessor: true })
   get kind(): TrackKind {
-    return this._kind;
+    const host = linkHostOf(this);
+    const live =
+      host?._trackLinkState(this.trackId) === 'live' ? host._trackKind(this.trackId) : null;
+    return live ?? this._kind;
   }
   set kind(value: TrackKind) {
+    const host = linkHostOf(this);
+    const live =
+      host?._trackLinkState(this.trackId) === 'live' ? host._trackKind(this.trackId) : null;
+    if (live && value !== live) {
+      console.warn(
+        '[dawcore] <daw-track> "' +
+          (this._declared.name || 'Untitled') +
+          '": kind cannot change after the track has loaded (still "' +
+          live +
+          '"). Remove the track and add one of the other kind.'
+      );
+      // The attribute is the page's declaration: it keeps what was written.
+      if (!this._fromAttribute) return;
+    }
     if (value !== 'audio' && value !== 'midi') {
       console.warn(
         '[dawcore] <daw-track kind="' +
@@ -278,6 +297,15 @@ export class DawTrackElement extends LitElement {
     }
     return editor;
   }
+
+  /**
+   * A move with `Node.moveBefore()` (#848; modern-web-guidance
+   * `custom-elements`): the browser calls this instead of
+   * `disconnectedCallback` → `connectedCallback`, so the element stays
+   * registered and sends no connected event again. The editor's
+   * MutationObserver still sees the move and reads the new position.
+   */
+  connectedMoveCallback(): void {}
 
   connectedCallback() {
     super.connectedCallback();

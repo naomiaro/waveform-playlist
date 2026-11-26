@@ -167,6 +167,15 @@ export class DawClipElement extends LitElement {
     return this;
   }
 
+  /**
+   * A move with `Node.moveBefore()` (#848; modern-web-guidance
+   * `custom-elements`): the browser calls this instead of
+   * `disconnectedCallback` → `connectedCallback`, so the element stays
+   * registered and sends no connected event again. The editor's
+   * MutationObserver still sees the move and reads the new position.
+   */
+  connectedMoveCallback(): void {}
+
   connectedCallback() {
     super.connectedCallback();
     // Defer dispatch so:

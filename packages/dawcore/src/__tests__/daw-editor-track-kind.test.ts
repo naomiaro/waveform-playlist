@@ -236,9 +236,11 @@ describe('<daw-editor> one kind of clip per track (#756)', () => {
         .mocked(console.warn)
         .mock.calls.filter(([message]) => String(message).includes('kind cannot change')).length;
     expect(kindWarnings()).toBe(1);
-    // The element keeps what the page set: the editor writes no attribute (#848)...
+    // The property is live (#848): it reads the track's kind, and a refused
+    // set writes nothing, the attribute included...
     await track.updateComplete;
-    expect(track.getAttribute('kind')).toBe('audio');
+    expect(track.kind).toBe('midi');
+    expect(track.getAttribute('kind')).toBe('midi');
 
     // ...and an unrelated later change does not warn again.
     track.volume = 0.5;

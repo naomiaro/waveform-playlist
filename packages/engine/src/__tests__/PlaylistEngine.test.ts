@@ -1785,6 +1785,21 @@ describe('PlaylistEngine', () => {
       expect(called.map(([name]) => name)).toEqual([]);
     });
 
+    it('dispose({ keepAdapter: true }) empties the adapter, so an engine on an empty arrangement plays nothing (#848)', () => {
+      const adapter = { ...createMockAdapter(), onPlaybackEnded: vi.fn() };
+      const arrangement = createArrangement();
+      arrangement.addTrack(
+        makeTrack('t1', [makeClip({ id: 'c1', startSample: 0, durationSamples: 48000 })])
+      );
+      const engine = new PlaylistEngine({ adapter, arrangement, sampleRate: 48000 });
+      vi.mocked(adapter.setTracks).mockClear();
+      engine.dispose({ keepAdapter: true });
+      expect(adapter.setTracks).toHaveBeenLastCalledWith([]);
+      // The next engine on an empty arrangement has nothing to send; the adapter holds nothing.
+      new PlaylistEngine({ adapter, arrangement: createArrangement(), sampleRate: 48000 });
+      expect(vi.mocked(adapter.setTracks).mock.lastCall?.[0]).toEqual([]);
+    });
+
     it('a second engine on the same adapter after keepAdapter plays its own arrangement (#848)', async () => {
       let ended: (() => void) | null = null;
       const adapter = {

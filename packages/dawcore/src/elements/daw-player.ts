@@ -73,6 +73,10 @@ export class DawPlayerElement extends LitElement {
   private _resizeObserver: ResizeObserver | null = null;
 
   static styles = css`
+    /* The hidden attribute hides the element: :host sets display (modern-web-guidance custom-elements). */
+    :host([hidden]) {
+      display: none;
+    }
     :host {
       display: block;
       position: relative;

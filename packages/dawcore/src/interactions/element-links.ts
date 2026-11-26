@@ -14,7 +14,7 @@
  *
  * Attributes are never written by the editor.
  */
-import type { MidiNoteData } from '@waveform-playlist/core';
+import type { MidiNoteData, TrackKind } from '@waveform-playlist/core';
 
 export type LinkState = 'pending' | 'live' | 'detached';
 
@@ -50,6 +50,8 @@ export interface ElementLinkHost {
   _requestClipChange(trackId: string, clipId: string, partial: Partial<ClipLinkValues>): void;
   /** The track's position in the arrangement, -1 when it is not there. */
   _trackIndex(trackId: string): number;
+  /** The kind of a track the arrangement holds, null when it holds none. */
+  _trackKind(trackId: string): TrackKind | null;
   /** Why an element of this editor is detached, for the warning. */
   _detachedReason(): string;
 }

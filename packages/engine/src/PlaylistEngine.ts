@@ -622,7 +622,11 @@ export class PlaylistEngine {
     this._isPlaying = false;
     this._adapter?.onPlaybackEnded?.(null);
     try {
-      if (!options.keepAdapter) this._adapter?.dispose();
+      // A kept adapter is emptied: the next engine may have nothing to send
+      // (an empty arrangement sends no setTracks), and this one's tracks must
+      // not go on playing through it (#848).
+      if (options.keepAdapter) this._adapter?.setTracks([]);
+      else this._adapter?.dispose();
     } catch (err) {
       console.warn('[waveform-playlist/engine] Error disposing adapter:', err);
     }

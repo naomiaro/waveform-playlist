@@ -60,6 +60,10 @@ export class DawAnnotationListElement extends LitElement {
   private _cancelling = false;
 
   static styles = css`
+    /* The hidden attribute hides the element: :host sets display (modern-web-guidance custom-elements). */
+    :host([hidden]) {
+      display: none;
+    }
     :host {
       display: block;
       max-height: var(--daw-annotation-list-max-height, 240px);
