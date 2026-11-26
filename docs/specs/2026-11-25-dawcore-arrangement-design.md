@@ -223,7 +223,7 @@ Independent of PRs 2 and 3.
 - Reparenting: the arrangement survives a disconnect (a moved `<input>` keeps
   its value). The engine is disposed with its adapter as today and rebuilt
   when a fresh adapter is set. Element tracks are not added again on
-  reconnect, whether or not the arrangement still holds them (dormant
+  reconnect, whether or not the arrangement still holds them (detached
   elements, PR 3).
 - Recording: a finished take goes in with `arrangement.updateTrack` (today
   `engine.updateTrack` plus `_engineTracks` and the descriptor); the take
@@ -254,21 +254,62 @@ DOM order is not synced.
 - **The `srcObject` model (decided, 2026-11-25).** Like `<video src>` and
   `video.srcObject`: the `<daw-track>` children declare the content of the
   editor's OWN arrangement. A handed-in arrangement is played alone; the
-  children are not added to it, and are dormant (below) while it is set. An
+  children are not added to it, and are detached (below) while it is set. An
   app that wants markup and an object to drive reads `editor.arrangement`
   (the editor's own) and does not hand one in. Setting `editor.arrangement`
   back to `null` returns to the editor's own arrangement, with what it held.
   The editor never disposes an arrangement it was handed.
-- **Dormant elements (decided, 2026-11-25).** An element whose track or clip
-  is not in the arrangement the editor plays (an Undo of the track's
-  arrival, an app's or agent's `removeTrack`, a split, which gives both
-  halves new ids, or a handed-in arrangement) is dormant: not drawn, not in
+- **Detached elements (decided, 2026-11-25).** An element is linked to its
+  track or clip by id. It is live whenever the arrangement the editor plays
+  holds that id (so a redo of its arrival or an undo of its removal makes it
+  live again), and detached otherwise: after an Undo of the track's arrival,
+  an app's or agent's `arrangement.removeTrack`, or while a handed-in
+  arrangement is set. A detached element is not drawn, not in
   `editor.tracks`, its properties return its attribute values, and an
-  attribute change on it does nothing. It is never added again by the
-  editor: not on the editor's reconnect, not on an arrangement swap, not on
-  an attribute change. Removing it from the DOM and inserting it again
-  declares a new track (or clip). The native picture: an `<input>` after its
-  form was reset, whose markup stays while the live state moved on.
+  attribute change on it does nothing. The editor never adds it again: not on
+  the editor's reconnect, not on an arrangement swap, not on an attribute
+  change. Removing it from the DOM and inserting it again declares a new
+  track (or clip). Native precedents: a `<source>` inside `<video>` after
+  the media element chose one (changing its `src` does nothing until
+  `load()`; all are inert while `srcObject` is set), and an `<input>` whose
+  value the user changed (the `value` attribute is inert until
+  `form.reset()`).
+- **Making detachment visible (decided, 2026-11-25: all three).**
+  - A split keeps the original clip's id on the LEFT half; the right half
+    gets a new id. A `<daw-clip>` then follows its left half, so a split
+    never detaches an element. This is an engine change
+    (`packages/engine/src/arrangement/clipEdits.ts` `splitClip`, and
+    `operations/clipOperations.ts`) seen by React too, where clip ids are
+    keys; the plan checks what in browser reads a split's ids (selection,
+    spectrogram canvases registered by clip id, `useClipSplitting`). An undo
+    of the split brings the clip back under the same id. Engine and browser
+    changesets.
+  - A custom state, `:state(detached)`, on `<daw-track>` and `<daw-clip>`
+    (`ElementInternals.states`), so CSS and `el.matches(':state(detached)')`
+    can see it. It is never written to the DOM (the page's markup stays
+    untouched). The modern-web-guidance guide `custom-elements` recommends
+    custom states for runtime state of this kind rather than a synthetic
+    attribute.
+  - A `console.warn` when an attribute changes on a detached element, naming
+    the element and why it is detached.
+- **The editor's own methods are arrangement calls (decided, 2026-11-25).**
+  `editor.addTrack(config)` builds the track (its clips as loading clips,
+  the mix, and the editor-only parts: render mode, effects) and adds it to
+  the arrangement the editor plays; it creates no element and resolves with
+  the track id once the track has entered (was: the `<daw-track>` element,
+  `daw-editor.ts:2923`; an upgrade entry). `updateTrack`, `reorderTrack`,
+  `addClip` and `updateClip` call the arrangement and write no element: an
+  element-backed track's properties show the change, its attributes do not.
+  `loadMidi` follows `addTrack`. The same methods work on a handed-in
+  arrangement, so an agent has one API.
+- **An editor method that removes also removes the element (decided,
+  2026-11-25).** `editor.removeTrack` and `editor.removeClip` remove the
+  `<daw-track>` / `<daw-clip>` from the DOM, as `select.remove(i)` and
+  `table.deleteRow(i)` do, and as `editor.removeTrack` does today
+  (`daw-editor.ts:1729`). Undo brings the track back without an element.
+  Removing an element is something only the page or an editor method does;
+  a change to the arrangement alone (an Undo, an agent's
+  `arrangement.removeTrack`) detaches it.
 - `<daw-track>` properties `volume`, `pan`, `muted`, `soloed`, `name` and
   `<daw-clip>` properties `start`, `duration`, `offset`, `gain`, `name`,
   fades, become getters over the arrangement, falling back to the parsed
@@ -286,9 +327,9 @@ DOM order is not synced.
   the `index` of an inserted element). An Undo of a reorder
   does not move elements. `_syncDomToEngineOrder`, `_syncEngineOrderToDom`
   and `_inOrderSync` go.
-- Removing an element removes its track as an undo step (as today). Undo
-  brings the track back without an element, drawn like any element-less
-  track. `_reconcileDescriptorsWithEngineTracks` goes: the editor-only fields
+- The page removing an element removes its track as an undo step (as
+  today). Undo brings the track back without an element, drawn like any
+  element-less track. `_reconcileDescriptorsWithEngineTracks` goes: the editor-only fields
   of a track with no descriptor take their defaults (render mode from the
   kind, no effects).
 - `_engineTracks` goes: the editor reads `arrangement.getTracks()` (the same
