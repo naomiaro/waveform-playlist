@@ -36,6 +36,9 @@ vi.mock('@dnd-kit/react', () => ({
     dndProps = props;
     return <>{props.children}</>;
   },
+  // DragWatch (#848) reads these below the provider.
+  useDragDropManager: () => null,
+  useDragDropMonitor: () => {},
 }));
 vi.mock('../hooks/useDragSensors', () => ({ useDragSensors: () => [] }));
 
