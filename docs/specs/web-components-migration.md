@@ -991,7 +991,7 @@ track.closeEffectGui(wamId);
 
 ### Per-Track Effects by ID (element-less tracks)
 
-The `<daw-track>` element methods above require a `<daw-track>` DOM element. Tracks created **without** one — drag-dropped via `<daw-editor file-drop>`, or `editor.addTrack(...)` when the consumer doesn't hold the returned element — have a `trackId` but no element to call methods on. `<daw-editor>` exposes the same per-track surface addressed by `trackId` so those tracks can carry their own insert chain:
+The `<daw-track>` element methods above require a `<daw-track>` DOM element. Tracks created **without** one — drag-dropped via `<daw-editor file-drop>`, or a track an Undo brought back after its element was removed — have a `trackId` but no element to call methods on. `<daw-editor>` exposes the same per-track surface addressed by `trackId` so those tracks can carry their own insert chain:
 
 ```typescript
 editor.addTrackEffect(trackId: string, type: string, params?: Record<string, number>): string
@@ -1557,7 +1557,7 @@ editor.appendChild(t); // → daw-track-ready event fires when loaded
 
 Removal works via `element.remove()` — the editor's MutationObserver detects detached `<daw-track>` nodes and cleans up engine state, peaks, and clip buffers. The engine call is incremental (`adapter.removeTrack`) when the adapter supports it; otherwise it falls back to `setTracks()` and stops playback.
 
-**Updating reflected attributes** (`name`, `volume`, `pan`, `muted`, `soloed`, `src`) on a `<daw-track>` after connection fires `daw-track-update`. The event's `changed` lists the properties of that update; the editor sends the engine only the mixer properties it names, as one undo step (#843), and refreshes its descriptor from the element. While the track is still loading a mixer change sets the values it enters with (no step). Changing `src` re-runs the full load pipeline.
+**Updating reflected attributes** (`name`, `volume`, `pan`, `muted`, `soloed`, `src`) on a `<daw-track>` after connection fires `daw-track-update`. The event's `changed` lists the properties of that update; the editor sends the engine only the mixer properties it names, as one undo step (#843), and refreshes its descriptor from the element. A mixer change while the track loads is a step too (#848). Changing `src` of the `<daw-track src>` shorthand replaces its clip with a new loading clip, one undo step.
 
 #### Late `<daw-clip>` mutation
 
@@ -1576,7 +1576,7 @@ The editor's `daw-track-connected` handler reads all `<daw-clip>` children synch
 For consumers who can't or won't go through declarative DOM (Vue/Svelte/Angular templates, MIDI sources without a `src` URL, dynamic clip generation):
 
 ```typescript
-editor.addTrack(config: TrackConfig): Promise<DawTrackElement>
+editor.addTrack(config: TrackConfig): Promise<string>         
 editor.removeTrack(trackId: string): void
 editor.updateTrack(trackId: string, partial: Partial<TrackConfig>): void
 editor.addClip(trackId: string, config: ClipConfig): Promise<string>      // returns clipId
@@ -1594,8 +1594,6 @@ interface TrackConfig {
 
 interface ClipConfig {
   src?: string;            // URL — fetched + decoded
-  audioBuffer?: AudioBuffer; // decoded buffer (skips fetch)
-  waveformData?: WaveformDataObject;  // pre-computed peaks (peaks-first render)
   peaksSrc?: string;       // URL for .dat/.json peaks
   midiNotes?: MidiNoteData[]; // for MIDI/piano-roll tracks
   start?: number;          // seconds, default 0
@@ -1620,11 +1618,11 @@ Behavior contract — all methods go through the same path as a declared `<daw-t
 
 ```javascript
 // Plain audio
-const t = await editor.addTrack({
+const trackId = await editor.addTrack({
   name: 'Drums',
   clips: [{ src: '/audio/drums.opus', start: 0 }],
 });
-// t is a <daw-track> element — t.trackId is its id
+// resolves once the track has entered, before its audio loads (#848)
 
 // MIDI (no src, parsed notes provided directly)
 await editor.addTrack({
@@ -1705,7 +1703,7 @@ midiInput.onchange = async () => {
 
 ### File Type Detection
 
-`loadFiles()` does no upfront MIME type filtering — every file is passed to `AudioContext.decodeAudioData()`. Non-audio files (`.pdf`, `.txt`, `.mid`, etc.) will fail at decode and emit a `daw-files-load-error` event. This is intentional for audio: the browser's decoder is the most reliable detector of valid audio. For MIDI files, route through `editor.loadMidi()` instead.
+`loadFiles()` skips a file whose MIME type is set and is not `audio/*` (reported with `daw-files-load-error`); a file with an empty type (`.opus` on some browsers) is passed to the decoder, and a file that does not decode is reported the same way. The browser's decoder is the most reliable detector of valid audio. For MIDI files, route through `editor.loadMidi()` instead.
 
 ```typescript
 'daw-files-load-error'; // detail: {file: File, error: string}
@@ -1881,7 +1879,7 @@ Each undo step stores a frozen copy of `tracks[]` and the mix (by track id) befo
 
 The stack has a fixed default limit of **100 steps**, configurable via `engine.undoLimit` or `editor.undoLimit`. When the limit is reached, the oldest entry is dropped.
 
-Any new structural edit clears the redo stack (standard behavior — you can't redo after making a new change). `clearHistory()` is called automatically when tracks are fully replaced via `setTracks()`, since old snapshots reference a different track set. `<daw-editor>` ends every track load with `setTracks()`, so a finished load clears the steps made before it, mixer steps included (#848).
+Any new structural edit clears the redo stack (standard behavior — you can't redo after making a new change). `clearHistory()` is called automatically when tracks are fully replaced via `setTracks()`, since old snapshots reference a different track set. `<daw-editor>` no longer calls `setTracks()` when a track loads (#848): loading never clears the history; the page's own `<daw-track>` elements that enter while it is empty are not steps.
 
 ### Transactions
 
