@@ -491,7 +491,6 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    */
   private _entryQueue: string[] = [];
   private _entryFlushScheduled = false;
-  private _warnedWaitingForAdapter = false;
   /** `<daw-track>` elements `addTrack()` made: every other one is the page's (the history rule). */
   private _editorMadeTracks = new WeakSet<DawTrackElement>();
   /** `.dat` peaks drawn for a clip still loading, by clip id (an editor-only render cache). */
@@ -1259,14 +1258,27 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this.removeEventListener('daw-track-reorder-grab', this._onTrackReorderGrab as EventListener);
     // Before the engine is disposed: a clip drag's cancel aborts its transaction.
     this._cancelDrags(true);
-    // No audio loads while detached (the decode context goes with the engine).
-    for (const cancel of [...this._loadWaitCancels]) {
-      cancel(new Error('<daw-editor> was disconnected while the track was loading'));
+    // No audio loads while detached (the decode context goes with the
+    // engine). A dropped file whose track has entered is kept and counts as
+    // loaded: it loads after a reparent, like the page's tracks (maintainer,
+    // #917). One not entered yet is not added.
+    for (const end of [...this._loadWaitEnds]) end();
+    for (const trackId of this._entryQueue) {
+      if (this._trackElements.has(trackId) || !this._entryWaiters.has(trackId)) continue;
+      const nextTracks = new Map(this._tracks);
+      nextTracks.delete(trackId);
+      this._tracks = nextTracks;
+      this._entryQueue = this._entryQueue.filter((id) => id !== trackId);
+      this._settleEntry(
+        trackId,
+        new Error('<daw-editor> was disconnected before the file entered')
+      );
     }
     this._childObserver?.disconnect();
     this._childObserver = null;
-    // Re-filled by the children's reconnect (`_onTrackConnected`).
-    this._trackElements.clear();
+    // `_trackElements` is kept (#917): the build on a fresh adapter can run
+    // before the children's deferred reconnect, and its descriptor reconcile
+    // must still see which tracks have an element.
     this._peaksCache.clear();
     // The worker goes; the pipeline makes a new one on its next use.
     this._peakPipeline.terminate();
@@ -1417,16 +1429,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     // daw-track.ts's connectedCallback re-dispatches a deferred
     // daw-track-connected for the SAME trackId in that case. If the track is
     // already registered (loading or fully loaded), this is a reconnect from
-    // a move, not a first-time (or post-teardown) registration: refresh the
-    // element mapping and bail out WITHOUT re-reading the descriptor or
-    // reloading. Re-reading would revert live daw-track-control mixer edits
-    // of a loading track (they change its seed, not the element's
-    // attributes); reloading would re-fetch — for a file-dropped track whose
-    // blob: URL was already revoked after its first load (Task 6), that
-    // fetch is against a dead URL and spuriously fires daw-track-error.
-    // Genuine re-registration after the EDITOR itself is reparented still
-    // works: the editor's disconnectedCallback clears _tracks entirely, so
-    // this guard is a no-op then and a full reload happens as before.
+    // a move, not a first-time registration: refresh the element mapping and
+    // bail out WITHOUT re-reading the descriptor or entering it again. The
+    // same holds when the EDITOR itself was reparented: the disconnect keeps
+    // the arrangement and the descriptors (#848), so the children's
+    // reconnect enters nothing again, also a track an Undo took out.
     if (this._tracks.has(trackId)) {
       this._trackElements.set(trackId, trackEl as DawTrackElement);
       return;
@@ -1560,7 +1567,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this._tracks = new Map(this._tracks).set(trackId, descriptor);
     // Only the mixer properties this update changed (#843), as one undo step:
     // a rename after an Undo must not send the element's older volume back.
-    // The seed while loading, else the engine setters.
+    // The arrangement's setters (a loading track is in the arrangement too, #848).
     const changed = Array.isArray(e.detail.changed) ? e.detail.changed : [];
     this._writeMixFields(trackId, pickMix(mixOfElement(trackEl), changed));
     if (oldDescriptor && oldDescriptor.src !== descriptor.src) {
@@ -1720,9 +1727,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       );
     }
     if (this._tracks.has(trackId)) {
-      // Validated values: to the seed while loading, else to the engine. A
-      // slider's gesture id makes its drag one undo step (#843); a control
-      // without one (mute, solo) is a step per event.
+      // Validated values to the arrangement's setters (also while the track
+      // loads, #848). A slider's gesture id makes its drag one undo step
+      // (#843); a control without one (mute, solo) is a step per event.
       const options: MixerChangeOptions | undefined =
         typeof gesture === 'string' ? { gesture } : undefined;
       if (prop === 'volume') this._writeMix(trackId, 'volume', clampNumber(value, 0, 1), options);
@@ -1731,7 +1738,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       if (prop === 'soloed') this._writeMix(trackId, 'soloed', Boolean(value), options);
     }
     // Don't sync back to <daw-track> DOM element — avoids daw-track-update loop.
-    // The arrangement (or a loading track's seed) holds the control values.
+    // The arrangement holds the control values.
   };
   private _onTrackRemoveRequest = (e: CustomEvent) => {
     const { trackId } = e.detail ?? {};
@@ -1791,6 +1798,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       );
       return;
     }
+    // A track that has not entered yet: the change goes into its descriptor.
+    const desc = this._tracks.get(detail.trackId);
+    if (desc && !this._isEntered(detail.trackId)) {
+      this._tracks = new Map(this._tracks).set(detail.trackId, {
+        ...desc,
+        clips: desc.clips.map((c) =>
+          isDomClip(c) && c.clipId === clipEl.clipId ? this._readClipDescriptor(clipEl) : c
+        ),
+      });
+      return;
+    }
     this._applyClipUpdate(detail.trackId, detail.clipId, clipEl);
   };
   private _onClipRemovedFromDom(clipEl: DawClipElement) {
@@ -1800,6 +1818,15 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         this._removeClipFromTrack(t.id, clipId);
         return;
       }
+    }
+    // A track that has not entered yet reads its clips from its descriptor.
+    for (const [trackId, desc] of this._tracks) {
+      if (this._isEntered(trackId) || !desc.clips.some((c) => c.clipId === clipId)) continue;
+      this._tracks = new Map(this._tracks).set(trackId, {
+        ...desc,
+        clips: desc.clips.filter((c) => c.clipId !== clipId),
+      });
+      return;
     }
     // No matching engine clip. May be benign (clip was removed before its load
     // completed), but it can also indicate a DOM/engine id mismatch — purge any
@@ -2045,10 +2072,14 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         clips: desc.clips.filter((c) => c.clipId !== clipId),
       });
     }
+    const wasLoading = track.clips.some((c) => c.id === clipId && isLoadingClip(c));
     this._arrangement.updateTrack(trackId, (current) => ({
       ...current,
       clips: current.clips.filter((c) => c.id !== clipId),
     }));
+    // Its load will never be announced (an addClip() waiting for it watches
+    // the arrangement and rejects).
+    if (wasLoading) this._announcer.forgetClip(clipId);
   }
   private _readTrackDescriptor(trackEl: DawTrackElement): StoredTrackDescriptor {
     const clipEls = trackEl.querySelectorAll('daw-clip') as NodeListOf<DawClipElement>;
@@ -2131,13 +2162,14 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    */
   _flushTrackEntries(): void {
     if (this._entryQueue.length === 0) return;
-    if (!this._engine) {
-      if (!this._externalAdapter && !this._warnedWaitingForAdapter) {
-        this._warnedWaitingForAdapter = true;
-        console.warn(
-          '[dawcore] tracks are waiting for editor.adapter: they enter the editor once it is set.'
-        );
-      }
+    // Without an engine the queue waits, silently (maintainer, #917: play()
+    // throws the no-adapter error).
+    if (!this._engine) return;
+    // M1: during a drag the arrangement has the drag's transaction open; an
+    // add would join it (an abort would drop the track, a commit merge it
+    // into the drag's undo step). Enter when the drag has ended.
+    if (this._dragInProgress) {
+      this._flushAfterDrag();
       return;
     }
     const queued = this._entryQueue;
@@ -2162,6 +2194,20 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     }
     if (historyWasEmpty && pageEntered) arrangement.clearHistory();
     for (const id of ordered.filter((id) => !isPageTrack(id))) this._enterTrack(id);
+  }
+  private _waitingForDragEnd = false;
+  /** Flush the queue once the drag in progress has ended (its pointer or key is released). */
+  private _flushAfterDrag(): void {
+    if (this._waitingForDragEnd) return;
+    this._waitingForDragEnd = true;
+    const events = ['pointerup', 'pointercancel', 'keyup'] as const;
+    const retry = () => {
+      for (const type of events) window.removeEventListener(type, retry);
+      this._waitingForDragEnd = false;
+      // After the drag's own handlers have ended it.
+      setTimeout(() => this._flushTrackEntries(), 0);
+    };
+    for (const type of events) window.addEventListener(type, retry);
   }
   /** Enter one registered track. False when it is gone, already in, or refused. */
   private _enterTrack(trackId: string): boolean {
@@ -2343,14 +2389,17 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * back (a dropped file that could not be loaded was never a declaration).
    */
   _discardTrack(trackId: string): void {
+    const track = this._arrangement.getTracks().find((t) => t.id === trackId);
+    this._announcer.forget(trackId, track?.clips.map((c) => c.id) ?? []);
     this._arrangement.removeTrack(trackId, { undoable: false });
     this._onTrackRemoved(trackId);
   }
-  /** Rejects the waits of `_whenTrackLoaded` when the editor is disconnected. */
-  private _loadWaitCancels = new Set<(error: Error) => void>();
+  /** Ends the waits of `_whenTrackLoaded` (as loaded) when the editor is disconnected. */
+  private _loadWaitEnds = new Set<() => void>();
   /**
-   * Resolves once the track has loaded (`daw-track-ready`), rejects when its
-   * audio failed (`daw-track-error`) or the editor is disconnected meanwhile.
+   * Resolves once the track has loaded (`daw-track-ready`), or when the
+   * editor is disconnected meanwhile (the track is kept and loads after a
+   * reparent); rejects when its audio failed (`daw-track-error`).
    */
   _whenTrackLoaded(trackId: string): Promise<void> {
     const state = this._announcer.stateOf(trackId);
@@ -2360,7 +2409,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       const cleanup = () => {
         this.removeEventListener('daw-track-ready', onReady);
         this.removeEventListener('daw-track-error', onError);
-        this._loadWaitCancels.delete(cancel);
+        this._loadWaitEnds.delete(end);
       };
       const onReady = (e: Event) => {
         if ((e as CustomEvent<DawTrackIdDetail>).detail.trackId !== trackId) return;
@@ -2373,13 +2422,13 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         cleanup();
         reject(detail.error instanceof Error ? detail.error : new Error(String(detail.error)));
       };
-      const cancel = (error: Error) => {
+      const end = () => {
         cleanup();
-        reject(error);
+        resolve();
       };
       this.addEventListener('daw-track-ready', onReady);
       this.addEventListener('daw-track-error', onError);
-      this._loadWaitCancels.add(cancel);
+      this._loadWaitEnds.add(end);
     });
   }
   /**
@@ -2560,7 +2609,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const structuralChange = engineState.tracksVersion !== this._lastTracksVersion;
     // Per-track mixer edits (volume/mute/solo/pan) bump mixerVersion, NOT
     // tracksVersion (#501). Refresh the _engineTracks cache on either so the
-    // next setTracks rebuild keeps live mixer state — but only run the
+    // controls show the current mix — but only run the
     // expensive structural work below for true structural changes, never on
     // every volume/pan drag frame.
     const mixerChange = engineState.mixerVersion !== this._lastMixerVersion;
@@ -2736,10 +2785,12 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   }
   /**
    * Append a `<daw-track>` element built from `config` and resolve with its
-   * track id once the track has entered the arrangement (#848): before its
-   * audio has loaded (follow that with `daw-track-ready` / `daw-track-error`
-   * or the arrangement's `sources`). Without `editor.adapter` it waits for
-   * one. Rejects when the track is refused or removed before it enters.
+   * track id once the track has entered the arrangement (#848), before its
+   * audio has loaded. To follow loading, add the `daw-track-ready` /
+   * `daw-track-error` listener BEFORE calling: for a track with nothing to
+   * fetch, or whose audio is already loaded, it fires before this resolves.
+   * Without `editor.adapter` it waits for one. Rejects when the track is
+   * refused by the arrangement or removed before it enters.
    */
   addTrack(config: TrackConfig = {}): Promise<string> {
     const trackEl = document.createElement('daw-track') as DawTrackElement;
@@ -2782,6 +2833,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     const trackEl = this._trackElements.get(trackId);
     if (trackEl) {
       trackEl.remove();
+      // Detached, the MutationObserver is off: remove the track here (#917).
+      if (!this.isConnected) this._onTrackRemoved(trackId);
     } else if (this._tracks.has(trackId) || this._isEntered(trackId)) {
       // File-dropped and undo-restored tracks have no DOM element.
       this._onTrackRemoved(trackId);
@@ -2810,8 +2863,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       const anchor = els[clamped];
       if (clamped > from) anchor.after(el);
       else anchor.before(el);
-    } else if (this._engineTracks.has(trackId)) {
-      this._engine!.reorderTrack(trackId, toIndex);
+    } else if (this._isEntered(trackId)) {
+      this._arrangement.reorderTrack(trackId, toIndex);
       this.requestUpdate();
     } else {
       console.warn('[dawcore] reorderTrack: no track found for id "' + trackId + '"');
@@ -2829,8 +2882,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
 
   /**
    * Update reflected attributes on a track. The mixer fields go to their
-   * owner as one undo step (#843): the engine, or while the track is loading
-   * the values it will enter with (not a step). For DOM-element tracks the
+   * owner, the arrangement, as one undo step (#843; also while the track
+   * loads, #848). For DOM-element tracks the
    * changes are also written to the `<daw-track>` element; for tracks
    * without a DOM element (file drops) the descriptor is updated in place.
    */
@@ -2884,8 +2937,10 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
   }
   /**
    * Append a clip to an existing track. Builds a `<daw-clip>` from `config`
-   * and appends it to the track's DOM element when one exists; resolves with
-   * the new clip's id once the audio decode + peak generation finish.
+   * and appends it to the track's DOM element; resolves with the new clip's
+   * id once its audio has loaded (`daw-clip-ready`, before its peaks are
+   * drawn); rejects when it fails to load, is refused, or leaves the
+   * arrangement before it loads (a removal, an Undo).
    */
   addClip(trackId: string, config: ClipConfig): Promise<string> {
     if (!config.src) {
@@ -2907,13 +2962,40 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       );
     }
     const clipEl = this._buildClipElement(config);
-    return this._awaitId(
+    const settled = this._awaitId(
       'daw-clip-ready',
       'daw-clip-error',
       (d) => d.clipId === clipEl.clipId,
       clipEl.clipId,
       () => trackEl.appendChild(clipEl)
     );
+    // A clip that leaves the arrangement before its audio loads (a removal,
+    // an Undo, its track removed) is never announced: once it has been in
+    // the arrangement and is gone, reject (#917).
+    return new Promise<string>((resolve, reject) => {
+      let seen = false;
+      const stopWatching = this._arrangement.subscribe(() => {
+        const present = this._arrangement
+          .getTracks()
+          .some((t) => t.clips.some((c) => c.id === clipEl.clipId));
+        if (present) {
+          seen = true;
+        } else if (seen) {
+          stopWatching();
+          reject(new Error('clip "' + clipEl.clipId + '" was removed before its audio loaded'));
+        }
+      });
+      settled.then(
+        (clipId) => {
+          stopWatching();
+          resolve(clipId);
+        },
+        (err) => {
+          stopWatching();
+          reject(err);
+        }
+      );
+    });
   }
   /**
    * Remove a clip by id. Removes the matching `<daw-clip>` DOM element when
@@ -3583,11 +3665,16 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       (el) => (el as DawTrackElement).trackId
     );
     const engineIds: string[] = engine.getState().tracks.map((t) => t.id);
-    const target = [...engineIds].sort((a, b) => {
-      const ai = domOrder.indexOf(a);
-      const bi = domOrder.indexOf(b);
-      if (ai === -1 || bi === -1) return 0; // element-less: keep relative position
-      return ai - bi;
+    // The slots element-backed tracks hold, in the engine's order, refilled
+    // in DOM order; an element-less track keeps its slot. (A sort whose
+    // comparator returns 0 for element-less tracks is not transitive and can
+    // leave the order as it was, #917.)
+    const inDom = new Set(domOrder);
+    const slots = engineIds.flatMap((id, i) => (inDom.has(id) ? [i] : []));
+    const domSorted = domOrder.filter((id) => engineIds.includes(id));
+    const target = [...engineIds];
+    slots.forEach((slot, k) => {
+      target[slot] = domSorted[k];
     });
     if (target.every((id, i) => id === engineIds[i])) return;
     this._inOrderSync = true;
@@ -3623,8 +3710,9 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       .filter((el): el is DawTrackElement => el != null);
     if (desired.length < 2) return;
     // Permute engine-known elements into engine order. Elements the engine
-    // hasn't seen yet (tracks still loading — the engine holds only the
-    // loaded subset during startup) are never moved, so they keep their
+    // hasn't seen yet (tracks still queued, waiting for an adapter or the
+    // next flush; a loading track is in the engine since #848) are never
+    // moved, so they keep their
     // relative order among themselves (their absolute index can still shift
     // when engine-known neighbors move around them); anchoring desired[0] at
     // els[0] instead would promote the loaded subset to the top and reorder

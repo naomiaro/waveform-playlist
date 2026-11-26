@@ -12,7 +12,7 @@ export interface FileLoaderHost {
   readonly isConnected: boolean;
   /** Add the file as a track; resolves with its id once it has entered. */
   _addDroppedFile(file: File): Promise<string>;
-  /** Resolves when the track has loaded; rejects when its audio failed. */
+  /** Resolves when the track has loaded or the editor was disconnected; rejects when its audio failed. */
   _whenTrackLoaded(trackId: string): Promise<void>;
   /** Take a track out for good: no undo step, and no undo brings it back. */
   _discardTrack(trackId: string): void;
@@ -46,6 +46,12 @@ export async function loadFiles(
   };
 
   for (const file of fileArray) {
+    // A disconnect ends the call: the file loading then is kept (it loads
+    // after a reparent); the ones not started are not added (#917).
+    if (!host.isConnected) {
+      dispatchLoadError(file, new Error('<daw-editor> was disconnected'));
+      continue;
+    }
     // file.type can be '' for valid audio (.opus on some browsers) — only
     // reject explicitly non-audio MIME types.
     if (file.type && !file.type.startsWith('audio/')) {

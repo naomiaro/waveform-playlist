@@ -24,7 +24,6 @@ export interface RemoveTrackOptions {
   undoable?: boolean;
 }
 
-/** How a mixer setter's change goes into the undo history. */
 /** Options of `addTrack`. */
 export interface AddTrackOptions {
   /**
@@ -34,6 +33,7 @@ export interface AddTrackOptions {
   index?: number;
 }
 
+/** How a mixer setter's change goes into the undo history. */
 export interface MixerChangeOptions {
   /** Changes with the same id, one after another, are one undo step. */
   gesture?: string;

@@ -58,6 +58,12 @@ export class LoadAnnouncer {
     this._loadingClips.add(clipId);
   }
 
+  /** A loading clip was removed: its load will not be announced. */
+  forgetClip(clipId: string): void {
+    this._loadingClips.delete(clipId);
+    this._clipErrors.delete(clipId);
+  }
+
   /** The error a failed track was announced with. */
   errorOf(trackId: string): Error {
     return this._tracks.get(trackId)?.error ?? new Error('track "' + trackId + '" failed to load');

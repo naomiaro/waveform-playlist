@@ -199,7 +199,7 @@ describe('daw-editor: tracks enter the arrangement and load through it', () => {
     expect(seen.map((e) => e.type).sort()).toEqual(['daw-clip-error', 'daw-track-ready']);
   });
 
-  it('tracks wait for the adapter, with one warning', async () => {
+  it('tracks wait for the adapter, without a warning', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     stubFetch({ '/a.wav': 'ok', '/b.wav': 'ok' });
     const editor = (await mountEditor({
@@ -208,10 +208,8 @@ describe('daw-editor: tracks enter the arrangement and load through it', () => {
     })) as any;
     expect(editor.tracks.map((t: { name: string }) => t.name)).toEqual(['A', 'B']);
     expect(names(editor)).toEqual([]);
-    const waiting = warn.mock.calls.filter((c) =>
-      String(c[0]).includes('waiting for editor.adapter')
-    );
-    expect(waiting).toHaveLength(1);
+    // Maintainer, #917: no warning; play() throws the no-adapter error.
+    expect(warn).not.toHaveBeenCalled();
     stubPeakPipeline(editor);
     editor.adapter = makeFakeAdapter().adapter;
     expect(names(editor)).toEqual(['A', 'B']);
@@ -545,5 +543,169 @@ describe('clips appended while a track loads or waits (#848)', () => {
     const clips = editor._arrangement.getTracks()[0].clips;
     expect(clips.map((c: { src?: string }) => c.src)).toEqual(['/a.wav', '/b.wav']);
     expect(console.warn).not.toHaveBeenCalledWith(expect.stringContaining('still loading'));
+  });
+});
+
+// Review of #917: each test reproduces a finding of the first round.
+describe('review fixes (#917)', () => {
+  it('M1: a track that connects during a drag enters when the drag ends, not inside it', async () => {
+    const editor = await mount(makeFakeAdapter(), MIDI_TRACK);
+    let dragging = true;
+    Object.defineProperty(editor, '_dragInProgress', { get: () => dragging, configurable: true });
+    editor.insertAdjacentHTML('beforeend', MIDI_TRACK.replace('Keys', 'Late'));
+    await tick(2);
+    expect(names(editor)).toEqual(['Keys']);
+    dragging = false;
+    window.dispatchEvent(new Event('pointerup'));
+    await tick(2);
+    expect(names(editor)).toEqual(['Keys', 'Late']);
+  });
+
+  it('M2: a DOM reorder with an element-less track in between reorders the rows', async () => {
+    const editor = await mount(
+      makeFakeAdapter(),
+      MIDI_TRACK.replace('Keys', 'A') +
+        MIDI_TRACK.replace('Keys', 'B') +
+        MIDI_TRACK.replace('Keys', 'C')
+    );
+    editor.querySelectorAll('daw-track')[1].remove();
+    await tick();
+    editor._arrangement.undo(); // B comes back without an element, in the middle
+    expect(names(editor)).toEqual(['A', 'B', 'C']);
+    const c = editor._arrangement.getTracks()[2].id;
+    editor.reorderTrack(c, 0);
+    await tick();
+    expect(names(editor)).toEqual(['C', 'B', 'A']);
+  });
+
+  it('M3: a reparent with the adapter set at once does not add an undone track again', async () => {
+    const editor = await mount(makeFakeAdapter(), MIDI_TRACK);
+    editor._arrangement.setTrackVolume(editor._arrangement.getTracks()[0].id, 0.5);
+    await editor.addTrack({ name: 'B', midi: { notes: [] } });
+    editor._arrangement.undo();
+    expect(names(editor)).toEqual(['Keys']);
+    const other = document.createElement('div');
+    document.body.appendChild(other);
+    other.appendChild(editor);
+    editor.adapter = makeFakeAdapter().adapter;
+    await tick(2);
+    expect(names(editor)).toEqual(['Keys']);
+    expect(editor._arrangement.canRedo).toBe(true);
+  });
+
+  it('M4: loadFiles resolves when the editor is disconnected; the file loading then is kept and reported loaded', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fake = makeFakeAdapter();
+    const editor = await mount(fake, '');
+    const held = fake.holdDecode('f2.wav');
+    const files = [makeAudioFile('f1.wav'), makeAudioFile('f2.wav'), makeAudioFile('f3.wav')];
+    const result = editor.loadFiles(files);
+    await vi.waitFor(() => expect(fake.decodeCount('f2.wav')).toBe(1));
+    editor.remove();
+    const settled = await Promise.race([result, tick(20).then(() => 'still pending')]);
+    expect(settled).not.toBe('still pending');
+    const { loaded, failed } = settled as { loaded: string[]; failed: Array<{ file: File }> };
+    expect(loaded).toHaveLength(2);
+    expect(failed.map((f) => f.file)).toEqual([files[2]]);
+    expect(names(editor)).toEqual(['f1', 'f2']);
+    held.resolve();
+  });
+
+  it('L1: addClip rejects when its clip is removed before its audio loads', async () => {
+    const fake = makeFakeAdapter();
+    stubFetch({ '/a.wav': 'ok', '/b.wav': 'ok' });
+    const editor = await mount(fake, audioTrack('A', '/a.wav'));
+    await settle(editor);
+    const trackId = editor._arrangement.getTracks()[0].id;
+    fake.holdDecode('/b.wav');
+    const pending = editor.addClip(trackId, { src: '/b.wav', start: 3, duration: 1 });
+    const outcome = pending.then(
+      () => 'resolved',
+      (err: Error) => err.message
+    );
+    await tick();
+    editor.removeClip(trackId, editor._arrangement.getTracks()[0].clips[1].id);
+    expect(await outcome).toMatch(/removed before/);
+  });
+
+  it('L2: a clip removed or changed while its track waits for the adapter enters as it is then', async () => {
+    stubFetch({ '/a.wav': 'ok', '/b.wav': 'ok' });
+    const editor = (await mountEditor({
+      adapter: null,
+      html:
+        '<daw-track name="T"><daw-clip src="/a.wav" duration="1"></daw-clip>' +
+        '<daw-clip src="/b.wav" start="2" duration="1"></daw-clip></daw-track>',
+    })) as any;
+    const [keep, gone] = [...editor.querySelectorAll('daw-clip')] as any[];
+    gone.remove();
+    keep.start = 5;
+    await keep.updateComplete;
+    await tick(2);
+    stubPeakPipeline(editor);
+    editor.adapter = makeFakeAdapter().adapter;
+    const clips = editor._arrangement.getTracks()[0].clips;
+    expect(clips.map((c: { id: string }) => c.id)).toEqual([keep.clipId]);
+    expect(clips[0].start).toBe(5);
+  });
+
+  it('L3: reorderTrack of an element-less track on a detached editor reorders the arrangement', async () => {
+    const editor = await mount(
+      makeFakeAdapter(),
+      MIDI_TRACK.replace('Keys', 'A') + MIDI_TRACK.replace('Keys', 'B')
+    );
+    editor.querySelectorAll('daw-track')[1].remove();
+    await tick();
+    editor._arrangement.undo();
+    const b = editor._arrangement.getTracks()[1].id;
+    editor.remove();
+    expect(() => editor.reorderTrack(b, 0)).not.toThrow();
+    expect(names(editor)).toEqual(['B', 'A']);
+  });
+
+  it('L4: removeTrack on a detached editor removes the track too', async () => {
+    const editor = await mount(makeFakeAdapter(), MIDI_TRACK.replace('Keys', 'A') + MIDI_TRACK);
+    const a = editor._arrangement.getTracks()[0].id;
+    editor.remove();
+    editor.removeTrack(a);
+    expect(names(editor)).toEqual(['Keys']);
+    expect(editor.querySelectorAll('daw-track')).toHaveLength(1);
+  });
+});
+
+describe('review fixes, round 1 fuzz (#917)', () => {
+  it('L1: addClip rejects when an Undo takes its clip out before its audio loads', async () => {
+    const fake = makeFakeAdapter();
+    stubFetch({ '/a.wav': 'ok', '/b.wav': 'ok' });
+    const editor = await mount(fake, audioTrack('A', '/a.wav'));
+    await settle(editor);
+    const trackId = editor._arrangement.getTracks()[0].id;
+    fake.holdDecode('/b.wav');
+    const outcome = editor.addClip(trackId, { src: '/b.wav', start: 3, duration: 1 }).then(
+      () => 'resolved',
+      (err: Error) => err.message
+    );
+    await vi.waitFor(() => expect(editor._arrangement.getTracks()[0].clips).toHaveLength(2));
+    editor._arrangement.undo();
+    expect(await Promise.race([outcome, tick(10).then(() => 'still pending')])).toMatch(
+      /removed before/
+    );
+  });
+
+  it('L1: addClip rejects when its track is removed before its audio loads', async () => {
+    const fake = makeFakeAdapter();
+    stubFetch({ '/a.wav': 'ok', '/b.wav': 'ok' });
+    const editor = await mount(fake, audioTrack('A', '/a.wav'));
+    await settle(editor);
+    const trackId = editor._arrangement.getTracks()[0].id;
+    fake.holdDecode('/b.wav');
+    const outcome = editor.addClip(trackId, { src: '/b.wav', start: 3, duration: 1 }).then(
+      () => 'resolved',
+      (err: Error) => err.message
+    );
+    await vi.waitFor(() => expect(editor._arrangement.getTracks()[0].clips).toHaveLength(2));
+    editor.removeTrack(trackId);
+    expect(await Promise.race([outcome, tick(10).then(() => 'still pending')])).toMatch(
+      /removed before/
+    );
   });
 });
