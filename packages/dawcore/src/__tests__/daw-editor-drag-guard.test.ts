@@ -184,9 +184,10 @@ describe('<daw-editor> during a drag (#848)', () => {
     expect(handler.isActive).toBe(false);
     expect(host.reorderTrack).not.toHaveBeenCalled();
 
-    const annotationDrag = { isActive: true, cancel: vi.fn() };
+    const annotationDrag = { isActive: true, isDragging: true, cancel: vi.fn() };
     annotationDrag.cancel.mockImplementation(() => {
       annotationDrag.isActive = false;
+      annotationDrag.isDragging = false;
     });
     editor._annotationDrag = annotationDrag;
     expect(pressEscape().defaultPrevented).toBe(true);
@@ -202,6 +203,31 @@ describe('<daw-editor> during a drag (#848)', () => {
     expect(stop).not.toHaveBeenCalled();
     pressEscape();
     expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('undo during a press, then a drag, is one transaction (the press stays live)', async () => {
+    const editor = await setupEditor();
+    const timeline = pressClipHeader(editor);
+    editor.undo();
+    expect(editor._engine.undo).toHaveBeenCalledTimes(1);
+    expect(editor._engine.beginTransaction).not.toHaveBeenCalled();
+    movePointer(timeline, 140);
+    expect(editor._engine.beginTransaction).toHaveBeenCalledTimes(1);
+    timeline.dispatchEvent(new PointerEvent('pointerup', { clientX: 140, pointerId: 1 }));
+    expect(editor._engine.commitTransaction).toHaveBeenCalledTimes(1);
+    expect(editor._engine.abortTransaction).not.toHaveBeenCalled();
+  });
+
+  it('Escape during a press that has not moved is left to the shortcuts', async () => {
+    const editor = await setupEditor(true);
+    const stop = vi.spyOn(editor, 'stop').mockImplementation(() => {});
+    pressClipHeader(editor);
+    const annotationDrag = { isActive: true, isDragging: false, cancel: vi.fn() };
+    editor._annotationDrag = annotationDrag;
+    expect(pressEscape().defaultPrevented).toBe(true); // by the Stop shortcut
+    expect(stop).toHaveBeenCalledTimes(1);
+    expect(editor._clipPointer.isActive).toBe(true);
+    expect(annotationDrag.cancel).not.toHaveBeenCalled();
   });
 
   it('Escape with no drag in progress is left alone', async () => {

@@ -200,6 +200,12 @@ export class AnnotationDragHandler {
     return this._drag !== null;
   }
 
+  /** True once the pointer has moved past the drag threshold: a press that
+   *  has not moved (a click on the box) is not a drag (#848). */
+  get isDragging(): boolean {
+    return this._drag?.moved ?? false;
+  }
+
   /** Cancel the drag in progress (Escape, editor disconnect): the boundaries
    *  go back to where they were when it began (#848). */
   cancel(): void {

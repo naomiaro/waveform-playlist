@@ -1260,7 +1260,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     this.removeEventListener('daw-track-reorder', this._onTrackReorder as EventListener);
     this.removeEventListener('daw-track-reorder-grab', this._onTrackReorderGrab as EventListener);
     // Before the engine is disposed: a clip drag's cancel aborts its transaction.
-    this._cancelDrags();
+    this._cancelDrags(true);
     this._childObserver?.disconnect();
     this._childObserver = null;
     this._trackElements.clear();
@@ -3376,15 +3376,24 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     return this._clipPointer.isDragging || this._trackReorderDrag.isActive;
   }
 
-  /** Cancel every drag in progress, as a `pointercancel` would. Returns whether one was. */
-  _cancelDrags(): boolean {
-    let cancelled = this._pointer.cancelClipDrag();
+  /**
+   * Cancel every drag in progress, as a `pointercancel` would. Returns whether
+   * one was. A clip or annotation press that has not moved is not a drag and
+   * is left alone, unless `includePresses` (the editor's disconnect, which
+   * ends every pointer interaction).
+   */
+  _cancelDrags(includePresses = false): boolean {
+    let cancelled = false;
+    if (includePresses || this._clipPointer.isDragging) {
+      cancelled = this._pointer.cancelClipDrag() || cancelled;
+    }
     if (this._trackReorderDrag.isActive) {
       this._trackReorderDrag.cancel();
       cancelled = true;
     }
-    if (this._annotationDrag.isActive) {
-      this._annotationDrag.cancel();
+    const annotation = this._annotationDrag;
+    if (includePresses ? annotation.isActive : annotation.isDragging) {
+      annotation.cancel();
       cancelled = true;
     }
     return cancelled;
@@ -3401,7 +3410,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     if (this._cancelDrags()) e.preventDefault();
   };
 
-  /** Undo the last structural edit. Does nothing while a drag is in progress. */
+  /** Undo the last edit. Does nothing while a drag is in progress. */
   undo(): void {
     if (this._dragInProgress) return;
     if (!this._engine) {

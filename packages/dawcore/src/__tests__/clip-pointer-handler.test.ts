@@ -732,11 +732,46 @@ describe('ClipPointerHandler', () => {
   });
 
   describe('undo transactions', () => {
-    it('calls beginTransaction on drag start', () => {
+    // A press is not a drag: the transaction opens when the pointer passes
+    // the drag threshold, so an undo during a press has nothing to abort
+    // (#848, review of #915; maintainer: the press stays live).
+    it('opens its transaction when the drag starts, not at the press', () => {
       const el = makeClipEl('clip-1', 'track-1');
       handler.tryHandle(el, pointerEvent('pointerdown', { clientX: 100 }));
-
+      expect(engine.beginTransaction).not.toHaveBeenCalled();
+      handler.onPointerMove(pointerEvent('pointermove', { clientX: 102 }));
+      expect(engine.beginTransaction).not.toHaveBeenCalled();
+      handler.onPointerMove(pointerEvent('pointermove', { clientX: 104 }));
       expect(engine.beginTransaction).toHaveBeenCalledTimes(1);
+      handler.onPointerMove(pointerEvent('pointermove', { clientX: 120 }));
+      expect(engine.beginTransaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('takes the clip bounds when the drag starts (an undo during the press moved them)', () => {
+      const shadowHost = document.createElement('div');
+      const shadow = shadowHost.attachShadow({ mode: 'open' });
+      const container = document.createElement('div');
+      container.classList.add('clip-container');
+      container.dataset.clipId = 'clip-1';
+      container.style.left = '200px';
+      container.style.width = '400px';
+      shadow.appendChild(container);
+      const reextract = vi.fn().mockReturnValue(null);
+      const localHandler = new ClipPointerHandler(
+        createMockHost(engine, { shadowRoot: shadow, reextractClipPeaks: reextract })
+      );
+      localHandler.tryHandle(
+        makeBoundaryEl('clip-1', 'track-1', 'right'),
+        pointerEvent('pointerdown', { clientX: 100 })
+      );
+      vi.mocked(engine.getClipBounds).mockReturnValue({
+        offsetSamples: 0,
+        durationSamples: 96000,
+        startSample: 0,
+        sourceDurationSamples: 192000,
+      });
+      localHandler.onPointerMove(pointerEvent('pointermove', { clientX: 150 }));
+      expect(reextract).toHaveBeenCalledWith('clip-1', 0, 96000 + 50 * 1024);
     });
 
     it('calls commitTransaction after successful drag', () => {
@@ -749,13 +784,23 @@ describe('ClipPointerHandler', () => {
       expect(engine.abortTransaction).not.toHaveBeenCalled();
     });
 
-    it('calls abortTransaction on click (no drag)', () => {
+    it('a click (no drag) opens and ends no transaction', () => {
       const el = makeClipEl('clip-1', 'track-1');
       handler.tryHandle(el, pointerEvent('pointerdown', { clientX: 100 }));
       handler.onPointerUp(pointerEvent('pointerup', { clientX: 100 }));
 
-      expect(engine.abortTransaction).toHaveBeenCalledTimes(1);
+      expect(engine.beginTransaction).not.toHaveBeenCalled();
+      expect(engine.abortTransaction).not.toHaveBeenCalled();
       expect(engine.commitTransaction).not.toHaveBeenCalled();
+    });
+
+    it('a press cancelled before it moved ends no transaction', () => {
+      const el = makeClipEl('clip-1', 'track-1');
+      handler.tryHandle(el, pointerEvent('pointerdown', { clientX: 100 }));
+      handler.onPointerCancel(pointerEvent('pointercancel', { clientX: 100 }));
+
+      expect(engine.abortTransaction).not.toHaveBeenCalled();
+      expect(handler.isActive).toBe(false);
     });
 
     it('calls abortTransaction when drag has zero net delta', () => {

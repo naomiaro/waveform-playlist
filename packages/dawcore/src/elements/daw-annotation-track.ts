@@ -335,6 +335,10 @@ export class DawAnnotationTrackElement extends LitElement {
   private _onKeyDownCapture = (e: KeyboardEvent): void => {
     if (!this.keyboardControls) return;
     if (e.repeat) return;
+    // <daw-editor>'s drag cancel (a window capture listener, so it runs
+    // first) prevented this Escape: it cancelled a drag and does nothing
+    // else, so the selection stays (#848).
+    if (e.key === 'Escape' && e.defaultPrevented) return;
     // Same rule as the editor shortcuts: a key the focused control uses itself
     // (text entry, Escape in a modal dialog, Space/Enter on a focused button)
     // is not a shortcut. Reads the composed path, so it

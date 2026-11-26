@@ -98,6 +98,17 @@ describe('AnnotationDragHandler', () => {
     expect(track.annotations[0].end).toBeCloseTo(3); // restored
   });
 
+  it('isDragging is true only once the pointer has moved past the threshold (#848)', () => {
+    const boundary = lane.querySelector('.annotation-boundary') as HTMLElement;
+    handler.onPointerDown(fakePointer(boundary, 300), track);
+    expect(handler.isActive).toBe(true);
+    expect(handler.isDragging).toBe(false);
+    handler._onPointerMove(fakePointer(boundary, 380));
+    expect(handler.isDragging).toBe(true);
+    handler.cancel();
+    expect(handler.isDragging).toBe(false);
+  });
+
   it('cancel restores the boundaries from the start of the drag (#848)', () => {
     const boundary = lane.querySelector('.annotation-boundary') as HTMLElement;
     const removeListener = vi.spyOn(boundary, 'removeEventListener');
