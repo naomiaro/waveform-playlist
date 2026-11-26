@@ -3,8 +3,9 @@
  * Operates on the editor instance via a narrow interface.
  */
 
-import type { ClipTrack, PeakData } from '@waveform-playlist/core';
-import { carveClipRange, createClip } from '@waveform-playlist/core';
+import type { AudioClip, LoadingClip, PeakData } from '@waveform-playlist/core';
+import { carveClipRange, createClip, isLoadingClip } from '@waveform-playlist/core';
+import type { Arrangement } from '@waveform-playlist/engine';
 import type { PeakPipeline } from '../workers/peakPipeline';
 import type { DawErrorDetail, DawRecordingClipAddDetail } from '../events';
 import type { StoredTrackDescriptor, ClipDescriptor } from '../types';
@@ -19,7 +20,8 @@ export interface RecordingClipHost {
   readonly isConnected: boolean;
   readonly effectiveSampleRate: number;
   _tracks: Map<string, StoredTrackDescriptor>;
-  _engineTracks: Map<string, ClipTrack>;
+  /** The take goes into the editor's arrangement (#848); the engine follows it. */
+  _arrangement: Arrangement;
   _peaksData: Map<string, PeakData>;
   _clipBuffers: Map<string, AudioBuffer>;
   _clipOffsets: Map<string, { offsetSamples: number; durationSamples: number }>;
@@ -27,11 +29,6 @@ export interface RecordingClipHost {
    * pipeline base scale like any other load — the floor must cover them). */
   _raiseZoomFloor(scale: number): void;
   _peakPipeline: PeakPipeline;
-  _engine: {
-    setTracks(tracks: readonly ClipTrack[]): void;
-    updateTrack?(trackId: string, track: ClipTrack): void;
-  } | null;
-  _recomputeDuration(): void;
   dispatchEvent(event: Event): boolean;
 }
 
@@ -75,8 +72,7 @@ export function addRecordedClip(
   host._peakPipeline
     .generatePeaks(trimmedBuf, host.renderSamplesPerPixel, host.mono)
     .then((pd) => {
-      const t = host._engineTracks.get(trackId);
-      if (!t) {
+      if (!host._arrangement.getTracks().some((t) => t.id === trackId)) {
         // Track was removed during peak generation — clean up the orphaned
         // buffer and never insert the peaks entry (this clip never reaches
         // the engine, so nothing else would ever delete it).
@@ -91,13 +87,20 @@ export function addRecordedClip(
       // buffer's WaveformData at the base scale — zooming finer than it
       // would render the recorded waveform squeezed in its container.
       host._raiseZoomFloor(host._peakPipeline.getCachedScale(trimmedBuf));
-      host._engineTracks = new Map(host._engineTracks).set(trackId, {
-        ...t,
-        // Punch-in replace (#579): the recorded clip owns [startSample,
-        // startSample + durSamples) — carve overlapped content out of the
-        // existing clips before inserting (parity with the React provider).
-        clips: [...carveClipRange(t.clips, startSample, startSample + durSamples), clip],
-      });
+      // One undo step, in the function form so the track's loading clips
+      // stay. Punch-in replace (#579): the recorded clip owns [startSample,
+      // startSample + durSamples) — carve overlapped LOADED content out
+      // before inserting (parity with the React provider); a clip still
+      // loading has no samples to carve and is kept as it is.
+      host._arrangement.updateTrack(trackId, (current) => ({
+        ...current,
+        clips: [
+          ...current.clips.flatMap((c): (AudioClip | LoadingClip)[] =>
+            isLoadingClip(c) ? [c] : carveClipRange([c], startSample, startSample + durSamples)
+          ),
+          clip,
+        ],
+      }));
       // Keep _tracks in sync so public API and track controls reflect the clip
       const desc = host._tracks.get(trackId);
       if (desc) {
@@ -125,13 +128,6 @@ export function addRecordedClip(
           ...desc,
           clips: [...desc.clips, clipDesc],
         });
-      }
-      host._recomputeDuration();
-      const updatedTrack = host._engineTracks.get(trackId);
-      if (host._engine?.updateTrack && updatedTrack) {
-        host._engine.updateTrack(trackId, updatedTrack);
-      } else {
-        host._engine?.setTracks([...host._engineTracks.values()]);
       }
       // daw-recording-complete fires BEFORE the clip exists (it is
       // cancelable), so it cannot carry the id. This follow-up fires once
