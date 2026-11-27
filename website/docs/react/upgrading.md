@@ -881,7 +881,7 @@ Under either provider:
 | Hook | Returns |
 | --- | --- |
 | `usePlaybackRate()` | `playbackRate`, `setPlaybackRate` |
-| `useMediaElementTrack()` | `duration`, `isReady`, `peaksDataArray`, `fadeIn`, `fadeOut`, `playoutRef` |
+| `useMediaElementTrack()` | `duration`, `isReady`, `peaksDataArray`, `playoutRef` (the fades are on the clip in `peaksDataArray`: [see below](#usemediaelementtrack-fadein-and-fadeout-are-removed)) |
 
 The values of `usePlaybackControls()`, `useEditorControls()`, `usePlaybackRefs()` and `useEngineRefs()` never change, so calling them never re-renders the component.
 
@@ -978,8 +978,8 @@ From `useMediaElementData()`:
 | `duration` | `useMediaElementTrack()` |
 | `isReady` | `useMediaElementTrack()` |
 | `peaksDataArray` | `useMediaElementTrack()` |
-| `fadeIn` | `useMediaElementTrack()` |
-| `fadeOut` | `useMediaElementTrack()` |
+| `fadeIn` | `useMediaElementTrack().peaksDataArray[0]?.[0]?.fadeIn` ([the fades entry](#usemediaelementtrack-fadein-and-fadeout-are-removed)) |
+| `fadeOut` | `useMediaElementTrack().peaksDataArray[0]?.[0]?.fadeOut` |
 | `playoutRef` | `useMediaElementTrack()` |
 | `sampleRate` | `usePlaylistView()` |
 | `waveHeight`, `barWidth`, `barGap`, `roundedBars`, `progressBarWidth` | props of `<WaveformViewOptions>`; inside a root, `usePlaylistInfo()` (see [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers)) |
@@ -1507,7 +1507,7 @@ In development a part that is not where it can work says so once in the console 
 | `<MediaElementWaveform />` under a provider without `timescale` | no ruler | a ruler |
 | `<WaveformEditor />` where `<Waveform showClipHeaders />` was, with clips that have fades | no fade curves | the fade curves are drawn |
 | `usePlaylistInfo()` of `@waveform-playlist/ui-components`, read inside a root: `controls` (removed in [the view options entry](#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers)), `timeScaleHeight` | what the provider's `controls` and `timescale` props said | worked out from the parts: `{ show: true, width }` of the controls part, or `{ show: false, width: 0 }` without one or with a width that is not positive (always under the MediaElement provider), and 30 or 0 |
-| `useMediaElementTrack().fadeIn` / `.fadeOut` | the object of the latest `track` prop | the first object seen while `duration` and `type` are the same, so the hook's value no longer changes on every render of a parent that writes the fade inline |
+| The fades of the clip in `useMediaElementTrack().peaksDataArray` (the hook's own `fadeIn` / `fadeOut` were removed later: [see below](#usemediaelementtrack-fadein-and-fadeout-are-removed)) | the object of the latest `track` prop | the first object seen while `duration` and `type` are the same, so the hook's value no longer changes on every render of a parent that writes the fade inline |
 | A composition with `<WaveformLoopRegion />` and no `<WaveformTimescale />` | (not possible) | the 30 px strip is there for the loop region alone |
 | `<WaveformTimescale>` switched off and on beside a `<WaveformLoopRegion>` | (not possible) | the loop region stays mounted |
 | A take being recorded, without `useRecordingSession` | the take's track was muted for the take, and playback ran past the end of the audio | neither |
@@ -2383,7 +2383,7 @@ The six conversion functions in `@waveform-playlist/ui-components` were copies o
 | --- | --- |
 | The controlled `ContinuousPlayCheckbox`, `LinkEndpointsCheckbox`, `EditableCheckbox` of `@waveform-playlist/annotations` (props `checked`, `onChange`, and `disabled` on the first two) | under a playlist provider: the bound component of the same name, without `checked` and `onChange`; `disabled` is still taken, now by all three. Without a provider: a checkbox of your own from `BaseCheckboxWrapper`, `BaseCheckbox` and `BaseCheckboxLabel` of `@waveform-playlist/ui-components` (below) |
 | The controlled `DownloadAnnotationsButton` of `@waveform-playlist/annotations` (prop `annotations`) | under a playlist provider: the bound component of the same name, without the prop. Without a provider: `annotations.map(serializeAeneas)` and a download of your own (below) |
-| `AnnotationsTrack`, `AnnotationsTrackProps` (`@waveform-playlist/annotations`) | `AnnotationBoxesWrapper` with `height={100}` (its default is 30; `AnnotationsTrack`'s was 100). The other props are the same: `className`, `children`, `width` (`offset` is removed too: see [props that nothing read](#props-that-nothing-read-are-removed)) |
+| `AnnotationsTrack`, `AnnotationsTrackProps` (`@waveform-playlist/annotations`) | `AnnotationBoxesWrapper` with `height={100}` (its default is 30; `AnnotationsTrack`'s was 100). The other props are the same: `className`, `children`, `width` (`offset` is removed too: see [props that nothing read](#props-and-components-the-packages-did-not-use-are-removed)) |
 | `useAnnotationControls`, `UseAnnotationControlsOptions`, `UseAnnotationControlsReturn` (`@waveform-playlist/annotations`) | under a playlist provider: `useAnnotationOptions()` and `setContinuousPlay`, `setLinkEndpoints`, `setAnnotationsEditable` of `usePlaybackControls()`. Without one: two `useState`s and `updateAnnotationBoundaries` of `@waveform-playlist/core` (below) |
 | `AnnotationUpdateParams` (`@waveform-playlist/annotations`) | `AnnotationBoundaryUpdate` of `@waveform-playlist/core`, the same six fields |
 | `Annotation`, `AnnotationProps` (`@waveform-playlist/annotations`) | no one-to-one replacement. It drew one annotation as an overlay with its text edited inside the box. `AnnotationBox` draws a box; `AnnotationList` of `@waveform-playlist/browser` draws and edits the text |
@@ -2599,7 +2599,7 @@ const [snapTo, setSnapTo] = useState<BeatsAndBarsSnapTo>('beat');
 
 **Find:** `SpectrogramCanvasRegistration` in an import from `@waveform-playlist/browser` or `@waveform-playlist/ui-components`; `TrackMenuItem` in an import from `@waveform-playlist/spectrogram`.
 
-**Replace with:** `SpectrogramCanvasRegistration` from `@waveform-playlist/core`; `TrackMenuItem` from `@waveform-playlist/ui-components`. Both types have the fields they had, except `TrackMenuItem.label`, which was never drawn and is removed (see [props that nothing read](#props-that-nothing-read-are-removed)).
+**Replace with:** `SpectrogramCanvasRegistration` from `@waveform-playlist/core`; `TrackMenuItem` from `@waveform-playlist/ui-components`. Both types have the fields they had, except `TrackMenuItem.label`, which was never drawn and is removed (see [props that nothing read](#props-and-components-the-packages-did-not-use-are-removed)).
 
 **Find:** `TrackControlsContext`, `useTrackControls`.
 
@@ -2640,7 +2640,7 @@ const [snapTo, setSnapTo] = useState<BeatsAndBarsSnapTo>('beat');
 | `SnapTo` imported from `@waveform-playlist/ui-components` | `'bar' \| 'beat' \| 'off'` | a TypeScript error (types only: nothing changes at runtime). The type is `BeatsAndBarsSnapTo` |
 | A removed function called in plain JavaScript (`useAnnotationControls()`, `useTrackControls()`, a conversion imported from `@waveform-playlist/ui-components`, `getShortcutLabel` imported from either package) | ran | a TypeScript error. Without TypeScript: a failed build, or a `TypeError` where the import is `undefined`, depending on the bundler (see above) |
 
-Not changed: `AnnotationProvider`, `AnnotationBox`, `AnnotationBoxesWrapper`, `AnnotationText`, `parseAeneas` and `serializeAeneas` of `@waveform-playlist/annotations`; `WaveformAnnotationBoxes` and `AnnotationList` of `@waveform-playlist/browser`, which still draw nothing without `<AnnotationProvider>`; `useAnnotationIntegration()`, still exported by `@waveform-playlist/browser` (`AnnotationIntegrationProvider` is replaced by `AnnotationIntegrationContext`: [its own entry](#annotationintegrationprovider-and-spectrogramintegrationprovider-are-replaced-by-their-contexts)); `AudioPosition` of `@waveform-playlist/browser`; `SnapTo` and the conversion functions of `@waveform-playlist/core`; the five controls that `@waveform-playlist/ui-components` and `@waveform-playlist/browser` both export.
+Not changed by this entry: `AnnotationProvider`, `AnnotationBox` and `AnnotationBoxesWrapper` (both change in [a later entry](#props-and-components-the-packages-did-not-use-are-removed) and [`AnnotationBox` draws its edge handles only with `editable`](#annotationbox-draws-its-edge-handles-only-with-editable)), `AnnotationText`, `parseAeneas` and `serializeAeneas` of `@waveform-playlist/annotations`; `WaveformAnnotationBoxes` and `AnnotationList` of `@waveform-playlist/browser`, which still draw nothing without `<AnnotationProvider>`; `useAnnotationIntegration()`, still exported by `@waveform-playlist/browser` (`AnnotationIntegrationProvider` is replaced by `AnnotationIntegrationContext`: [its own entry](#annotationintegrationprovider-and-spectrogramintegrationprovider-are-replaced-by-their-contexts)); `AudioPosition` of `@waveform-playlist/browser`; `SnapTo` and the conversion functions of `@waveform-playlist/core`; the five controls that `@waveform-playlist/ui-components` and `@waveform-playlist/browser` both export.
 
 ### What to check after the replacement
 
@@ -4088,7 +4088,7 @@ In the last release `useClipDragHandlers` took `{ tracks, onTracksChange, sample
 - **A clip still loading** cannot be dragged, trimmed or split: its placeholder has no handles, and `splitClipAt` returns `false` for it.
 - **The handlers' identity:** within one mount of the provider (the arrangement and the provider's trim preview do not change then) `onDragStart` keeps its identity, `onDragMove` changes with `samplesPerPixel` or the sample rate, and `onDragEnd` with `samplesPerPixel`.
 
-In plain JavaScript leftover `tracks`, `onTracksChange`, `samplesPerPixel`, `engineRef` and `isDraggingRef` options are ignored (a leftover `samplesPerPixel` changes nothing: the hooks read the same value from the provider). TypeScript reports them (`Object literal may only specify known properties`). `ClipCollisionModifier.configure({ tracks, samplesPerPixel })` still takes tracks: give it `usePlaylistTimeline().tracks` (its `tracks` is typed `readonly ClipTrack[]` or a function returning one).
+In plain JavaScript leftover `tracks`, `onTracksChange`, `samplesPerPixel`, `engineRef` and `isDraggingRef` options are ignored. A leftover `samplesPerPixel` changes nothing when it was `usePlaylistZoom().samplesPerPixel`, as the docs said to pass; a different value (a constant, a state of your own) is now replaced by the provider's zoom level for the trim and the split snapping. TypeScript reports them: `Object literal may only specify known properties` for `useClipDragHandlers`, `Expected 0 arguments, but got 1` for `useClipSplitting`. `ClipCollisionModifier.configure({ tracks, samplesPerPixel })` still takes tracks: give it `usePlaylistTimeline().tracks` (its `tracks` is typed `readonly ClipTrack[]` or a function returning one).
 
 **Find:** `useClipDragHandlers({` and `useClipSplitting({` with `tracks`, `onTracksChange`, `samplesPerPixel`, `engineRef` or `isDraggingRef`.
 
@@ -4823,7 +4823,7 @@ const { masterVolume } = usePlaylistMixer();
 const { zoomIn, zoomOut, setMasterVolume } = useEditorControls();
 ```
 
-## Props that nothing read are removed
+## Props and components the packages did not use are removed
 
 **Packages:** `@waveform-playlist/ui-components` and `@waveform-playlist/annotations`.
 
@@ -4833,14 +4833,14 @@ const { zoomIn, zoomOut, setMasterVolume } = useEditorControls();
 | `StyledPlaylist` | `Playlist` with the theme injected into the unread `theme` prop | `Playlist` |
 | `LoopRegion`, `LoopRegionProps` | an overlay with two markers; the views draw the loop with `TimescaleLoopRegion`, which stays | `TimescaleLoopRegion`, or an overlay of your own |
 | `trackIndex`, `clipIndex` of `ClipHeader` and `ClipBoundary` | nothing (`Clip` keeps both: they are in the drag data) | remove the props |
-| `isOverlay` of `Clip` | drew the clip in the flow (not at its position) for a drag overlay; nothing in the packages renders a drag overlay | no replacement: a `Clip` is placed at its `startSample` |
-| `offset` of `Track` (the views passed 0) | a left padding in pixels inside the track | shift the clips (`startSample`), or a wrapper of your own with `padding-left` |
-| `offset` of `AnnotationBoxesWrapper` (`@waveform-playlist/annotations`) | a left padding in pixels inside the wrapper | add it to the boxes' `startPosition` and `endPosition` |
+| `isOverlay` of `Clip` | drew the clip in the flow (not at its position) for a drag overlay, without drag or trim handles; nothing in the packages renders a drag overlay | no replacement: a `Clip` is placed at its `startSample`. A copy left with `isOverlay` in plain JavaScript is now a real clip: with `showHeader` it registers the header and both edges as draggables under the clip's own ids, beside the clip it copies |
+| `offset` of `Track` (the views passed 0) | a `padding-left` inside the track. It moved only children placed in the flow, such as a `Channel` rendered straight in the track; a `Clip` sets its own `left` and was not moved | remove it; for content of your own, a wrapper with `padding-left`. The track's row element no longer has an inline `padding-left: 0px`, so a `padding` your CSS gives that element now applies |
+| `offset` of `AnnotationBoxesWrapper` (`@waveform-playlist/annotations`) | a `padding-left` inside the wrapper. It moved only children placed in the flow; an `AnnotationBox` sets its own `left` and was not moved | remove it; for content of your own, a wrapper with `padding-left` |
 | `samplesPerPixel` of `SpectrogramChannel` (it was required) | nothing | remove the prop |
 | `samplesPerPixel` of `SmartChannel` | overrode the `PlaylistInfoContext` value for a piano roll (the spectrogram did not read it) | the `samplesPerPixel` of the `PlaylistInfoContext` value around it |
 | `label` of `TrackMenuItem` | nothing: `TrackMenu` draws each item's `content` | remove the field |
 
-In plain JavaScript a leftover prop is ignored; for `offset` that removes the padding it made, and for `SmartChannel`'s `samplesPerPixel` the context's value is used. TypeScript reports each one.
+In plain JavaScript a leftover prop is ignored (`isOverlay` aside, above); for `offset` that removes the padding it made, which moved no clip and no annotation box, and for `SmartChannel`'s `samplesPerPixel` the context's value is used. TypeScript reports each one.
 
 **Find:** the names in the first column.
 
@@ -4883,13 +4883,32 @@ The fades are also the `fadeIn` and `fadeOut` of the `track` you give the provid
 
 **Package:** `@waveform-playlist/browser`.
 
-`MediaElementPlaylistProvider` read `samplesPerPixel` once, at mount. There is no zoom control under this provider, so the prop is the only place the zoom level is set, and the provider now follows it: a new value redraws the waveform at it (`usePlaylistZoom().samplesPerPixel` takes it), and the player is not rebuilt.
+`MediaElementPlaylistProvider` read `samplesPerPixel` once, at mount. There is no zoom control under this provider, so the prop is the only place the zoom level is set, and the provider now follows it: a new value redraws the waveform at it (`usePlaylistZoom().samplesPerPixel` takes it), and the player is not rebuilt. The view stays anchored as described in [the next entry](#a-zoom-change-keeps-the-time-under-the-pointer-or-the-time-at-the-centre).
+
+A value finer than the waveform data (below its `scale`, the samples per pixel the `.dat` file was made at) is drawn at the data's own resolution, and `usePlaylistZoom().samplesPerPixel` reports that value. Before, such a value (at mount) left the track's row empty, with the console warning `Failed to extract peaks from waveform data: … Zoom level … too low`.
 
 `automaticScroll` (both providers) and the `samplesPerPixel` of `WaveformPlaylistProvider` stay initial values. The provider owns them afterwards (`setAutomaticScroll` of `usePlaybackControls()`; `zoomIn` and `zoomOut` of `useEditorControls()`), and a later change of the prop is not followed, as before.
 
 **Find:** a `samplesPerPixel` on `MediaElementPlaylistProvider` that changes after mount (state of the app, a prop passed down). If the old behaviour, a level fixed at mount, is what you want, pass a value that does not change.
 
 **Replace with:** nothing to change: the change now shows.
+
+## A zoom change keeps the time under the pointer, or the time at the centre
+
+**Package:** `@waveform-playlist/browser` (both providers).
+
+When the zoom level changes (`zoomIn()` / `zoomOut()` of `useEditorControls()`, the MediaElement provider's `samplesPerPixel` prop), the view keeps the time under a hovering mouse or pen where it is, when the pointer is over the waveform. Otherwise it keeps the time at the centre of the view where it is, which is what `WaveformPlaylistProvider` did before; the MediaElement player kept the scroll position in pixels, so the visible audio jumped. A touch does not hover: after a tap the centre is kept. A click on the Zoom In or Zoom Out button puts the pointer on the button, so the buttons keep the centre.
+
+Two more changes:
+
+- **A zoom out from a scrolled view no longer jumps.** `WaveformPlaylistProvider` read the scroll position after the content had shrunk, when the browser had already clamped it to the new width, and kept the wrong time at the centre (on the multi-clip example, a Zoom Out from the middle of the timeline moved the centre by 12% of the timeline's length: `e2e/multi-clip.spec.ts`, "a zoom button keeps the time at the centre of the view where it is", run against the previous provider). The anchor now starts from the position before the zoom.
+- **The scroll is set before the new zoom is painted** (a layout effect), not after (an effect).
+
+A Ctrl/⌘ + wheel or pinch zoom gesture is not part of the library yet: [#933](https://github.com/naomiaro/waveform-playlist/issues/933).
+
+**Find:** code that sets the scroll container's `scrollLeft` after a zoom of its own, to keep a point in view: it now runs after the provider's adjustment and replaces it.
+
+**Replace with:** nothing for most apps. To keep another point than the pointer or the centre (the playhead, a selection), set `scrollLeft` in a `useEffect` that depends on `usePlaylistZoom().samplesPerPixel`, in a component below the provider. A `useLayoutEffect` there would not do: a child's layout effects run before the provider's, whose adjustment would replace the value.
 
 ## `AnnotationIntegrationProvider` and `SpectrogramIntegrationProvider` are replaced by their contexts
 
@@ -4914,7 +4933,7 @@ import { AnnotationIntegrationContext } from '@waveform-playlist/browser';
 
 **Package:** `@waveform-playlist/spectrogram`, with its type: `SpectrogramMenuItemsProps` is `SpectrogramMenuItemsOptions`.
 
-It is a function that returns an array of `TrackMenuItem`, not a component; the name says so now. It takes the same options and returns the same items.
+It is a function that returns an array of `TrackMenuItem`, not a component; the name says so now. It takes the same options and returns the same items, without the `label` the first one had (`TrackMenuItem.label` is removed: [above](#props-and-components-the-packages-did-not-use-are-removed)).
 
 **Find:** `SpectrogramMenuItems` and `SpectrogramMenuItemsProps`.
 

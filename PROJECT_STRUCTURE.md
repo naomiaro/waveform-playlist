@@ -202,7 +202,7 @@ const clip = createClipFromSeconds({
   │   ├── SpectrogramLabels.tsx  # Frequency axis labels
   │   ├── Playhead.tsx           # Playback position indicator
   │   ├── Selection.tsx          # Selection overlay
-  │   ├── LoopRegion.tsx         # Loop region overlay
+  │   ├── LoopRegion.tsx         # TimescaleLoopRegion and LoopRegionMarkers (the loop in the timescale)
   │   ├── FadeOverlay.tsx        # Fade in/out visualization
   │   ├── SegmentedVUMeter.tsx   # LED-style VU meter (multi-channel; `meter` source or `levels` props)
   │   ├── ErrorBoundary.tsx      # PlaylistErrorBoundary (plain CSS)
@@ -288,7 +288,7 @@ const clip = createClipFromSeconds({
   - `SpectrogramChannel` - Spectrogram canvas rendering (chunked)
   - `SpectrogramLabels` - Frequency axis labels
   - `FadeOverlay` - Fade in/out visualization
-  - `LoopRegion` - Loop region overlay
+  - `TimescaleLoopRegion` - The loop region in the timescale (draggable markers)
   - `SegmentedVUMeter` - LED-style VU meter (horizontal/vertical, multi-channel, configurable dB range/color stops/peak hold). Takes a `MeterSource` (`meter` prop, drawn directly to the DOM) or `levels`/`peakLevels` props
   - `useThrottledValue` / `useMeterLevels` (`src/hooks/useThrottledValue.ts`) - a `ValueSource` as React state, at most `updateRate` times a second
   - `PlaylistErrorBoundary` - Error boundary with plain CSS (no ThemeProvider dependency)
@@ -333,6 +333,7 @@ const clip = createClipFromSeconds({
   │   ├── useReadyOnce.ts               # WaveformPlaylistProvider: isReady, onReady and the ready event once per mount; Play refused before the first ready
   │   ├── useAnnotationState.ts         # the annotationStore prop's list (read, never written), getAnnotations for the loop, preview, active id, the three options (state that follows the annotationList prop); AnnotationListProp
   │   ├── useScrollFollow.ts            # scroll container, automatic scroll, centrePlayhead()
+  │   ├── zoomAnchor.ts                 # useZoomAnchor: a zoom keeps the time under the hovering pointer (or the centre); the committed zoom for the loop
   │   ├── useFrameCallbacks.ts          # frame-callback registry + FrameData
   │   ├── followAnnotations.ts          # annotation step of the animation loop (pure)
   │   ├── useMergedTheme.ts             # the theme prop merged over defaultTheme
@@ -892,7 +893,7 @@ Rendered by both `WaveformPlaylistProvider` and `MediaElementPlaylistProvider` (
    - `timeFormat`, `isAutomaticScroll`
    - Apart from the view value because every clip's progress overlay and the visualization read that one
 
-11. **PlaylistZoomContext** (`usePlaylistZoom()`) - Changes on a zoom (fixed under the MediaElement provider)
+11. **PlaylistZoomContext** (`usePlaylistZoom()`) - Changes on a zoom (under the MediaElement provider: its `samplesPerPixel` prop)
 
 Rendered by `WaveformPlaylistProvider` only, blocked by `MediaElementPlaylistProvider` (12, three of them internal):
 
@@ -929,7 +930,7 @@ Rendered by `MediaElementPlaylistProvider` only, blocked by `WaveformPlaylistPro
 
 24. **PlaybackRateContext** (`usePlaybackRate()`) - The playback speed and its setter
 
-25. **MediaElementTrackContext** (`useMediaElementTrack()`) - Duration, `isReady`, peaks, fades and the player ref of the one track
+25. **MediaElementTrackContext** (`useMediaElementTrack()`) - Duration, `isReady`, peaks (their clip carries the fades) and the player ref of the one track
 
 **Key Files:**
 

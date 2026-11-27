@@ -612,7 +612,7 @@ function Transcript({
 
 ### AnnotationBox
 
-One annotation box with a handle on each edge.
+One annotation box; with `editable`, a handle on each edge.
 
 ```tsx
 import { AnnotationBox } from '@waveform-playlist/annotations';

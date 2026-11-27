@@ -790,6 +790,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     };
     startAnimationFrameLoop(updateTime);
   }, [
+    samplesPerPixelRef,
     setActiveAnnotationId,
     startAnimationFrameLoop,
     getPlaybackTime,

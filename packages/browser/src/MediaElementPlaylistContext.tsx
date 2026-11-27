@@ -172,6 +172,21 @@ export interface MediaElementPlaylistProviderProps {
  *
  * For multi-track editing, use WaveformPlaylistProvider instead.
  */
+/**
+ * The waveform data's own samples per pixel, the finest zoom its peaks can be
+ * drawn at; 0 (no limit) when it cannot be read. The peak extraction reads
+ * the same data, warns that it failed and draws an empty row, so the error is
+ * reported there and not twice.
+ */
+function dataSamplesPerPixel(data: WaveformDataObject): number {
+  try {
+    const scale = data.scale;
+    return Number.isFinite(scale) && scale > 0 ? scale : 0;
+  } catch {
+    return 0;
+  }
+}
+
 export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProviderProps> = ({
   track,
   samplesPerPixel: samplesPerPixelProp = 1024,
@@ -276,7 +291,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   const currentTimeRef = useRef<number>(0);
   // The zoom level follows the prop (#828), no finer than the waveform data:
   // peaks cannot be drawn below the data's own samples per pixel.
-  const samplesPerPixel = Math.max(samplesPerPixelProp, track.waveformData.scale);
+  const samplesPerPixel = Math.max(samplesPerPixelProp, dataSamplesPerPixel(track.waveformData));
   // The committed level for the animation loop; a change keeps the time under
   // the hovering pointer (or the centre) in place, as the WebAudio provider does.
   const samplesPerPixelRef = useZoomAnchor(scrollContainerRef, samplesPerPixel);
@@ -677,6 +692,7 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
 
     startAnimationFrameLoop(updateTime);
   }, [
+    samplesPerPixelRef,
     sampleRate,
     startAnimationFrameLoop,
     isAutomaticScrollRef,

@@ -191,7 +191,7 @@ interface PlaylistSettingsContextValue {
 
 ### usePlaylistZoom
 
-The zoom level. The value changes on a zoom. Under `MediaElementPlaylistProvider` the level is fixed: `canZoomIn` and `canZoomOut` are always `false`.
+The zoom level. The value changes on a zoom. Under `MediaElementPlaylistProvider` the level is its `samplesPerPixel` prop (followed, no finer than the waveform data): `canZoomIn` and `canZoomOut` are always `false`.
 
 ```typescript
 function usePlaylistZoom(): PlaylistZoomContextValue;

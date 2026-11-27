@@ -102,6 +102,8 @@ interface FadeConfig {
 
 Zoom level for waveform rendering. The provider follows it: a new value redraws the waveform at it, and the player is not rebuilt. There is no zoom control under this provider (`canZoomIn` and `canZoomOut` are always `false`), so this prop is the only place the level is set.
 
+On a change the view keeps the time under a hovering mouse or pen where it is when the pointer is over the waveform, and the time at the centre of the view otherwise. A value finer than the waveform data (below its `scale`, the samples per pixel the `.dat` file was made at) is drawn at the data's own resolution, and `usePlaylistZoom().samplesPerPixel` reports that value.
+
 `waveHeight`, `barWidth`, `barGap`, `roundedBars` and `progressBarWidth` are props of [`<WaveformViewOptions>`](/docs/react/api/components#waveformviewoptions), not of the provider. `waveHeight` is the height of one channel and is 80 px by default (it was 100 while it was a prop of this provider); the row is that times the number of channels, plus the clip header when the view has one. A leftover one on the provider is a compile error in TypeScript and is ignored in plain JavaScript (the defaults are drawn). See the [upgrade guide](/docs/react/upgrading#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers).
 
 The time ruler is not a provider prop. It is a part of the view: `<MediaElementWaveform />` draws it, and a composition has it when it renders `<WaveformTimescale />` inside `<MediaElementWaveformRoot>`. There is no controls column for this player. See [Composing the View](/docs/react/guides/composing-the-view).

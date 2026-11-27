@@ -99,7 +99,7 @@ describe('MediaElementPlaylistProvider follows its samplesPerPixel prop', () => 
     expect(engine.created).toBe(1);
   });
 
-  it('a value finer than the waveform data is drawn at the data\'s resolution', async () => {
+  it("a value finer than the waveform data is drawn at the data's resolution", async () => {
     const view = render(ui({ samplesPerPixel: WAVEFORM_SPP }));
     await waitFor(() => expect(engine.created).toBe(1));
     view.rerender(ui({ samplesPerPixel: 220 }));
@@ -107,7 +107,7 @@ describe('MediaElementPlaylistProvider follows its samplesPerPixel prop', () => 
     expect(drawnLength()).toBe(LENGTH);
   });
 
-  it('a starting value finer than the data is drawn at the data\'s resolution too', async () => {
+  it("a starting value finer than the data is drawn at the data's resolution too", async () => {
     render(ui({ samplesPerPixel: 100 }));
     await waitFor(() => expect(engine.created).toBe(1));
     expect(seen.zoom!.samplesPerPixel).toBe(WAVEFORM_SPP);
@@ -189,13 +189,13 @@ describe('the animation loop uses the committed zoom', () => {
         await play!(0);
       });
       flushFrame();
-      expect(frameSpp.at(-1)).toBe(WAVEFORM_SPP);
+      expect(frameSpp[frameSpp.length - 1]).toBe(WAVEFORM_SPP);
       await act(async () => {
         startTransition(() => setSpp(WAVEFORM_SPP * 2));
       });
       flushFrame();
       expect(committedZoom).toBe(WAVEFORM_SPP);
-      expect(frameSpp.at(-1)).toBe(WAVEFORM_SPP);
+      expect(frameSpp[frameSpp.length - 1]).toBe(WAVEFORM_SPP);
     } finally {
       globalThis.requestAnimationFrame = raf;
       globalThis.cancelAnimationFrame = caf;

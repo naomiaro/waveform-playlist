@@ -83,7 +83,7 @@ Audio starts loading when the provider has its first adapter: nothing is fetched
 **Type:** `number`
 **Default:** `1024`
 
-The zoom level the provider starts at. Higher values show more audio, lower values show more detail. This is the initial value: afterwards the engine owns the level, which `useEditorControls().zoomIn()` and `zoomOut()` change (through `zoomLevels`), and a later change of the prop is not followed.
+The zoom level the provider starts at. Higher values show more audio, lower values show more detail. This is the initial value: afterwards the engine owns the level, which `useEditorControls().zoomIn()` and `zoomOut()` change (through `zoomLevels`), and a later change of the prop is not followed. On a zoom the view keeps the time under a hovering mouse or pen where it is when the pointer is over the tracks, and the time at the centre of the view otherwise (so the Zoom In and Zoom Out buttons keep the centre).
 
 | Value | Use Case |
 |-------|----------|

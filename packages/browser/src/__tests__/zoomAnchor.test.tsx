@@ -68,7 +68,10 @@ function fakeLayout(element: HTMLDivElement, scrollLeft = 1000) {
 }
 
 const laidOut = new WeakSet<HTMLDivElement>();
-const state = { element: null as HTMLDivElement | null, committed: null as React.RefObject<number> | null };
+const state = {
+  element: null as HTMLDivElement | null,
+  committed: null as React.RefObject<number> | null,
+};
 const Harness: React.FC<{ spp: number }> = ({ spp }) => {
   const ref = useRef<HTMLDivElement | null>(null);
   state.committed = useZoomAnchor(ref, spp);

@@ -20,6 +20,8 @@ This page contains all TypeScript interfaces extracted from source code. Designe
 
 ## Provider Props (WaveformPlaylistProvider)
 
+The props type is exported: `import type { WaveformPlaylistProviderProps } from '@waveform-playlist/browser'` (since #828). On a zoom change either provider keeps the time under a hovering mouse or pen where it is when the pointer is over the waveform, and the time at the centre otherwise (a zoom button keeps the centre).
+
 ```typescript
 interface WaveformPlaylistProviderProps {
   /** The owner of the tracks, the mix, the undo history and the loading (#812):
@@ -102,6 +104,8 @@ interface WaveformPlaylistProviderProps {
 
 ## Provider Props (MediaElementPlaylistProvider)
 
+The props type is exported: `import type { MediaElementPlaylistProviderProps } from '@waveform-playlist/browser'` (since #828).
+
 ```typescript
 interface FadeConfig {
   duration: number;                      // Duration of the fade in seconds
@@ -120,7 +124,7 @@ interface MediaElementPlaylistProviderProps {
   track: MediaElementTrackConfig;
   children: ReactNode;
   audioContext?: AudioContext;            // Enables Web Audio routing (fades, effects)
-  samplesPerPixel?: number;              // Default: 1024. Followed: a new value redraws the waveform at it (no zoom control here)
+  samplesPerPixel?: number;              // Default: 1024. Followed: a new value redraws the waveform at it (no zoom control here); no finer than the waveform data's scale
   playbackRate?: number; // Default: 1. Not clamped by the provider (setPlaybackRate clamps to 0.5–2.0)
   preservesPitch?: boolean;              // Default: true (set false for external pitch processor)
   automaticScroll?: boolean;             // Default: false. Initial value: setAutomaticScroll() changes it; a later prop change is not followed. While on, a drag during playback is one seek to the press, no range
@@ -403,7 +407,8 @@ interface PlaylistSettingsContextValue {
 ```typescript
 /**
  * The zoom level (#768). Changes on a zoom. Under the MediaElement provider
- * the level is fixed: `canZoomIn` and `canZoomOut` are always false.
+ * the level is its `samplesPerPixel` prop (followed, no finer than the
+ * waveform data); `canZoomIn` and `canZoomOut` are always false.
  */
 interface PlaylistZoomContextValue {
   samplesPerPixel: number;
@@ -982,7 +987,9 @@ interface AnnotationTextProps {
 // Removed (#867): onAnnotationUpdate. The id field refuses an empty id and an id another
 // annotation has (nothing written; the stored id is shown again).
 // The browser package types what it passes as AnnotationTextIntegrationProps (in
-// AnnotationIntegration): the same fields, `store` included.
+// AnnotationIntegration): the same fields, `store` included. <AnnotationProvider> provides
+// it; code of your own provides one with <AnnotationIntegrationContext value={…}>
+// (`AnnotationIntegrationContext` and `useAnnotationIntegration` from @waveform-playlist/browser).
 ```
 
 ## Effects Hooks

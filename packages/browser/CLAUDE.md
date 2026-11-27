@@ -223,8 +223,8 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 **Key Hooks:**
 
-- `useClipDragHandlers` - Drag-to-move and boundary trimming on the provider's arrangement (`{ samplesPerPixel, snapSamplePosition? }`; no `tracks` or `engineRef` option): a move is one `arrangement.moveClip()` on drop, a trim a view-only preview and then one `arrangement.trimClip()` on release; clips found by id
-- `useClipSplitting` - Split clips at playhead (`{ samplesPerPixel }`); `splitClipAt(trackId, clipId, splitTime)` takes ids and makes one `arrangement.splitClip()`
+- `useClipDragHandlers` - Drag-to-move and boundary trimming on the provider's arrangement (`{ snapSamplePosition? }`, the zoom read from `usePlaylistZoom()`; no `tracks`, `engineRef` or `samplesPerPixel` option): a move is one `arrangement.moveClip()` on drop, a trim a view-only preview and then one `arrangement.trimClip()` on release; clips found by id
+- `useClipSplitting` - Split clips at playhead (no options: the zoom is read from `usePlaylistZoom()`); `splitClipAt(trackId, clipId, splitTime)` takes ids and makes one `arrangement.splitClip()`
 - `useKeyboardShortcuts` - Flexible keyboard shortcut system
 - `usePlaybackShortcuts` - Default playback shortcuts (0 = rewind to start)
 - `useAnnotationKeyboardControls` - Annotation navigation, editing, auto-scroll, and playback (`{ store, activeAnnotationId, … }`: the boundary keys update the store's current list, the active annotation found by id)
