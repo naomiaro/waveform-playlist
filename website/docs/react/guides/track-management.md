@@ -363,7 +363,7 @@ setTrackPan(trackId, -1);
 
 ### Pan law
 
-How a track is panned depends on its pan law: `'mono'` (equal power, 3 dB down per side at centre) or `'stereo'` (unity at centre). A track takes the law of the first audio it holds and keeps it, whatever clips follow; `useTrack().panLaw` reads `'auto'` until then. The built-in panel (`DefaultTrackControls`) has no control for it, so the law can only be changed by a control your app draws. To let a user choose:
+How a track is panned depends on its pan law: `'mono'` (equal power, 3 dB down per side at centre) or `'stereo'` (unity at centre). A track takes the law of the first audio it holds and keeps it, whatever clips follow; `useTrack().panLaw` reads `'auto'` until then. The built-in panel (`DefaultTrackControls`) has no control for it, so a person using your app can change it only through a control you draw. To let a user choose:
 
 ```tsx
 // In a track's panel (among the children of <WaveformTrackControls>)
@@ -384,7 +384,7 @@ function PanLawButtons() {
 
 The [effects guide](./effects.md#a-tracks-pan-law) says what each law does to a clip of the other kind.
 
-A track keeps its mute, solo, volume and pan for as long as its id is in the arrangement: removing another track, adding tracks in front of it or reordering does not reset it, and an undo or a redo never changes it. The setters work with no engine attached (before the first build, during a rebuild).
+A track keeps its mute, solo, volume, pan and pan law for as long as its id is in the arrangement: removing another track, adding tracks in front of it or reordering does not reset it. An undo or a redo brings back the mix of the state it returns to ([Undo of Mixer Moves](#undo-of-mixer-moves)). The setters work with no engine attached (before the first build, during a rebuild).
 
 ## Track Selection
 
