@@ -79,6 +79,25 @@ const effectConstructors: Record<string, EffectConstructor> = {
   stereoWidener: asEffectConstructor(StereoWidener),
 };
 
+/**
+ * Tone's Chorus, Tremolo, AutoPanner and AutoFilter build their LFO stopped
+ * and run it only after `start()`: never started, each is a fixed delay, gain,
+ * pan and filter (#820). Phaser and Vibrato start theirs in the constructor
+ * and have no `start()`; no other built-in has one. So an effect that can be
+ * started is started, here, once: an effect in a chain is on for as long as
+ * it exists (bypass is done by the chain), and `dispose()` stops the LFO.
+ *
+ * The LFO is not tied to the transport: live it runs from the moment the
+ * effect is added (from the first resume when the context is still
+ * suspended), in a WAV export from time 0.
+ */
+function startModulation(effect: ToneAudioNode): void {
+  const startable = effect as ToneAudioNode & { start?: () => unknown };
+  if (typeof startable.start === 'function') {
+    startable.start();
+  }
+}
+
 // Generate unique instance ID
 let instanceCounter = 0;
 const generateInstanceId = (): string => {
@@ -118,6 +137,7 @@ export function createToneEffectInstance(
 
   // Create the effect instance
   const effect = new Constructor(options);
+  startModulation(effect);
   const instanceId = generateInstanceId();
 
   // Dynamic property access on Tone.js effects for parameter get/set.
