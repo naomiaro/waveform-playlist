@@ -1,4 +1,4 @@
-import { createPanStage, type PanStage } from '@waveform-playlist/core';
+import { createPanStage, type DecidedPanLaw, type PanStage } from '@waveform-playlist/core';
 
 const PREFIX = '[waveform-playlist] ';
 
@@ -16,8 +16,8 @@ const PREFIX = '[waveform-playlist] ';
  * Pan is core's gain-matrix stage, not a `StereoPannerNode` (#669): a
  * panner picks its law from the layout it RECEIVES, which pre-fader is the
  * effects chain's output — a stereo reverb on a mono track would sit ~3 dB
- * louder at centre. The stage takes its law from `sourceChannelCount`, the
- * max channel count of the track's clips, whatever the chain outputs.
+ * louder at centre. The stage takes its law from `panLaw` (the track's own,
+ * core's `trackPanLaw`), whatever the chain outputs.
  */
 export class TrackNode {
   readonly id: string;
@@ -27,13 +27,13 @@ export class TrackNode {
   private _muteNode: GainNode;
   private _effects: { input: AudioNode; output: AudioNode } | null = null;
 
-  constructor(id: string, audioContext: AudioContext, sourceChannelCount = 1) {
+  constructor(id: string, audioContext: AudioContext, panLaw: DecidedPanLaw = 'mono') {
     this.id = id;
     // Unity-gain summing point for the track's clip sources — the stable
     // node an effects chain is inserted after.
     this._inputNode = audioContext.createGain();
     this._volumeNode = audioContext.createGain();
-    this._panStage = createPanStage(audioContext, 0, sourceChannelCount);
+    this._panStage = createPanStage(audioContext, 0, panLaw);
     this._muteNode = audioContext.createGain();
 
     // Wire: input → volume → pan → mute (caller connects output via connectOutput)
@@ -60,10 +60,10 @@ export class TrackNode {
     this._panStage.setPan(value);
   }
 
-  /** Select the pan law from the track's source material: 1 = mono law
-   *  (−3 dB per side at centre), 2+ = stereo law (unity at centre). */
-  setSourceChannelCount(sourceChannelCount: number): void {
-    this._panStage.setSourceChannelCount(sourceChannelCount);
+  /** Switch the pan law: 'mono' (−3 dB per side at centre) or 'stereo'
+   *  (unity at centre). The gains ramp; the law it already has does nothing. */
+  setPanLaw(panLaw: DecidedPanLaw): void {
+    this._panStage.setPanLaw(panLaw);
   }
 
   setMute(muted: boolean): void {

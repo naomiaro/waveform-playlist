@@ -1,4 +1,4 @@
-import type { PlayoutTrack } from '@waveform-playlist/core';
+import type { PanLaw, PlayoutTrack } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import { Transport } from './transport';
 import type { Tick, TransportOptions, CountInMode } from './types';
@@ -149,6 +149,10 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
 
   setTrackPan(trackId: string, pan: number): void {
     this._transport.setTrackPan(trackId, pan);
+  }
+
+  setTrackPanLaw(trackId: string, panLaw: PanLaw): void {
+    this._transport.setTrackPanLaw(trackId, panLaw);
   }
 
   setLoop(enabled: boolean, start: number, end: number): void {

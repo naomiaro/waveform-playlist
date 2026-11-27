@@ -1,6 +1,6 @@
 /**
- * The mixer part of an arrangement: volume, mute, solo and pan by track id,
- * as pure functions over an immutable Map.
+ * The mixer part of an arrangement: volume, mute, solo, pan and pan law by
+ * track id, as pure functions over an immutable Map.
  *
  * The values live here and not on the track objects, so a fader move
  * replaces no track. The current Map holds an entry for each current track;
@@ -8,15 +8,29 @@
  * `volume` / `muted` / `soloed` / `pan` fields are the values it ENTERED
  * with; they seed its entry when its id has none, and are not read while it
  * has one.
+ *
+ * The pan law (#684) is `'auto'` until the track holds decoded audio; that
+ * audio decides it (`decidePanLaws`), and from then on the track's clips do
+ * not change it. `'auto'` is only ever the law of a track with no decoded
+ * audio, or of a MIDI track (which always plays with the mono law).
  */
 
-import type { ArrangementTrack } from '@waveform-playlist/core';
+import {
+  DEFAULT_PAN_LAW,
+  audioPanLaw,
+  isDecidedPanLaw,
+  isLoadingClip,
+  trackKind,
+} from '@waveform-playlist/core';
+import type { ArrangementTrack, AudioClip, DecidedPanLaw, PanLaw } from '@waveform-playlist/core';
 
 export interface TrackMixerValues {
   volume: number;
   muted: boolean;
   soloed: boolean;
   pan: number;
+  /** `'auto'` until the track's first decoded audio decides it (#684). */
+  panLaw: PanLaw;
 }
 
 export type Mixer = ReadonlyMap<string, TrackMixerValues>;
@@ -33,7 +47,45 @@ export function mixerValuesOf(track: ArrangementTrack): TrackMixerValues {
     muted: track.muted ?? false,
     soloed: track.soloed ?? false,
     pan: track.pan ?? DEFAULT_PAN,
+    panLaw: enteringPanLaw(track),
   };
+}
+
+/** The law of the decoded audio an audio track holds; null for a MIDI track or a track without any. */
+function decidedByAudio(track: ArrangementTrack): DecidedPanLaw | null {
+  if (trackKind(track) === 'midi') return null;
+  return audioPanLaw({
+    clips: track.clips.filter((clip): clip is AudioClip => !isLoadingClip(clip)),
+  });
+}
+
+/**
+ * The law a track enters with: its own field when that is a decided law,
+ * else the law of its decoded audio, else `'auto'`. A MIDI track enters with
+ * `'auto'` whatever it carries; so does a field that is not a law.
+ */
+function enteringPanLaw(track: ArrangementTrack): PanLaw {
+  if (trackKind(track) === 'midi') return DEFAULT_PAN_LAW;
+  if (isDecidedPanLaw(track.panLaw)) return track.panLaw;
+  return decidedByAudio(track) ?? DEFAULT_PAN_LAW;
+}
+
+/**
+ * First audio decides (#684): each track whose entry is `'auto'` and that
+ * holds decoded audio gets the law of that audio. An entry that has a law
+ * keeps it, whatever the clips are. The same Map when nothing changes.
+ */
+export function decidePanLaws(mixer: Mixer, tracks: readonly ArrangementTrack[]): Mixer {
+  let next: Map<string, TrackMixerValues> | null = null;
+  for (const track of tracks) {
+    const entry = mixer.get(track.id);
+    if (!entry || entry.panLaw !== DEFAULT_PAN_LAW) continue;
+    const panLaw = decidedByAudio(track);
+    if (!panLaw) continue;
+    if (!next) next = new Map(mixer);
+    next.set(track.id, { ...entry, panLaw });
+  }
+  return next ?? mixer;
 }
 
 /**
@@ -103,7 +155,13 @@ export function withoutEntry(mixer: Mixer, trackId: string): Mixer {
 }
 
 function sameValues(a: TrackMixerValues, b: TrackMixerValues): boolean {
-  return a.volume === b.volume && a.muted === b.muted && a.soloed === b.soloed && a.pan === b.pan;
+  return (
+    a.volume === b.volume &&
+    a.muted === b.muted &&
+    a.soloed === b.soloed &&
+    a.pan === b.pan &&
+    a.panLaw === b.panLaw
+  );
 }
 
 /** The same ids with the same values (compared by value, not by Map or entry identity). */
@@ -136,6 +194,7 @@ export function mixerChanges(
     if (was.muted !== now.muted) values.muted = now.muted;
     if (was.soloed !== now.soloed) values.soloed = now.soloed;
     if (was.pan !== now.pan) values.pan = now.pan;
+    if (was.panLaw !== now.panLaw) values.panLaw = now.panLaw;
     if (Object.keys(values).length > 0) changes.push({ trackId, values });
   }
   return changes;
@@ -154,7 +213,9 @@ export function withMixerValues<T extends ArrangementTrack>(
     (track.volume === values.volume &&
       track.muted === values.muted &&
       track.soloed === values.soloed &&
-      track.pan === values.pan)
+      track.pan === values.pan &&
+      // A track that carries no law is an 'auto' track: no copy for that alone.
+      (track.panLaw ?? DEFAULT_PAN_LAW) === values.panLaw)
   ) {
     return track;
   }

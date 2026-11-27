@@ -267,6 +267,14 @@ describe('NativePlayoutAdapter', () => {
     // Should not throw
   });
 
+  it('delegates the pan law to the transport', () => {
+    const ctx = mockAudioContext();
+    const adapter = new NativePlayoutAdapter(ctx);
+    const setTrackPanLaw = vi.spyOn(adapter.transport, 'setTrackPanLaw');
+    adapter.setTrackPanLaw('track-1', 'stereo');
+    expect(setTrackPanLaw).toHaveBeenCalledWith('track-1', 'stereo');
+  });
+
   it('delegates master volume', () => {
     const ctx = mockAudioContext();
     const adapter = new NativePlayoutAdapter(ctx);

@@ -1,4 +1,5 @@
-import { createPanStage, trackChannelCount } from '@waveform-playlist/core';
+import { createPanStage, trackPanLaw } from '@waveform-playlist/core';
+import type { PanLaw } from '@waveform-playlist/core';
 import {
   createEffectInstance,
   ensureEffectPrepared,
@@ -34,6 +35,8 @@ interface ExportTrack {
   id: string;
   volume: number;
   pan: number;
+  /** The track's pan law (the arrangement's mixer value). `'auto'` or none: from its clips. */
+  panLaw?: PanLaw;
   muted: boolean;
   soloed: boolean;
   clips: ExportClip[];
@@ -121,9 +124,9 @@ export async function exportAudioImpl(
       // compressor works. Order matters for every nonlinear effect.
       const volume = ctx.createGain();
       volume.gain.value = track.volume;
-      // Same pan stage as live (#669): the law comes from the clips' channel
-      // count, not from whatever layout the effects chain outputs.
-      const panStage = createPanStage(ctx, track.pan, trackChannelCount(track));
+      // Same pan stage as live (#669): the law is the track's own (#684),
+      // not whatever layout the effects chain outputs.
+      const panStage = createPanStage(ctx, track.pan, trackPanLaw(track));
       cleanups.push(panStage.dispose);
       chain.output.connect(volume);
       volume.connect(panStage.input);

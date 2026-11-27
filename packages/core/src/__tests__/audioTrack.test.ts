@@ -170,6 +170,11 @@ describe('audioTrack name', () => {
 });
 
 describe('audioTrack follow-ups', () => {
+  it('carries a pan law only when one is given', () => {
+    expect(audioTrack({ audioBuffer: buffer, panLaw: 'stereo' }).panLaw).toBe('stereo');
+    expect('panLaw' in audioTrack({ audioBuffer: buffer })).toBe(false);
+  });
+
   it('throws when offset is at or past the end of the audio', () => {
     expect(() => audioTrack({ audioBuffer: buffer, offset: 2 })).toThrow(
       'audioTrack: offset is past the end of the audio'

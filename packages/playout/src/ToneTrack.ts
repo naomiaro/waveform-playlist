@@ -13,6 +13,7 @@ import {
   applyFadeIn,
   applyFadeOut,
   createPanStage,
+  type DecidedPanLaw,
   type Fade,
   type PanStage,
 } from '@waveform-playlist/core';
@@ -54,8 +55,8 @@ export interface ToneTrackOptions {
   track: Track;
   effects?: TrackEffectsFunction;
   destination?: ToneAudioNode;
-  /** Max channel count across clips — selects the pan law (core's createPanStage). Default: 1 */
-  channelCount?: number;
+  /** The track's pan law (core's trackPanLaw). Default: 'mono' */
+  panLaw?: DecidedPanLaw;
 }
 
 /** Per-clip scheduling info and audio nodes */
@@ -92,11 +93,11 @@ export class ToneTrack {
     this.inputGain = new Gain({ gain: 1 });
     this.volumeNode = new Volume(gainToDb(options.track.gain));
     // Core's gain-matrix pan stage, built from native nodes on Tone's raw
-    // context. The pan LAW is chosen by the source's channel count.
+    // context. The pan LAW is the track's own (core's trackPanLaw).
     this.panStage = createPanStage(
       getContext().rawContext as BaseAudioContext,
       options.track.stereoPan,
-      options.channelCount ?? 1
+      options.panLaw ?? 'mono'
     );
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
 
@@ -301,13 +302,11 @@ export class ToneTrack {
   }
 
   /**
-   * Select the pan law from the track's source material: 1 = mono law,
-   * 2+ = stereo law. Call when the track's clips change — a stereo clip
-   * joining a mono track moves it to the stereo law (same rule as the
-   * native transport and the offline export).
+   * Switch the track's pan law (the gains ramp). The law is the track's own
+   * (#684): its clips do not change it, on any renderer.
    */
-  setSourceChannelCount(sourceChannelCount: number): void {
-    this.panStage.setSourceChannelCount(sourceChannelCount);
+  setPanLaw(panLaw: DecidedPanLaw): void {
+    this.panStage.setPanLaw(panLaw);
   }
 
   /**

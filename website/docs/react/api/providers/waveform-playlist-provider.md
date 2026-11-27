@@ -431,6 +431,7 @@ interface EditorControlsContextValue {
   setTrackSolo: (trackId: string, soloed: boolean, options?: MixerChangeOptions) => void;
   setTrackVolume: (trackId: string, volume: number, options?: MixerChangeOptions) => void;
   setTrackPan: (trackId: string, pan: number, options?: MixerChangeOptions) => void;
+  setTrackPanLaw: (trackId: string, panLaw: 'mono' | 'stereo', options?: MixerChangeOptions) => void;
   /** An undo step of the arrangement. */
   reorderTrack: (trackId: string, toIndex: number) => void;
   /** Internal wiring for ClipInteractionProvider. */

@@ -13,12 +13,18 @@
  * onto, read from the arrangement's `recordingTrackIds`.
  */
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import type { DecidedPanLaw } from '@waveform-playlist/core';
 import type { Arrangement, MixerChangeOptions } from '@waveform-playlist/engine';
 import type { DragGuard } from './dragGuard';
 import { warnOnce } from '../components/partWarnings';
 import type { RecordingTrackContextValue } from '../contexts/playlistContexts';
 
-type MixerSetter = 'setTrackMute' | 'setTrackSolo' | 'setTrackVolume' | 'setTrackPan';
+type MixerSetter =
+  | 'setTrackMute'
+  | 'setTrackSolo'
+  | 'setTrackVolume'
+  | 'setTrackPan'
+  | 'setTrackPanLaw';
 
 /** A call with anything but a string id is a call from before #687: ignored, once said. */
 function isTrackId(setter: MixerSetter, trackId: unknown): trackId is string {
@@ -35,6 +41,7 @@ export interface ArrangementEditing {
   setTrackSolo: (trackId: string, soloed: boolean, options?: MixerChangeOptions) => void;
   setTrackVolume: (trackId: string, volume: number, options?: MixerChangeOptions) => void;
   setTrackPan: (trackId: string, pan: number, options?: MixerChangeOptions) => void;
+  setTrackPanLaw: (trackId: string, panLaw: DecidedPanLaw, options?: MixerChangeOptions) => void;
   reorderTrack: (trackId: string, toIndex: number) => void;
   undo: () => void;
   redo: () => void;
@@ -149,6 +156,14 @@ export function useArrangementEditing(
     },
     [arrangement]
   );
+  const setTrackPanLaw = useCallback(
+    (trackId: string, panLaw: DecidedPanLaw, options?: MixerChangeOptions) => {
+      if (isTrackId('setTrackPanLaw', trackId)) {
+        arrangement.setTrackPanLaw(trackId, panLaw, options);
+      }
+    },
+    [arrangement]
+  );
   const reorderTrack = useCallback(
     (trackId: string, toIndex: number) => arrangement.reorderTrack(trackId, toIndex),
     [arrangement]
@@ -167,6 +182,7 @@ export function useArrangementEditing(
     setTrackSolo,
     setTrackVolume,
     setTrackPan,
+    setTrackPanLaw,
     reorderTrack,
     undo,
     redo,

@@ -1,6 +1,7 @@
 import type {
   FadeType,
   MidiNoteData,
+  PanLaw,
   RenderMode,
   SpectrogramConfig,
   TrackKind,
@@ -14,6 +15,8 @@ export interface TrackDescriptor {
   src: string;
   volume: number;
   pan: number;
+  /** The pan law: `'auto'` until the track's first decoded audio decides it (#684). */
+  panLaw: PanLaw;
   muted: boolean;
   soloed: boolean;
   /** What the track holds: audio clips or MIDI clips, never both (#756). */
@@ -58,12 +61,12 @@ export function trackDescriptorRenderMode(
 }
 
 /** The mixer fields of a `TrackDescriptor`. */
-export type TrackMixFields = 'volume' | 'pan' | 'muted' | 'soloed';
+export type TrackMixFields = 'volume' | 'pan' | 'muted' | 'soloed' | 'panLaw';
 
 /**
  * What `<daw-editor>` stores per track (internal, not exported from the
  * package): a `TrackDescriptor` without its mix. The mix is the arrangement's
- * (#843); `editor.tracks` fills the four fields in from it.
+ * (#843); `editor.tracks` fills the mix fields in from it.
  */
 export type StoredTrackDescriptor = Omit<TrackDescriptor, TrackMixFields>;
 
@@ -165,6 +168,13 @@ export interface TrackConfig {
   name?: string;
   volume?: number;
   pan?: number;
+  /**
+   * The pan law (#684): `'mono'` or `'stereo'`. In `addTrack` it is the law
+   * the track enters with (default: decided by its first decoded audio); in
+   * `updateTrack` it sets the law of an entered track. `'auto'` there, or a
+   * value that is not a law, changes nothing.
+   */
+  panLaw?: PanLaw;
   muted?: boolean;
   soloed?: boolean;
   /**

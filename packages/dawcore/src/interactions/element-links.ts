@@ -14,7 +14,7 @@
  *
  * Attributes are never written by the editor.
  */
-import type { MidiNoteData, TrackKind } from '@waveform-playlist/core';
+import type { MidiNoteData, PanLaw, TrackKind } from '@waveform-playlist/core';
 
 export type LinkState = 'pending' | 'live' | 'detached';
 
@@ -24,6 +24,8 @@ export interface TrackLinkValues {
   pan: number;
   muted: boolean;
   soloed: boolean;
+  /** `'auto'` until the track's first decoded audio decides it (#684). */
+  panLaw: PanLaw;
   name: string;
 }
 

@@ -31,6 +31,7 @@ import { isDomClip, normalizeRenderMode, trackDescriptorRenderMode } from '../ty
 import {
   createMixerGesture,
   clipPixelWidth,
+  isDecidedPanLaw,
   isLoadingClip,
   trackKind,
 } from '@waveform-playlist/core';
@@ -57,7 +58,13 @@ import type {
   PlayoutAdapter,
   TrackMixerValues,
 } from '@waveform-playlist/engine';
-import { DEFAULT_TRACK_MIX, clampNumber, mixOfElement, mixOfTrack } from '../utils/track-mix';
+import {
+  DEFAULT_TRACK_MIX,
+  clampNumber,
+  declaredPanLaw,
+  mixOfElement,
+  mixOfTrack,
+} from '../utils/track-mix';
 import '../elements/daw-track-controls';
 import '../elements/daw-grid';
 import { hostStyles, clipStyles } from '../styles/theme';
@@ -1586,7 +1593,11 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     if (field === 'volume') arrangement.setTrackVolume(trackId, value as number, options);
     else if (field === 'pan') arrangement.setTrackPan(trackId, value as number, options);
     else if (field === 'muted') arrangement.setTrackMute(trackId, value as boolean, options);
-    else arrangement.setTrackSolo(trackId, value as boolean, options);
+    else if (field === 'soloed') arrangement.setTrackSolo(trackId, value as boolean, options);
+    // A decided track does not go back to 'auto' (#684): only a law is a request.
+    else if (field === 'panLaw' && isDecidedPanLaw(value)) {
+      arrangement.setTrackPanLaw(trackId, value, options);
+    }
   }
   /**
    * Change the given mixer fields of a track as ONE undo step (#843): all
@@ -1602,6 +1613,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
     if (mix.pan !== undefined) this._writeMix(trackId, 'pan', mix.pan, options);
     if (mix.muted !== undefined) this._writeMix(trackId, 'muted', mix.muted, options);
     if (mix.soloed !== undefined) this._writeMix(trackId, 'soloed', mix.soloed, options);
+    if (mix.panLaw !== undefined) this._writeMix(trackId, 'panLaw', mix.panLaw, options);
   }
   get selectedTrackId(): string | null {
     return this._selectedTrackId;
@@ -3512,6 +3524,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       pan: config.pan ?? DEFAULT_TRACK_MIX.pan,
       muted: config.muted ?? false,
       soloed: config.soloed ?? false,
+      panLaw: declaredPanLaw(config.panLaw),
     };
     this._pending = new Map(this._pending).set(trackId, { descriptor, mix });
     const entered = this._waitForEntry(trackId);
@@ -3622,6 +3635,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       pan: partial.pan,
       muted: partial.muted,
       soloed: partial.soloed,
+      ...(partial.panLaw !== undefined && { panLaw: declaredPanLaw(partial.panLaw) }),
     };
     this._writeMixFields(trackId, mix);
     if (partial.name !== undefined) this._renameTrack(trackId, partial.name);
@@ -3663,6 +3677,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
       if (partial.name !== undefined) el.name = partial.name;
       if (partial.volume !== undefined) el.volume = partial.volume;
       if (partial.pan !== undefined) el.pan = partial.pan;
+      if (partial.panLaw !== undefined) el.panLaw = partial.panLaw;
       if (partial.muted !== undefined) el.muted = partial.muted;
       if (partial.soloed !== undefined) el.soloed = partial.soloed;
       if (partial.renderMode !== undefined) el.renderMode = partial.renderMode;
@@ -3689,6 +3704,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
         pan: partial.pan ?? mix.pan,
         muted: partial.muted ?? mix.muted,
         soloed: partial.soloed ?? mix.soloed,
+        panLaw: partial.panLaw !== undefined ? declaredPanLaw(partial.panLaw) : mix.panLaw,
       },
     });
   }

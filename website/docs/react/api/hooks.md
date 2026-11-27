@@ -258,6 +258,8 @@ interface TrackState {
   soloed: boolean;
   volume: number;
   pan: number;
+  /** The pan law: `'auto'` until the track's first decoded audio decides it. */
+  panLaw: PanLaw; // 'auto' | 'mono' | 'stereo'
 }
 ```
 
@@ -939,6 +941,8 @@ interface EditorControlsContextValue {
   setTrackSolo: (trackId: string, soloed: boolean, options?: MixerChangeOptions) => void;
   setTrackVolume: (trackId: string, volume: number, options?: MixerChangeOptions) => void;
   setTrackPan: (trackId: string, pan: number, options?: MixerChangeOptions) => void;
+  /** `'mono'` or `'stereo'`; any other value, `'auto'` included, throws a `TypeError`. */
+  setTrackPanLaw: (trackId: string, panLaw: 'mono' | 'stereo', options?: MixerChangeOptions) => void;
   /** Move a track to a new index in the vertical track order. Purely
    *  organizational — playback is not interrupted. An undo step of the
    *  arrangement. */
@@ -1036,6 +1040,8 @@ interface TrackContextValue {
   volume: number;
   /** -1 (left) to 1 (right). */
   pan: number;
+  /** The pan law: `'auto'` until the track's first decoded audio decides it. */
+  panLaw: PanLaw;
   /** How the track is drawn. Always `'waveform'` for a MIDI track. */
   renderMode: RenderMode;
 
@@ -1068,6 +1074,8 @@ interface TrackContextValue {
   setSoloed: (soloed: boolean, options?: MixerChangeOptions) => void;
   setVolume: (volume: number, options?: MixerChangeOptions) => void;
   setPan: (pan: number, options?: MixerChangeOptions) => void;
+  /** `'mono'` or `'stereo'`; any other value throws a `TypeError`. Nothing happens for a MIDI track. */
+  setPanLaw: (panLaw: 'mono' | 'stereo', options?: MixerChangeOptions) => void;
   /** Makes this the selected track. */
   select: () => void;
   /** Moves the track one position up. Nothing happens for the first track. */

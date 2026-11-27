@@ -281,6 +281,7 @@ describe('each hook returns its own group of fields (#768)', () => {
         'setTrackSolo',
         'setTrackVolume',
         'setTrackPan',
+        'setTrackPanLaw',
         'reorderTrack',
         'setTrackDragPreview',
         'setSelectedTrackId',

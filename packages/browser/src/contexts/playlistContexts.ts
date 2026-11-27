@@ -11,7 +11,12 @@
  * must not pull in the WebAudio provider through it.
  */
 import { createContext, use } from 'react';
-import type { ClipTrack, AnnotationData, AnnotationStore } from '@waveform-playlist/core';
+import type {
+  ClipTrack,
+  AnnotationData,
+  AnnotationStore,
+  DecidedPanLaw,
+} from '@waveform-playlist/core';
 import type { Arrangement, MixerChangeOptions, PlaylistEngine } from '@waveform-playlist/engine';
 import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
 import type { TimeFormat } from '@waveform-playlist/ui-components';
@@ -260,6 +265,14 @@ export interface EditorControlsContextValue {
   setTrackSolo: (trackId: string, soloed: boolean, options?: MixerChangeOptions) => void;
   setTrackVolume: (trackId: string, volume: number, options?: MixerChangeOptions) => void;
   setTrackPan: (trackId: string, pan: number, options?: MixerChangeOptions) => void;
+  /**
+   * Set a track's pan law (#684): `'mono'` (equal power, −3 dB per side at
+   * centre) or `'stereo'` (unity at centre, panning folds one channel into
+   * the other). A track takes its law from the first decoded audio it holds
+   * and keeps it, whatever clips follow; this changes it. Any other value,
+   * `'auto'` included, throws a `TypeError`. A MIDI track has no law to set.
+   */
+  setTrackPanLaw: (trackId: string, panLaw: DecidedPanLaw, options?: MixerChangeOptions) => void;
 
   /** Move a track to a new index in the vertical track order. Purely
    *  organizational — playback is not interrupted. An undo step of the

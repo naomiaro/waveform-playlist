@@ -82,7 +82,7 @@ React packages without a Web Components equivalent yet: the recording arming sur
 | Element                     | Wraps                                      | Responsibilities                                                                                                                                                                                                                                                            |
 | --------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `<daw-editor>`              | PlaylistEngine + external `PlayoutAdapter` | Root element. Manages engine, tracks, state. Requires a consumer-provided adapter (`editor.adapter`) — it creates no AudioContext or adapter of its own (#378).                                                                                                             |
-| `<daw-track>`               | Track state                                | Declares a track. Contains `<daw-clip>` children. Attributes: `name`, `volume`, `pan`, `muted`, `soloed`, `record-armed`, `input-device` (not implemented, #469), `kind`, `render-mode`. `src` is shorthand for a track with a single implicit clip.                                |
+| `<daw-track>`               | Track state                                | Declares a track. Contains `<daw-clip>` children. Attributes: `name`, `volume`, `pan`, `pan-law`, `muted`, `soloed`, `record-armed`, `input-device` (not implemented, #469), `kind`, `render-mode`. `src` is shorthand for a track with a single implicit clip.                                |
 | `<daw-clip>`                | AudioClip                                  | Audio or MIDI clip within a track. Attributes: `src`, `peaks-src`, `start`, `duration`, `offset`, `gain`, `name`, `color`, `fade-in`, `fade-out`, `fade-type`. Multiple clips sharing the same `src` share one decoded AudioBuffer.                                         |
 | `<daw-waveform>`            | Canvas rendering                           | Waveform visualization. Renders peaks to canvas.                                                                                                                                                                                                                            |
 | `<daw-transport>`           | Transport controls container               | Groups transport buttons, links to an editor via `for` attribute.                                                                                                                                                                                                           |
@@ -466,6 +466,7 @@ src              String    —        Audio source URL
 name             String    —        Track display name
 volume           Number    1        Track volume (0–1)
 pan              Number    0        Stereo pan (-1 to 1)
+pan-law          String    —        'mono' | 'stereo': the law the track enters with (default: its first decoded audio decides, #684)
 muted            Boolean   false    Track is muted
 soloed           Boolean   false    Track is soloed
 record-armed     Boolean   false    Track is armed for recording — not implemented (#469)
@@ -480,7 +481,7 @@ render-mode      String    waveform 'waveform' | 'spectrogram' | 'split'. Audio 
 track.recordArmed: boolean       // Reflects record-armed attribute — not implemented (#469)
 track.inputDevice: string|null   // Reflects input-device attribute — not implemented (#469)
 track.kind: 'audio' | 'midi'     // Reflects kind attribute; a change after the track has entered is ignored with a warning
-track.name / volume / pan / muted / soloed  // Live (#848): the arrangement's values while it holds the track (muted: the stored mute); a set is one undo step and never writes the attribute; the declaration otherwise
+track.name / volume / pan / panLaw / muted / soloed  // Live (#848; panLaw is 'auto' until the track has audio, #684): the arrangement's values while it holds the track (muted: the stored mute); a set is one undo step and never writes the attribute; the declaration otherwise
 track.index: number              // Read-only: position in the arrangement the editor plays, -1 when not in it
 track.renderMode: string         // Reflects render-mode attribute
 track.isRecording: boolean       // Read-only: currently recording (armed + editor.isRecording) — not implemented (#469)

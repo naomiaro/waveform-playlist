@@ -1,16 +1,16 @@
-import type { PlayoutTrack, Track } from '@waveform-playlist/core';
+import type { PanLaw, PlayoutTrack, Track } from '@waveform-playlist/core';
 import {
   clipStartTime,
   clipEndTime,
   clipOffsetTime,
   clipDurationTime,
-  trackChannelCount,
+  trackPanLaw,
   trackKind,
 } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import { TonePlayout } from './TonePlayout';
 import type { EffectsFunction } from './TonePlayout';
-import type { ClipInfo, TrackEffectsFunction } from './ToneTrack';
+import type { ClipInfo, ToneTrack, TrackEffectsFunction } from './ToneTrack';
 import type { MidiClipInfo } from './MidiToneTrack';
 import type { SoundFontCache } from './SoundFontCache';
 import { now } from 'tone';
@@ -145,7 +145,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       clips: clipInfos,
       track: trackObj,
       effects: options?.trackEffects?.(track.id),
-      channelCount: trackChannelCount(track),
+      panLaw: trackPanLaw(track),
     });
   }
 
@@ -362,13 +362,13 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
           gain: clip.gain,
         }));
 
-        // The pan law follows the track's clips (a stereo take on a mono
-        // track), exactly as on the native transport and in the export.
+        // The track's own pan law (#684), exactly as on the native transport
+        // and in the export; its clips do not change it.
         const audioUpdated = playout.replaceTrackClips(
           trackId,
           clipInfos,
           startTime,
-          trackChannelCount(track)
+          trackPanLaw(track)
         );
         if (audioUpdated) {
           playout.applyInitialSoloState();
@@ -477,6 +477,16 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       const existing = _currentTracks.get(trackId);
       if (existing) _currentTracks.set(trackId, { ...existing, pan });
       playout?.getTrack(trackId)?.setPan(pan);
+    },
+
+    // A track's pan law changed (#684). 'auto': from the clips of the track
+    // last sent. The clips are not replaced; the pan stage ramps. A MIDI or
+    // SoundFont track has no law to set.
+    setTrackPanLaw(trackId: string, panLaw: PanLaw): void {
+      const existing = _currentTracks.get(trackId);
+      const track = playout?.getTrack(trackId);
+      if (!existing || !track || !('setPanLaw' in track)) return;
+      (track as ToneTrack).setPanLaw(trackPanLaw({ ...existing, panLaw }));
     },
 
     setLoop(enabled: boolean, start: number, end: number): void {

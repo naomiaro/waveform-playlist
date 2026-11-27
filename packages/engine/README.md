@@ -117,7 +117,7 @@ The engine's track, clip, mixer, recording and history methods call the arrangem
 
 ### Mixer moves are undo steps
 
-`setTrackVolume`, `setTrackMute`, `setTrackSolo` and `setTrackPan` (on the arrangement and on the engine) are undo steps: an undo puts the fader back. Their last argument, `options?: MixerChangeOptions`, says how a change goes into the history:
+`setTrackVolume`, `setTrackMute`, `setTrackSolo`, `setTrackPan` and `setTrackPanLaw` (on the arrangement and on the engine) are undo steps: an undo puts the fader back. Their last argument, `options?: MixerChangeOptions`, says how a change goes into the history:
 
 - nothing: each call is a step of its own;
 - `{ gesture: id }`: calls with the same id, one after another, are one step (a fader drag from press to release);
@@ -238,7 +238,8 @@ Rules that hold for the engine and the arrangement alike:
 
 - **Nothing handed out is a copy.** `arrangement.getTracks()` and `engine.getState().tracks` are shared with the undo history. The tracks an adapter receives are copies without the view fields (core's `TRACK_VIEW_FIELDS`, typed `PlayoutTrack`) that share these clips, frozen the same way. Never write to the array, a track or a clip: copy first (`{ ...track, clips: [...] }`) and pass the copy to `updateTrack`. `arrangement.updateTrack`, given a track object or a function, keeps each clip object the track already holds and copies every other clip, so the clips you did not replace are the same objects afterwards. Outside production builds (`process.env.NODE_ENV` is not `'production'`; a page that loads the module with no bundler, and so has no `process`, counts as production) the tracks array, each track, its `clips` array and each clip are frozen, so a write throws in strict code (every module is strict). What a clip refers to (its `AudioBuffer`, peaks, fades, notes) is not frozen. Tracks are copied on their way in, so the objects you pass stay yours.
 - **A change replaces only what changed.** The tracks array and the changed track and clip objects are new; every other track is the same object as before, so a comparison by identity finds what changed. The exception is `setTracks`, which copies every track it is given: after it no track is the object it was.
-- **The mix is separate from the tracks.** A track's own `volume`, `muted`, `soloed` and `pan` fields are the values it enters with. They seed its mixer entry when its id has none. `setTracks` keeps the mix of an id that is in the tracks it replaces, and `updateTrack` keeps the track's mix (also when it gives the track a new id); in those cases the fields are not read. `addTrack` seeds the entry from the new track's fields, also for the id of a track removed earlier. `getMixer()` holds the entries of the current tracks; each undo and redo state keeps its own. Change the mix with `setTrackVolume`, `setTrackMute`, `setTrackSolo` and `setTrackPan`, which act on a track that is in the current tracks. `engine.getState().tracks` and the tracks an adapter receives carry the current mix in those fields; `arrangement.getTracks()` does not (read `getMixer()`).
+- **The mix is separate from the tracks.** A track's own `volume`, `muted`, `soloed`, `pan` and `panLaw` fields are the values it enters with. They seed its mixer entry when its id has none. `setTracks` keeps the mix of an id that is in the tracks it replaces, and `updateTrack` keeps the track's mix (also when it gives the track a new id); in those cases the fields are not read. `addTrack` seeds the entry from the new track's fields, also for the id of a track removed earlier. `getMixer()` holds the entries of the current tracks; each undo and redo state keeps its own. Change the mix with `setTrackVolume`, `setTrackMute`, `setTrackSolo`, `setTrackPan` and `setTrackPanLaw`, which act on a track that is in the current tracks. `engine.getState().tracks` and the tracks an adapter receives carry the current mix in those fields; `arrangement.getTracks()` does not (read `getMixer()`).
+- **The pan law is a mixer value that the first audio decides.** `getMixer().get(id).panLaw` is `'auto'`, `'mono'` or `'stereo'`. A track enters with its own `panLaw` field when that is `'mono'` or `'stereo'`, else with the law of the decoded audio it holds (`'stereo'` if a clip's buffer has two or more channels), else with `'auto'`. A track that is `'auto'` gets the law of the first decoded audio it holds, in the same change that brings the audio: the same undo step for a clip added decoded, no step for a clip that finishes loading (every state the arrangement can return to gets the law of its own tracks; an undo or redo step that this makes equal to the state next to it is dropped, so a finished load can turn `canUndo` or `canRedo` false). From then on the clips do not change it: not a clip of the other kind, not the removal of every clip, not `setTracks` with the same id. The law belongs to the id, like the rest of the mix: an app that reuses a track id for other material gets the law the id had (use a new id, pass through `setTracks([])`, which drops every entry, or set the law). `setTrackPanLaw(id, 'mono' | 'stereo')` changes it and may be called before the track has audio; any other value, `'auto'` included, throws a `TypeError`. A MIDI track stays `'auto'` (it plays with the mono law), and the setter does nothing for it. The law converts no audio: a stereo clip on a `'mono'` track stays stereo. `engine.getState().tracks` and the tracks an adapter receives carry the law in `panLaw` (a track that carries no field and is `'auto'` is sent without one). A change of the law alone is one call of the adapter's optional `setTrackPanLaw`, also when an undo returns a track without audio to `'auto'`; an adapter without the method is sent the track again. Unlike the other four engine setters, `engine.setTrackPanLaw` makes no adapter call when the arrangement changed nothing (a track it does not hold, the law the track already has).
 - **Undo, redo and an aborted transaction restore the tracks, the clips and the mix** of the state they return to. Undoing a `removeTrack` brings the track back with the mix it had, and undoing an `updateTrack` that gave a track a new id brings back the old id with the mix it had then.
 - **Ids are unique.** `setTracks`, `addTrack` and `updateTrack` throw an `Error` for a duplicate track id, for two clips with one id on the same track, and for a track whose clips do not match its `kind` (a loading clip is an audio clip), before anything changes.
 - **Without an engine** clips are given no `startTick`, and a clip that came with one loses it when it is moved, trimmed on the left or split. Every clip without a tick, in the current tracks and in every undo and redo state, gets one from its `startSample` when an engine attaches. The shortest a clip may be is 0.1 s at the clip's own sample rate.
@@ -286,6 +287,7 @@ class PlaylistEngine {
   setTrackMute(trackId: string, muted: boolean, options?: MixerChangeOptions): void;
   setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
   setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
+  setTrackPanLaw(trackId: string, panLaw: 'mono' | 'stereo', options?: MixerChangeOptions): void;
   setTrackRecording(trackId: string, recording: boolean): void; // plays muted during the take; not an undo step
   readonly recordingTrackIds: ReadonlySet<string>; // the arrangement's set (the same object), read-only
   zoomIn(): void;
@@ -354,6 +356,7 @@ interface Arrangement {
   setTrackMute(trackId: string, muted: boolean, options?: MixerChangeOptions): void;
   setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
   setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
+  setTrackPanLaw(trackId: string, panLaw: 'mono' | 'stereo', options?: MixerChangeOptions): void;
 
   // the take's mute: the tracks a take is recording onto (outside the history)
   readonly recordingTrackIds: ReadonlySet<string>;
@@ -439,6 +442,9 @@ interface PlayoutAdapter {
   setTrackMute(trackId: string, muted: boolean): void;
   setTrackSolo(trackId: string, soloed: boolean): void;
   setTrackPan(trackId: string, pan: number): void;
+  // Optional. 'auto': from the track's clips (core's trackPanLaw). Without it the engine sends
+  // the track again (updateTrack, else setTracks), with the law in track.panLaw.
+  setTrackPanLaw?(trackId: string, panLaw: PanLaw): void;
   setLoop(enabled: boolean, start: number, end: number): void;
 
   setTempo?(bpm: number, atTick?: number): boolean | void;

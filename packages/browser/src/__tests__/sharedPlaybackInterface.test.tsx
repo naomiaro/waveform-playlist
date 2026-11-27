@@ -661,6 +661,7 @@ describe('the WebAudio provider splits its actions and refs', () => {
       'setTrackDragPreview',
       'setTrackMute',
       'setTrackPan',
+      'setTrackPanLaw',
       'setTrackSolo',
       'setTrackVolume',
       'undo',

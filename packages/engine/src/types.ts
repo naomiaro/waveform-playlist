@@ -1,4 +1,4 @@
-import type { ClipTrack, PlayoutTrack } from '@waveform-playlist/core';
+import type { ClipTrack, PanLaw, PlayoutTrack } from '@waveform-playlist/core';
 import type { Arrangement } from './arrangement';
 
 /**
@@ -40,6 +40,13 @@ export interface PlayoutAdapter {
   setTrackMute(trackId: string, muted: boolean): void;
   setTrackSolo(trackId: string, soloed: boolean): void;
   setTrackPan(trackId: string, pan: number): void;
+  /**
+   * A track's pan law changed (#684). `'auto'` means "from the track's
+   * clips" (core's `trackPanLaw`); it is sent when an undo returns a track
+   * without audio to it. Optional: an adapter without it is sent the track
+   * again (`updateTrack`, else `setTracks`), with the law in `track.panLaw`.
+   */
+  setTrackPanLaw?(trackId: string, panLaw: PanLaw): void;
   setLoop(enabled: boolean, start: number, end: number): void;
   /** Set tempo at a tick position. A defaulted (no atTick) call sets the base
    *  tempo on a single-entry map; adapters MAY refuse it when their tempo map

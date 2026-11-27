@@ -37,7 +37,7 @@ function track(clips: (AudioClip | LoadingClip)[]): ArrangementTrack {
   };
 }
 
-const MIX = { volume: 0.25, pan: -0.5, muted: false, soloed: true };
+const MIX = { volume: 0.25, pan: -0.5, muted: false, soloed: true, panLaw: 'auto' as const };
 
 describe('arrangement-view (#848)', () => {
   it('loadedTrack leaves out loading clips and carries the mix', () => {
@@ -61,7 +61,13 @@ describe('arrangement-view (#848)', () => {
   it('mixOf is the stored mix, muted while the track is recording', () => {
     const arrangement = createArrangement({ tracks: [track([loaded('a', 0, 48000)])] });
     arrangement.setTrackVolume('t1', 0.25);
-    expect(mixOf(arrangement, 't1')).toEqual({ volume: 0.25, pan: 0, muted: false, soloed: false });
+    expect(mixOf(arrangement, 't1')).toEqual({
+      volume: 0.25,
+      pan: 0,
+      muted: false,
+      soloed: false,
+      panLaw: 'auto',
+    });
     arrangement.setTrackRecording('t1', true);
     expect(mixOf(arrangement, 't1')?.muted).toBe(true);
     expect(mixOf(arrangement, 'nope')).toBeNull();

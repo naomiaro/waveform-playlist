@@ -1,3 +1,5 @@
+import type { DecidedPanLaw } from './panLaw';
+
 const PREFIX = '[waveform-playlist] ';
 
 /** Gains of the pan matrix: `out = [[ll, rl], [lr, rr]] · in`, where e.g.
@@ -10,23 +12,24 @@ export interface PanMatrix {
 }
 
 /**
- * The pan law for a track, chosen by the channel count of its SOURCE
- * material — exactly the two algorithms of the Web Audio `StereoPannerNode`.
+ * The gains of a pan law at a pan position: exactly the two algorithms of
+ * the Web Audio `StereoPannerNode`. Which law a track has is the track's own
+ * value (`trackPanLaw`), not a property of the signal that reaches the stage.
  *
- * - Mono source — equal-power pan, θ = (pan + 1)·π/4: L × cos θ, R × sin θ.
+ * - `'mono'` — equal-power pan, θ = (pan + 1)·π/4: L × cos θ, R × sin θ.
  *   For a mono signal (taken as L = R) that is the mono law, L = m·cos θ and
  *   R = m·sin θ: −3 dB per side at centre. A stereo signal from the track's
  *   effects is balanced by the same gains, so it stays stereo at the same
  *   centre level as the dry signal.
- * - Stereo source — the stereo law: centre passes both channels at unity;
+ * - `'stereo'` — the stereo law: centre passes both channels at unity;
  *   panning left folds the right channel into the left
  *   (L + R·cos x, R·sin x with x = (pan + 1)·π/2), and symmetrically right.
  *
  * `pan` is clamped to −1 … 1; a non-finite value is treated as centre.
  */
-export function panMatrix(pan: number, sourceChannelCount: number): PanMatrix {
+export function panMatrix(pan: number, panLaw: DecidedPanLaw): PanMatrix {
   const p = Number.isFinite(pan) ? Math.max(-1, Math.min(1, pan)) : 0;
-  if (sourceChannelCount < 2) {
+  if (panLaw === 'mono') {
     const theta = ((p + 1) * Math.PI) / 4;
     return { ll: Math.cos(theta), lr: 0, rl: 0, rr: Math.sin(theta) };
   }
@@ -45,23 +48,30 @@ export function panMatrix(pan: number, sourceChannelCount: number): PanMatrix {
  */
 export type PanStageContext = Pick<
   BaseAudioContext,
-  'createGain' | 'createChannelSplitter' | 'createChannelMerger'
+  'createGain' | 'createChannelSplitter' | 'createChannelMerger' | 'currentTime'
 >;
+
+/** How long a switch of pan law takes: the four gains ramp, so a switch during playback does not click (#684). */
+export const PAN_LAW_RAMP_SECONDS = 0.01;
 
 /** A track's pan stage: `input → … → output`, with `setPan(-1 … 1)`. */
 export interface PanStage {
   readonly input: AudioNode;
   readonly output: AudioNode;
   setPan(pan: number): void;
-  /** Switch the pan law (1 = mono law, 2+ = stereo law), keeping the pan. */
-  setSourceChannelCount(sourceChannelCount: number): void;
+  /**
+   * Switch the pan law, keeping the pan. The four gains ramp to the new
+   * matrix over `PAN_LAW_RAMP_SECONDS`; the law the stage already has does
+   * nothing.
+   */
+  setPanLaw(panLaw: DecidedPanLaw): void;
   /** Disconnect every node of the stage. */
   dispose(): void;
 }
 
 /**
- * Build the pan stage for a track whose source material has
- * `sourceChannelCount` channels (1 for mono clips and synth voices).
+ * Build the pan stage for a track with the pan law `panLaw` (core's
+ * `trackPanLaw(track)`; `'mono'` for synth voices).
  *
  * Why this is not a `StereoPannerNode`: a track's pan stage is fed by its
  * effects chain (pre-fader inserts), whose channel layout is not the
@@ -78,7 +88,7 @@ export interface PanStage {
 export function createPanStage(
   context: PanStageContext,
   pan: number,
-  sourceChannelCount: number
+  panLaw: DecidedPanLaw
 ): PanStage {
   // Take the incoming signal as stereo regardless of its layout: with an
   // explicit count of 2 (speakers interpretation) mono is upmixed to L = R
@@ -95,13 +105,35 @@ export function createPanStage(
   const rr = context.createGain();
 
   let currentPan = pan;
-  let currentChannelCount = sourceChannelCount;
+  let currentLaw = panLaw;
+  // True from a law switch until the next pan move: a ramp may be scheduled.
+  let rampScheduled = false;
+  const targets = (): Array<[GainNode, number]> => {
+    const matrix = panMatrix(currentPan, currentLaw);
+    return [
+      [ll, matrix.ll],
+      [lr, matrix.lr],
+      [rl, matrix.rl],
+      [rr, matrix.rr],
+    ];
+  };
+  /** Set the gains now. A scheduled ramp is cancelled first, or its end would override the value. */
   const apply = (): void => {
-    const matrix = panMatrix(currentPan, currentChannelCount);
-    ll.gain.value = matrix.ll;
-    lr.gain.value = matrix.lr;
-    rl.gain.value = matrix.rl;
-    rr.gain.value = matrix.rr;
+    for (const [node, value] of targets()) {
+      if (rampScheduled) node.gain.cancelScheduledValues(context.currentTime);
+      node.gain.value = value;
+    }
+    rampScheduled = false;
+  };
+  /** Move the gains to the current matrix over the ramp time, from where each is now. */
+  const ramp = (): void => {
+    const now = context.currentTime;
+    for (const [node, value] of targets()) {
+      node.gain.cancelScheduledValues(now);
+      node.gain.setValueAtTime(node.gain.value, now);
+      node.gain.linearRampToValueAtTime(value, now + PAN_LAW_RAMP_SECONDS);
+    }
+    rampScheduled = true;
   };
   apply();
 
@@ -122,9 +154,10 @@ export function createPanStage(
       currentPan = value;
       apply();
     },
-    setSourceChannelCount: (value) => {
-      currentChannelCount = value;
-      apply();
+    setPanLaw: (value) => {
+      if (value === currentLaw) return;
+      currentLaw = value;
+      ramp();
     },
     dispose: () => {
       for (const node of [upmix, split, ll, lr, rl, rr, merge]) {

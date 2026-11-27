@@ -23,7 +23,7 @@ import { type Fade, type MidiNoteData } from '@waveform-playlist/core';
 import { type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { syncSoundFontCacheToAdapter } from './soundFontSync';
 import type { TrackDragPreview } from './utils/trackOrderPreview';
-import type { PeakData } from '@waveform-playlist/core';
+import type { PanLaw, PeakData } from '@waveform-playlist/core';
 import type { AnnotationData, AnnotationStore } from '@waveform-playlist/core';
 import {
   useTimeFormat,
@@ -88,6 +88,11 @@ export interface TrackState {
   soloed: boolean;
   volume: number;
   pan: number;
+  /**
+   * The track's pan law (#684): `'auto'` until its first decoded audio
+   * decides it, then `'mono'` or `'stereo'`. Changed with `setTrackPanLaw`.
+   */
+  panLaw: PanLaw;
 }
 
 import {
@@ -1405,6 +1410,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
       setTrackSolo: editing.setTrackSolo,
       setTrackVolume: editing.setTrackVolume,
       setTrackPan: editing.setTrackPan,
+      setTrackPanLaw: editing.setTrackPanLaw,
       reorderTrack: editing.reorderTrack,
       setTrackDragPreview,
       setSelectedTrackId: setSelectedTrackIdControl,
@@ -1435,6 +1441,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
       editing.setTrackSolo,
       editing.setTrackVolume,
       editing.setTrackPan,
+      editing.setTrackPanLaw,
       editing.reorderTrack,
       setTrackDragPreview,
       setSelectedTrackIdControl,

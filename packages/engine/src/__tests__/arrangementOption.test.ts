@@ -639,6 +639,6 @@ describe('the public types', () => {
   it('TrackMixerValues is what getMixer() holds', () => {
     const arrangement = createArrangement({ tracks: fixture() });
     const values: TrackMixerValues | undefined = arrangement.getMixer().get('A');
-    expect(values).toEqual({ volume: 0.8, muted: false, soloed: false, pan: 0 });
+    expect(values).toEqual({ volume: 0.8, muted: false, soloed: false, pan: 0, panLaw: 'auto' });
   });
 });

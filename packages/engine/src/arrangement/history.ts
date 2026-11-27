@@ -7,7 +7,7 @@
  */
 
 import type { ArrangementTrack } from '@waveform-playlist/core';
-import { sameMixerValues, setMixerValues, withoutEntry } from './mixer';
+import { decidePanLaws, sameMixerValues, setMixerValues, withoutEntry } from './mixer';
 import type { Mixer, TrackMixerValues } from './mixer';
 
 export type Tracks = readonly ArrangementTrack[];
@@ -306,6 +306,35 @@ export function stateWithMixerValues(
     if (!mixer) {
       mixer = setMixerValues(state.mixer, trackId, patch);
       mixers.set(state.mixer, mixer);
+    }
+    const next = mixer === state.mixer ? state : { ...state, mixer };
+    states.set(state, next);
+    return next;
+  };
+}
+
+/**
+ * A function that gives a state the pan laws its own tracks decide
+ * (`decidePanLaws`, #684): a track whose entry is `'auto'` and that holds
+ * decoded audio gets the law of that audio. A state in which nothing is
+ * decided is the same object; states that shared both their tracks and
+ * their Map go on sharing a Map.
+ */
+export function stateWithDecidedPanLaws(): (state: SavedState) => SavedState {
+  const decided = new Map<Mixer, Map<Tracks, Mixer>>();
+  const states = new Map<SavedState, SavedState>();
+  return (state) => {
+    const known = states.get(state);
+    if (known) return known;
+    let byTracks = decided.get(state.mixer);
+    if (!byTracks) {
+      byTracks = new Map();
+      decided.set(state.mixer, byTracks);
+    }
+    let mixer = byTracks.get(state.tracks);
+    if (!mixer) {
+      mixer = decidePanLaws(state.mixer, state.tracks);
+      byTracks.set(state.tracks, mixer);
     }
     const next = mixer === state.mixer ? state : { ...state, mixer };
     states.set(state, next);

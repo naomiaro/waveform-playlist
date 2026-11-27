@@ -49,7 +49,7 @@ function fixture(): ClipTrack[] {
   ];
 }
 
-const DEFAULT_MIX = { volume: 1, muted: false, soloed: false, pan: 0 };
+const DEFAULT_MIX = { volume: 1, muted: false, soloed: false, pan: 0, panLaw: 'auto' as const };
 
 function setup() {
   const arrangement = new Arrangement({ timeBase: timeBase() });
@@ -252,6 +252,7 @@ describe('undo restores the tracks and the mix of the state it returns to', () =
       muted: true,
       soloed: false,
       pan: 0.9,
+      panLaw: 'auto',
     });
   });
 
@@ -548,7 +549,7 @@ describe('the engine’s projection: tracks with the current mix', () => {
 });
 
 describe('withMixerValues', () => {
-  const values = { volume: 0.5, muted: true, soloed: false, pan: 0.25 };
+  const values = { volume: 0.5, muted: true, soloed: false, pan: 0.25, panLaw: 'auto' as const };
 
   it('returns the track itself when its fields already hold the values, or there are none', () => {
     const same = track('A', [], values);
@@ -556,11 +557,28 @@ describe('withMixerValues', () => {
     expect(withMixerValues(same, undefined)).toBe(same);
   });
 
+  it("a track that carries no pan law is itself for an 'auto' entry, and a copy for a decided one", () => {
+    const { panLaw: _none, ...fields } = values;
+    const bare = track('A', [], fields);
+    expect('panLaw' in bare).toBe(false);
+    expect(withMixerValues(bare, values)).toBe(bare);
+    expect(withMixerValues(bare, { ...values, panLaw: 'mono' })).toEqual({
+      ...bare,
+      panLaw: 'mono',
+    });
+  });
+
+  it("a field that is not a law does not show through an 'auto' entry", () => {
+    const odd = track('A', [], { ...values, panLaw: 'bogus' as never });
+    expect(withMixerValues(odd, values).panLaw).toBe('auto');
+  });
+
   it.each([
     ['volume', { volume: 0.6 }],
     ['muted', { muted: false }],
     ['soloed', { soloed: true }],
     ['pan', { pan: -1 }],
+    ['panLaw', { panLaw: 'stereo' }],
   ] as const)(
     'returns a copy with the values when %s differs, and leaves the track as it was',
     (_, patch) => {

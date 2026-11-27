@@ -29,10 +29,11 @@ import type {
   ArrangementTrack,
   AudioClip,
   ClipSource,
+  DecidedPanLaw,
   LoadingClip,
   ValueSource,
 } from '@waveform-playlist/core';
-import { isLoadingClip } from '@waveform-playlist/core';
+import { isDecidedPanLaw, isLoadingClip, trackKind } from '@waveform-playlist/core';
 import { ARRANGEMENT_ATTACH_DECODE, ARRANGEMENT_ATTACH_TIME_BASE } from './attach';
 import type { ArrangementTimeBase, GetDecodeContext } from './attach';
 import { clipBounds, constrainTrim, moveClip, splitClip, trimClip } from './clipEdits';
@@ -53,6 +54,7 @@ import {
   pushStep,
   redoStep,
   sameState,
+  stateWithDecidedPanLaws,
   stateWithMixerValues,
   undoStep,
   withStateTracks,
@@ -600,6 +602,24 @@ export class ArrangementImpl implements Arrangement {
     this._setMixerValues(trackId, { pan }, options);
   }
 
+  /**
+   * Set a track's pan law (#684): a mixer value like the four above. It
+   * takes a decided law; anything else, `'auto'` included, throws before
+   * anything changes (a decided track does not go back to `'auto'`). May be
+   * called before the track holds audio: the law is then decided, and the
+   * first audio does not change it. A MIDI track has no law to set.
+   */
+  setTrackPanLaw(trackId: string, panLaw: DecidedPanLaw, options?: MixerChangeOptions): void {
+    if (!isDecidedPanLaw(panLaw)) {
+      throw new TypeError(
+        `setTrackPanLaw: panLaw must be 'mono' or 'stereo', got ${JSON.stringify(panLaw) ?? String(panLaw)}`
+      );
+    }
+    const track = this._tracks.find((t) => t.id === trackId);
+    if (!track || trackKind(track) === 'midi') return;
+    this._setMixerValues(trackId, { panLaw }, options);
+  }
+
   // ---------------------------------------------------------------------------
   // Recording mute (the track a take is recording onto)
   // ---------------------------------------------------------------------------
@@ -956,7 +976,69 @@ export class ArrangementImpl implements Arrangement {
         state: withStateTracks(state, pass.stored(state.tracks)),
       };
     }
+    this._decidePanLaws();
     return this._tracks === previous ? null : previous;
+  }
+
+  /**
+   * First audio decides a track's pan law (#684): in the current state and
+   * in every state the arrangement can return to, a track whose law is
+   * `'auto'` and that holds decoded audio gets the law of that audio, each
+   * state from its own tracks. Part of the change that brought the audio:
+   * not an undo step. `mixerVersion` counts it when the current mix changed.
+   *
+   * A saved step that no longer differs from the state next to it is
+   * dropped, as `_writeMixerThrough` does (a law set on a track whose only
+   * clip was loading, and the clip turns out to have that law): its undo, or
+   * its redo, would do nothing. A gesture whose own step went has no step to
+   * join, and its next change pushes a new one; a gesture whose step is still
+   * the top one goes on.
+   */
+  private _decidePanLaws(): void {
+    const decide = stateWithDecidedPanLaws();
+    const current = this._currentState();
+    const decided = decide(current);
+    if (decided !== current) {
+      this._mixer = decided.mixer;
+      this._mixerVersion++;
+    }
+    const changedIn = (before: History, after: History): boolean =>
+      after.undo.some((state, i) => state !== before.undo[i]) ||
+      after.redo.some((state, i) => state !== before.redo[i]);
+
+    let base = this._transaction?.state ?? null;
+    if (this._transaction && base) {
+      const decidedBase = decide(base);
+      if (decidedBase !== base) {
+        base = decidedBase;
+        this._transaction = { ...this._transaction, state: decidedBase };
+      }
+    }
+    const mapped = mapHistoryStates(this._history, decide);
+    const savedChanged = changedIn(this._history, mapped);
+    // A step can stop differing because IT was filled (an undo step from
+    // before a law was set) or because the CURRENT state was (a redo step
+    // that holds the law the audio turned out to have).
+    if (savedChanged || decided !== current) {
+      // The gesture's step, as the fill leaves it.
+      const top = mapped.undo[mapped.undo.length - 1];
+      const kept = dropRepeats(mapped, base ?? decided);
+      if (savedChanged || kept !== mapped) this._history = kept;
+      if (this._gesture && kept !== mapped) {
+        // As in `_writeMixerThrough`: the gesture goes on when the step now
+        // on top equals the one it joined (a step below became equal to it,
+        // and `dropRepeats` kept the older of the two). When its own step is
+        // gone, its next change pushes a new one.
+        const newTop = kept.undo[kept.undo.length - 1];
+        if (!(newTop !== undefined && top !== undefined && sameState(newTop, top))) {
+          this._gesture = null;
+        }
+      }
+    }
+    if (this._gesture) {
+      const before = mapHistoryStates(this._gesture.before, decide);
+      if (changedIn(this._gesture.before, before)) this._gesture = { ...this._gesture, before };
+    }
   }
 
   /** A load finished or failed by itself (not inside one of this arrangement's methods). */
