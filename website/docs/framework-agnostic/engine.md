@@ -104,7 +104,7 @@ The returned `EngineState` contains:
 |-------|------|-------------|
 | `tracks` | `readonly ClipTrack[]` | The tracks and their clips, each track with its current volume, mute, solo and pan. Not a copy: read it, never write to it |
 | `tracksVersion` | `number` | Monotonic counter — increments on structural track changes only |
-| `mixerVersion` | `number` | Monotonic counter — increments on every change of the current mix: a per-track mixer edit (volume/mute/solo/pan), an undo, a redo or an aborted transaction that brings back other values, and the start or end of a take's mute on a track that is in the current tracks |
+| `mixerVersion` | `number` | Monotonic counter — increments on every change of the current mix: a per-track mixer edit (volume/mute/solo/pan/pan law), a track's first decoded audio deciding its pan law, an undo, a redo or an aborted transaction that brings back other values, and the start or end of a take's mute on a track that is in the current tracks |
 | `duration` | `number` | Total timeline duration in seconds |
 
 **Playback**
@@ -187,7 +187,7 @@ engine.selectTrack(trackId: string | null): void;
 - a track ID that another track has;
 - two clips with the same ID on one track (the same clip ID on two different tracks is accepted).
 
-A track's `volume`, `muted`, `soloed` and `pan` fields are the mix it enters with. They are read when its ID has no mixer entry yet. `setTracks()` keeps the mix of an ID that is in the tracks it replaces; `updateTrack(id, track)` keeps the track's mix, also when the new track has another ID. In those cases the fields are not read. `addTrack()` reads them, also for the ID of a track removed earlier. Use the [volume methods](#volume) to change the mix.
+A track's `volume`, `muted`, `soloed`, `pan` and `panLaw` fields are the mix it enters with (a track without a `panLaw` takes the law of the first decoded audio it holds, and keeps it). They are read when its ID has no mixer entry yet. `setTracks()` keeps the mix of an ID that is in the tracks it replaces; `updateTrack(id, track)` keeps the track's mix, also when the new track has another ID. In those cases the fields are not read. `addTrack()` reads them, also for the ID of a track removed earlier. Use the [volume methods](#volume) to change the mix.
 
 The mix holds an entry for each current track; each undo and redo step keeps the mix it had, so a removed track's entry is in the step from before the removal and comes back with it.
 
@@ -412,7 +412,7 @@ arrangement.canUndo;
 arrangement.canRedo;
 ```
 
-`getTracks()` holds each track as it entered: its `volume`, `muted`, `soloed` and `pan` fields are not updated by the mixer setters. The current values are in `getMixer()`. (`engine.getState().tracks` is the same tracks with the current mix written into those fields and without the clips that are [still loading](#loading-audio).)
+`getTracks()` holds each track as it entered: its `volume`, `muted`, `soloed`, `pan` and `panLaw` fields are not updated by the mixer setters. The current values are in `getMixer()`. (`engine.getState().tracks` is the same tracks with the current mix written into those fields and without the clips that are [still loading](#loading-audio).)
 
 A subscriber is called after the engine has made its adapter call for that change. Two changes reach subscribers without the adapter being in step: one made with `skipAdapter`, and the `startTick` assignment when an engine attaches, which subscribers hear before that engine sends its first tracks to its adapter. `getMixer()` is also replaced, without a change of `mixerVersion`, when a track with a new ID enters or entries are dropped, and an undo, a redo or an abort replaces it with the mix of the state it returns to. A subscriber that throws is reported with `console.warn` and does not fail the change. `getTracks()` and `getMixer()` return the same object until it changes, so a subscriber can tell what changed by comparing with what it read last time.
 
@@ -1090,6 +1090,8 @@ interface TrackMixerValues {
   muted: boolean;
   soloed: boolean;
   pan: number;
+  /** 'auto' until the track's first decoded audio decides it; then 'mono' or 'stereo'. */
+  panLaw: 'auto' | 'mono' | 'stereo';
 }
 
 interface ClipBounds {

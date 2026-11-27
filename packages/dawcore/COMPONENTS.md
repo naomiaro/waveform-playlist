@@ -420,7 +420,7 @@ Render-less element that adds keyboard shortcuts to the editor. Must be a direct
 
 ## Undo and the Mix
 
-Mixer moves are undo steps, like clip and track edits: a control gesture, a `<daw-track>` attribute update and an `editor.updateTrack()` call are one step each, and Undo brings back the volume, pan, mute and solo of the state it returns to. `editor.tracks` and `<daw-track-controls>` report the arrangement's mix.
+Mixer moves are undo steps, like clip and track edits: a control gesture, a `<daw-track>` attribute update and an `editor.updateTrack()` call are one step each, and Undo brings back the volume, pan, pan law, mute and solo of the state it returns to. `editor.tracks` and `<daw-track-controls>` report the arrangement's mix.
 
 **A take mutes the track it records onto.** During a take the recorded track plays muted (`engine.setTrackRecording`): its controls and `editor.tracks` show it muted, and `exportAudio()` during the take leaves it out. The take's mute is not an undo step and does not change the track's own mute: a mute set during the take (through the element, `updateTrack` or the engine) stays after it, and the take's end only clears the take's mute.
 

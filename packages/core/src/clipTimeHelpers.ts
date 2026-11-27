@@ -27,8 +27,8 @@ export interface TrackChannelSource {
 
 /**
  * Max audio channel count across a track's clips (1 for a track with no
- * decoded audio). Selects the track's pan law (`createPanStage`) and the
- * offline render's output channels.
+ * decoded audio). Read for the React export's output channels. The track's
+ * pan law is not chosen from it: that is `trackPanLaw(track)` (#684).
  */
 export function trackChannelCount(track: TrackChannelSource): number {
   return track.clips.reduce(

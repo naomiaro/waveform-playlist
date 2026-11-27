@@ -1085,16 +1085,20 @@ describe('Transport', () => {
       expect(clipPlayerUpdate).not.toHaveBeenCalled();
     });
 
-    it('a later update that carries the law set with setTrackPanLaw keeps it', () => {
+    it('the transport stores no law: a later update takes it from the track it is given', () => {
       const ctx = mockAudioContext();
       const transport = new Transport(ctx);
       const monoClip = makeClip({ audioBuffer: monoBuffer });
       transport.setTracks([makeTrack([monoClip])]);
       transport.setTrackPanLaw('track-1', 'stereo');
+      expect(monoLawGains(ctx)).toBe(0);
 
-      // A later update that carries the same law keeps it.
+      // No law on the track: from its clips again, whatever setTrackPanLaw said.
+      transport.updateTrack('track-1', makeTrack([monoClip]));
+      expect(monoLawGains(ctx)).toBe(2);
+
+      // An engine sends the law with the track, so there it is kept.
       transport.updateTrack('track-1', makeTrack([monoClip], { panLaw: 'stereo' }));
-
       expect(monoLawGains(ctx)).toBe(0);
     });
 

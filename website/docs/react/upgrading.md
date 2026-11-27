@@ -123,12 +123,12 @@ The [effects guide](./guides/effects.md#track-signal-chain-and-panning) describe
 
 **Packages:** `@waveform-playlist/core`, `engine`, `playout`, `browser`.
 
-Every audio track now has a pan law of its own, `'mono'` or `'stereo'`. It is decided by the first decoded audio the track holds and then kept; it is a mixer value of the arrangement, beside `pan`. Previously the law was derived from the track's clips each time the track was built (the highest channel count among them), so it could change when the clips changed.
+Every audio track now has a pan law of its own, `'mono'` or `'stereo'`. It is decided by the first decoded audio the track holds and then kept; it is a mixer value of the arrangement, beside `pan`. Previously the law was derived from the track's clips each time the track was built (the highest channel count among them): it changed when a change to the tracks rebuilt the engine, and the WAV export derived it again from the clips it was given.
 
 **What you will hear:**
 
 - A track of mono clips only, or of stereo clips only, sounds as before.
-- A stereo clip added to a track of mono clips (a file dropped on it, a recorded take, `updateTrack`) no longer makes the mono clips 3 dB louder at centre. The stereo clip plays under the track's mono law: 3 dB lower at centre than on a stereo-law track, and a hard pan mutes one side instead of folding it in.
+- A stereo clip added to a track of mono clips (a file dropped on it, a recorded take) no longer makes the mono clips 3 dB louder at centre. The stereo clip plays under the track's mono law: 3 dB lower at centre than on a stereo-law track, and a hard pan mutes one side instead of folding it in.
 - Removing the last stereo clip from such a track no longer makes the mono clips 3 dB quieter.
 - A track that was emptied keeps its law for the next audio it is given. So does a track id you reuse: `setTracks` or `updateTrack` with an id the arrangement already holds keeps that id's law, as it keeps its volume and pan. Use a new id for new material (the default: `audioTrack()` and `createTrack()` generate one), or set the law.
 - A new track whose first clips are a mono file and a stereo file, both loading, takes the law of whichever finishes first. Previously it had the stereo law once both were in.
@@ -168,6 +168,20 @@ The states you pass to `exportWav(tracks, trackStates)` may leave `panLaw` out: 
 **Find:** a `PlayoutAdapter` of your own.
 
 **Replace with:** read the law from the track you are given, with `trackPanLaw(track)` from `@waveform-playlist/core` (`track.panLaw` when it is `'mono'` or `'stereo'`, else the law of the track's clips). Optionally add `setTrackPanLaw(trackId, panLaw)`; without it the engine sends the track again through `updateTrack` when only the law changed. An adapter that goes on deriving the law from the clips will disagree with the WAV export on a track that mixes mono and stereo clips.
+
+**Find:** `channelCount` in the options of a `ToneTrack` you construct yourself, or of `TonePlayout.addTrack` (`@waveform-playlist/playout`). It set the channel count of the track's panner.
+
+**Replace with:** `panLaw`. A leftover `channelCount` is ignored, and the track gets the mono law.
+
+```tsx
+// Before
+playout.addTrack({ clips, track, channelCount: 2 });
+
+// After
+playout.addTrack({ clips, track, panLaw: 'stereo' }); // channelCount: 1 → panLaw: 'mono'
+```
+
+`createToneAdapter()` passes the law itself; only code that builds playout tracks directly is affected.
 
 The [effects guide](./guides/effects.md#a-tracks-pan-law) describes the two laws.
 
