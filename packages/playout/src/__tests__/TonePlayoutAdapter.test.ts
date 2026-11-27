@@ -831,6 +831,68 @@ describe('createToneAdapter', () => {
       );
     });
 
+    describe('setTrackPanLaw', () => {
+      const stereoBuffer = { numberOfChannels: 2, duration: 1, sampleRate: 44100 } as AudioBuffer;
+      function withToneTrack(
+        track: Parameters<ReturnType<typeof createToneAdapter>['setTracks']>[0][number]
+      ) {
+        const adapter = createToneAdapter();
+        adapter.setTracks([track]);
+        const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+        const toneTrack = { setVolume: vi.fn(), setPan: vi.fn(), setPanLaw: vi.fn() };
+        instance.getTrack.mockReturnValue(toneTrack);
+        return { adapter, instance, toneTrack };
+      }
+      const clip = (audioBuffer?: AudioBuffer) =>
+        makeClip({
+          id: 'a1',
+          startSample: 0,
+          durationSamples: 44100,
+          ...(audioBuffer && { audioBuffer }),
+        });
+
+      it('switches the law of the playout track, and replaces no clips', () => {
+        const { adapter, instance, toneTrack } = withToneTrack(makeTrack('t1', [clip()]));
+
+        adapter.setTrackPanLaw!('t1', 'stereo');
+
+        expect(instance.getTrack).toHaveBeenCalledWith('t1');
+        expect(toneTrack.setPanLaw).toHaveBeenCalledWith('stereo');
+        expect(instance.replaceTrackClips).not.toHaveBeenCalled();
+      });
+
+      it("'auto' takes the law from the clips of the track it was last sent", () => {
+        const { adapter, toneTrack } = withToneTrack(makeTrack('t1', [clip(stereoBuffer)]));
+
+        adapter.setTrackPanLaw!('t1', 'mono');
+        adapter.setTrackPanLaw!('t1', 'auto');
+
+        expect(toneTrack.setPanLaw.mock.calls).toEqual([['mono'], ['stereo']]);
+      });
+
+      it('does nothing for an id it does not hold', () => {
+        const { adapter, instance, toneTrack } = withToneTrack(makeTrack('t1', [clip()]));
+        instance.getTrack.mockClear();
+
+        expect(() => adapter.setTrackPanLaw!('nope', 'stereo')).not.toThrow();
+
+        expect(toneTrack.setPanLaw).not.toHaveBeenCalled();
+      });
+
+      it('does nothing for a playout track that has no law to set (a MIDI track)', () => {
+        const adapter = createToneAdapter();
+        adapter.setTracks([
+          makeTrack('t1', [makeMidiClip({ id: 'm1', startSample: 0, durationSamples: 44100 })]),
+        ]);
+        // The default mock track has setVolume and setPan only, as a MidiToneTrack has no setPanLaw.
+        expect(() => adapter.setTrackPanLaw!('t1', 'stereo')).not.toThrow();
+      });
+
+      it('does nothing before any track was sent', () => {
+        expect(() => createToneAdapter().setTrackPanLaw!('t1', 'stereo')).not.toThrow();
+      });
+    });
+
     it("setTracks: a track is built with its own law, or the law of its clips for 'auto'", () => {
       const adapter = createToneAdapter();
       const stereo = makeClip({
