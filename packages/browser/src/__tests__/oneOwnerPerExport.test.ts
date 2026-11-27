@@ -51,21 +51,22 @@ function exportedNames(file: string, seen = new Set<string>()): Set<string> {
   if (seen.has(file)) return names;
   seen.add(file);
   const text = readFileSync(file, 'utf8');
-  const resolve = (spec: string): string | undefined => {
-    const base = join(dirname(file), spec);
-    return [`${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')].find(
-      (candidate) => {
-        try {
-          return statSync(candidate).isFile();
-        } catch {
-          return false;
-        }
-      }
-    );
+  // A `./x.js` specifier names `./x.ts`. A star export that resolves to no file
+  // fails the test: skipping it would drop its names from the comparison.
+  const resolve = (spec: string): string => {
+    const base = join(dirname(file), spec.replace(/\.js$/, ''));
+    const found = [
+      `${base}.ts`,
+      `${base}.tsx`,
+      join(base, 'index.ts'),
+      join(base, 'index.tsx'),
+    ].find(isFile);
+    if (!found)
+      throw new Error(`${relative(packagesRoot, file)}: cannot resolve export * from '${spec}'`);
+    return found;
   };
-  for (const match of text.matchAll(/export\s+\*\s+from\s+'(\.[^']+)'/g)) {
-    const target = resolve(match[1]);
-    if (target) exportedNames(target, seen).forEach((name) => names.add(name));
+  for (const match of text.matchAll(/export\s+\*\s+from\s+["'](\.[^"']+)["']/g)) {
+    exportedNames(resolve(match[1]), seen).forEach((name) => names.add(name));
   }
   for (const match of text.matchAll(/export\s+(?:type\s+)?\{([^}]*)\}/g)) {
     for (const part of match[1].split(',')) {
@@ -109,6 +110,12 @@ function entriesOf(dir: string): Array<[string, string]> {
         join(stem, 'index.tsx'),
       ].find(isFile);
       if (!source) throw new Error(`no source for ${dir} ${subpath} (${built})`);
+      // The mapping is a naming convention: check that tsup really builds this file.
+      const tsup = readFileSync(join(packagesRoot, dir, 'tsup.config.ts'), 'utf8');
+      const fromRoot = relative(join(packagesRoot, dir), source);
+      if (!tsup.includes(`'${fromRoot}'`)) {
+        throw new Error(`${dir}/tsup.config.ts does not build ${fromRoot} (entry ${subpath})`);
+      }
       return [subpath === '.' ? dir : `${dir}/${subpath.slice(2)}`, source];
     }
   );
@@ -123,6 +130,9 @@ const CONTROLLED_AND_BOUND = [
   'SelectionTimeInputs',
   'TimeFormatSelect',
 ];
+
+// Entries that export nothing a consumer imports by name: a worker script.
+const NO_NAMED_EXPORTS = ['dawcore-spectrogram/worker/spectrogram.worker'];
 
 // A subpath entry that offers part of its own package's main entry on a narrower
 // import: the same names, one package, so one owner. Not compared with that entry.
@@ -159,6 +169,10 @@ describe('one owner per exported name (#770)', () => {
     const NAME_OWNERS = [...names.keys()];
     // The scan must have found the entries, or an empty result means nothing.
     expect(ALL_PACKAGES.length).toBeGreaterThan(15);
+    for (const entry of NAME_OWNERS) {
+      if (!NO_NAMED_EXPORTS.includes(entry))
+        expect(names.get(entry)!.size, entry).toBeGreaterThan(0);
+    }
     expect(NAME_OWNERS).toContain('browser/tone');
     expect(NAME_OWNERS).toContain('dawcore-spectrogram/orchestrator');
     expect(names.get('dawcore')!.has('DawEditorElement')).toBe(true);

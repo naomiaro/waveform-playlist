@@ -77,7 +77,7 @@ function MidiPlaylist() {
 }
 ```
 
-`sampleRate` positions the clips in samples: pass the rate of the playlist's `AudioContext`. Playing the notes (piano roll, SoundFont or PolySynth) is `@waveform-playlist/browser` with `@waveform-playlist/playout`; see the MIDI guide.
+`sampleRate` positions the clips in samples: pass the rate of the playlist's `AudioContext` (48000 here: the provider's `sampleRate` prop creates its AudioContext at that rate). Playing the notes (piano roll, SoundFont or PolySynth) is `@waveform-playlist/browser` with `@waveform-playlist/playout`; see the MIDI guide.
 
 ## API
 
