@@ -253,6 +253,8 @@ Pre-computed peaks embed the source audio's sample rate (e.g., 48000 Hz). The br
 <WaveformPlaylistProvider sampleRate={48000} arrangement={arrangement} />
 
 // Web Components: the editor's rate is its adapter's AudioContext rate
+import { NativePlayoutAdapter } from '@dawcore/transport';
+
 editor.adapter = new NativePlayoutAdapter(new AudioContext({ sampleRate: 48000 }));
 ```
 

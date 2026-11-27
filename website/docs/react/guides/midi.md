@@ -119,6 +119,7 @@ If you already have note data (e.g., from a custom parser or algorithm), build t
 ```tsx
 import { createClipFromSeconds, createTrack } from '@waveform-playlist/core';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
+import { useCreateArrangement } from '@waveform-playlist/browser';
 
 // Built in the initializer, not on every render
 const arrangement = useCreateArrangement(() => [
