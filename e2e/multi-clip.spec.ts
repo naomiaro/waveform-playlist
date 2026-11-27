@@ -40,11 +40,17 @@ test.describe('Multi-Clip Example', () => {
   // (Zoom In is disabled after two clicks on this page: the last zoom level.)
   test('a zoom button keeps the time at the centre of the view where it is', async ({ page }) => {
     const zoomIn = page.getByRole('button', { name: 'Zoom In' });
-    await zoomIn.click();
-    await zoomIn.click();
-    // The last zoom level: the width read below is the final one.
-    await expect(zoomIn).toBeDisabled();
     const container = page.locator('[data-scroll-container]').first();
+    const startWidth = await container.evaluate((el) => el.scrollWidth);
+    await zoomIn.click();
+    await zoomIn.click();
+    // The last zoom level. The button is disabled before the new width
+    // commits (the zoom is a transition), so wait for the width: two steps
+    // make the timeline four times as wide.
+    await expect(zoomIn).toBeDisabled();
+    await expect(async () => {
+      expect(await container.evaluate((el) => el.scrollWidth)).toBeGreaterThan(startWidth * 3.5);
+    }).toPass({ timeout: 5000 });
     // Scroll to the middle of the timeline.
     await expect(async () => {
       const scrolled = await container.evaluate((el) => {
@@ -69,11 +75,17 @@ test.describe('Multi-Clip Example', () => {
   // of the view, so keeping the centre would move it about 120 px.
   test('a zoom button keeps a selected range where it is on screen', async ({ page }) => {
     const zoomIn = page.getByRole('button', { name: 'Zoom In' });
-    await zoomIn.click();
-    await zoomIn.click();
-    // The last zoom level: the width read below is the final one.
-    await expect(zoomIn).toBeDisabled();
     const container = page.locator('[data-scroll-container]').first();
+    const startWidth = await container.evaluate((el) => el.scrollWidth);
+    await zoomIn.click();
+    await zoomIn.click();
+    // The last zoom level. The button is disabled before the new width
+    // commits (the zoom is a transition), so wait for the width: two steps
+    // make the timeline four times as wide.
+    await expect(zoomIn).toBeDisabled();
+    await expect(async () => {
+      expect(await container.evaluate((el) => el.scrollWidth)).toBeGreaterThan(startWidth * 3.5);
+    }).toPass({ timeout: 5000 });
     await expect(async () => {
       const scrolled = await container.evaluate((el) => {
         el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
