@@ -630,11 +630,11 @@ import { AnnotationBox } from '@waveform-playlist/annotations';
 />
 ```
 
-`color` is the border of a box that is not active. `editable` defaults to `true` here and decides whether the two handles are drawn. The handles are dnd-kit draggables: to move an edge, render the boxes inside a `DragDropProvider` with the handlers of `useAnnotationDragHandlers` (above).
+`color` is the border of a box that is not active. `editable` defaults to `false` and decides whether the two handles are drawn. The handles are dnd-kit draggables: to move an edge, render the boxes inside a `DragDropProvider` with the handlers of `useAnnotationDragHandlers` (above).
 
 ### AnnotationBoxesWrapper
 
-The positioned container for a row of boxes. Props: `height` (default 30), `width`, `offset` (left padding in pixels, default 0), `className`.
+The positioned container for a row of boxes. Props: `height` (default 30), `width`, `className`.
 
 ```tsx
 import { AnnotationBoxesWrapper, AnnotationBox } from '@waveform-playlist/annotations';

@@ -33,7 +33,7 @@ const meta: Meta<typeof SegmentedVUMeter> = {
     segmentWidth: { control: { type: 'range', min: 4, max: 30, step: 1 } },
     segmentHeight: { control: { type: 'range', min: 2, max: 20, step: 1 } },
     segmentGap: { control: { type: 'range', min: 0, max: 5, step: 1 } },
-    showScale: { control: 'boolean' },
+    hideScale: { control: 'boolean' },
     coloredInactive: { control: 'boolean' },
     labelColor: { control: 'color' },
     colorStops: { control: false },
@@ -65,7 +65,7 @@ export const StereoVertical: StoryWithLevels = {
     segmentWidth: 20,
     segmentHeight: 8,
     segmentGap: 2,
-    showScale: true,
+    hideScale: false,
     orientation: 'vertical',
   },
   render: ({ leftLevelDb, rightLevelDb, ...props }) => (
@@ -95,7 +95,7 @@ export const MonoVertical: StoryWithLevels = {
   },
   args: {
     leftLevelDb: -10,
-    showScale: true,
+    hideScale: false,
   },
   render: ({ leftLevelDb, ...props }) => (
     <SegmentedVUMeter levels={[dBToNormalized(leftLevelDb)]} channelLabels={['M']} {...props} />
@@ -121,7 +121,7 @@ export const Horizontal: StoryWithLevels = {
     leftLevelDb: -4,
     rightLevelDb: -10,
     orientation: 'horizontal',
-    showScale: true,
+    hideScale: false,
   },
   render: ({ leftLevelDb, rightLevelDb, ...props }) => (
     <SegmentedVUMeter
@@ -159,7 +159,7 @@ export const HorizontalCompact: StoryWithLevels = {
     segmentWidth: 14,
     segmentHeight: 4,
     segmentGap: 1,
-    showScale: true,
+    hideScale: false,
   },
   render: ({ leftLevelDb, rightLevelDb, ...props }) => (
     <SegmentedVUMeter
@@ -217,7 +217,7 @@ export const CompactSize: StoryWithLevels = {
     segmentHeight: 5,
     segmentGap: 1,
     segmentCount: 16,
-    showScale: true,
+    hideScale: false,
   },
   render: ({ leftLevelDb, rightLevelDb, ...props }) => (
     <SegmentedVUMeter
@@ -234,7 +234,7 @@ export const CompactSize: StoryWithLevels = {
 
 export const NoScale: StoryObj = {
   name: 'No Scale',
-  render: () => <SegmentedVUMeter levels={[0.6, 0.45]} peakLevels={[0.8, 0.6]} showScale={false} />,
+  render: () => <SegmentedVUMeter levels={[0.6, 0.45]} peakLevels={[0.8, 0.6]} hideScale />,
   parameters: {
     docs: { description: { story: 'Meter without the dB scale column, for tighter layouts.' } },
   },

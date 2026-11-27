@@ -5,7 +5,6 @@ import { DotsIcon } from './TrackControls/DotsIcon';
 
 export interface TrackMenuItem {
   id: string;
-  label?: string;
   content: ReactNode;
 }
 

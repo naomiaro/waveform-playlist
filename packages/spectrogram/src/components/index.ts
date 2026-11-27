@@ -1,4 +1,4 @@
-export { SpectrogramMenuItems } from './SpectrogramMenuItems';
-export type { SpectrogramMenuItemsProps } from './SpectrogramMenuItems';
+export { spectrogramMenuItems } from './SpectrogramMenuItems';
+export type { SpectrogramMenuItemsOptions } from './SpectrogramMenuItems';
 export { SpectrogramSettingsModal } from './SpectrogramSettingsModal';
 export type { SpectrogramSettingsModalProps } from './SpectrogramSettingsModal';

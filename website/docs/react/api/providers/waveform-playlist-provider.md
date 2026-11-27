@@ -83,7 +83,7 @@ Audio starts loading when the provider has its first adapter: nothing is fetched
 **Type:** `number`
 **Default:** `1024`
 
-Zoom level. Higher values show more audio, lower values show more detail.
+The zoom level the provider starts at. Higher values show more audio, lower values show more detail. This is the initial value: afterwards the engine owns the level, which `useEditorControls().zoomIn()` and `zoomOut()` change (through `zoomLevels`), and a later change of the prop is not followed.
 
 | Value | Use Case |
 |-------|----------|
@@ -215,7 +215,7 @@ Array of zoom levels in samples per pixel.
 **Type:** `boolean`
 **Default:** `false`
 
-Auto-scroll to keep playhead visible. While it is on, a drag on the waveform during playback does not select a range: the press and its release seek to where the press landed.
+Auto-scroll to keep playhead visible. This is the initial value: afterwards the provider owns the setting, which `usePlaybackControls().setAutomaticScroll()` (or the `AutomaticScrollCheckbox`) changes, and a later change of the prop is not followed. While it is on, a drag on the waveform during playback does not select a range: the press and its release seek to where the press landed.
 
 #### `indefinitePlayback`
 

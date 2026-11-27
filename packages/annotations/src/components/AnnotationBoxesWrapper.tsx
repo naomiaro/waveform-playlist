@@ -17,17 +17,15 @@ const Container = styled.div.attrs<ContainerProps>((props) => ({
   z-index: 110;
 `;
 
-const BoxesContainer = styled.div<{ $offset?: number }>`
+const BoxesContainer = styled.div`
   position: relative;
   height: 100%;
-  padding-left: ${(props) => props.$offset || 0}px;
 `;
 
 export interface AnnotationBoxesWrapperProps {
   className?: string;
   children?: React.ReactNode;
   height?: number;
-  offset?: number;
   width?: number;
 }
 
@@ -35,12 +33,11 @@ export const AnnotationBoxesWrapper: FunctionComponent<AnnotationBoxesWrapperPro
   children,
   className,
   height = 30,
-  offset = 0,
   width,
 }) => {
   return (
     <Container className={className} $height={height} $width={width}>
-      <BoxesContainer $offset={offset}>{children}</BoxesContainer>
+      <BoxesContainer>{children}</BoxesContainer>
     </Container>
   );
 };

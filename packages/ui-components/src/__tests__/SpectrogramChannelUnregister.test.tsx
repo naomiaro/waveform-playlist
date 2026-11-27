@@ -26,7 +26,6 @@ describe('SpectrogramChannel unregisters each canvas id once', () => {
 
   const baseProps = {
     index: 0,
-    samplesPerPixel: 1000,
     clipId: 'clip',
   };
 

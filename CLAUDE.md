@@ -201,7 +201,7 @@ The view follows the same rule since #703: `<Waveform />`, `<WaveformEditor />` 
 
 **Not for "does this part exist" (#685).** Whether something is drawn is decided by rendering its component, not by a boolean on a parent: `<WaveformClipHeaders />` inside `<WaveformTracks>`, not `<Waveform showClipHeaders />`; `<WaveformTimescale />` in the root, not `timescale` on the provider. A boolean that switches a part on puts every part's options on one root and needs a second source as soon as the part has options of its own. When a combination is common, give it a name as a ready-made composition (`<WaveformEditor />`), which takes no options for its parts.
 
-Props that still break this convention on `dev` (four that default to `true`, and two on ui-components' `Clip` that decide whether a part exists, `showFades` and `disableHeaderDrag`) are listed in #828, each waiting for a yes or no; do not copy them as precedent.
+The exceptions that stay, decided on #828 (do not copy them as precedent): `preservesPitch` on `MediaElementPlaylistProvider` defaults to `true` because it mirrors `HTMLMediaElement.preservesPitch`; the `enabled` option of the shortcut hooks defaults to `true` (a hook option, not a JSX prop); ui-components' low-level `Clip` keeps `showFades` and `disableHeaderDrag` (browser maps `<WaveformFades>` onto `showFades`). `ExportWavButton.applyEffects` is #817's.
 
 ### Styled Components
 

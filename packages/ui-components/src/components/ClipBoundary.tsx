@@ -58,8 +58,6 @@ interface BoundaryDragHandleProps {
 
 export interface ClipBoundaryProps {
   clipId: string;
-  trackIndex: number;
-  clipIndex: number;
   edge: BoundaryEdge;
   dragHandleProps?: BoundaryDragHandleProps;
   /**
@@ -80,8 +78,6 @@ export interface ClipBoundaryProps {
  */
 export const ClipBoundary: FunctionComponent<ClipBoundaryProps> = ({
   clipId,
-  trackIndex: _trackIndex,
-  clipIndex: _clipIndex,
   edge,
   dragHandleProps,
   touchOptimized = false,

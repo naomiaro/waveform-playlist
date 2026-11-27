@@ -100,7 +100,7 @@ interface FadeConfig {
 **Type:** `number`
 **Default:** `1024`
 
-Zoom level for waveform rendering.
+Zoom level for waveform rendering. The provider follows it: a new value redraws the waveform at it, and the player is not rebuilt. There is no zoom control under this provider (`canZoomIn` and `canZoomOut` are always `false`), so this prop is the only place the level is set.
 
 `waveHeight`, `barWidth`, `barGap`, `roundedBars` and `progressBarWidth` are props of [`<WaveformViewOptions>`](/docs/react/api/components#waveformviewoptions), not of the provider. `waveHeight` is the height of one channel and is 80 px by default (it was 100 while it was a prop of this provider); the row is that times the number of channels, plus the clip header when the view has one. A leftover one on the provider is a compile error in TypeScript and is ignored in plain JavaScript (the defaults are drawn). See the [upgrade guide](/docs/react/upgrading#the-options-that-only-affect-how-a-view-draws-are-waveformviewoptions-they-leave-the-providers).
 
@@ -135,7 +135,7 @@ Whether to preserve pitch when changing playback rate. When `true`, the browser'
 **Type:** `boolean`
 **Default:** `false`
 
-Auto-scroll to keep the playhead centered during playback. While it is on, a drag on the waveform during playback does not select a range: the press and its release seek to where the press landed.
+Auto-scroll to keep the playhead centered during playback. This is the initial value: afterwards the provider owns the setting, which `usePlaybackControls().setAutomaticScroll()` (or the `AutomaticScrollCheckbox`) changes, and a later change of the prop is not followed. While it is on, a drag on the waveform during playback does not select a range: the press and its release seek to where the press landed.
 
 ### Theming
 
@@ -239,8 +239,6 @@ interface MediaElementTrackContextValue {
   isReady: boolean;
   /** One track with one clip (`[]` when the peak data could not be read). The clip carries the track's fadeIn / fadeOut. */
   peaksDataArray: TrackClipPeaks[];
-  fadeIn?: FadeConfig;
-  fadeOut?: FadeConfig;
   /** The player. `current` is null until it has been created. */
   playoutRef: React.RefObject<MediaElementPlayout | null>;
 }

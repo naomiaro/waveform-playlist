@@ -18,7 +18,13 @@ describe('AnnotationBox per-entity Feedback plugin config (@dnd-kit 0.5)', () =>
     const manager = new DragDropManager();
     render(
       <DragDropProvider manager={manager}>
-        <AnnotationBox annotationId="a1" annotationIndex={3} startPosition={10} endPosition={50} />
+        <AnnotationBox
+          annotationId="a1"
+          annotationIndex={3}
+          startPosition={10}
+          endPosition={50}
+          editable
+        />
       </DragDropProvider>
     );
     const start = manager.registry.draggables.get('annotation-boundary-start-3');

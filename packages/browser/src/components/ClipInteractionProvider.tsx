@@ -98,7 +98,7 @@ export const ClipInteractionProvider: React.FC<ClipInteractionProviderProps> = (
     onDragStart: handleDragStart,
     onDragMove,
     onDragEnd,
-  } = useClipDragHandlers({ samplesPerPixel, snapSamplePosition });
+  } = useClipDragHandlers({ snapSamplePosition });
 
   // Undo and redo do nothing during a track-reorder drag (#848, #906); the
   // clip drags mark the guard in useClipDragHandlers.

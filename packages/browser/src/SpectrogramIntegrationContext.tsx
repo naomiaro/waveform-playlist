@@ -56,8 +56,6 @@ export interface SpectrogramIntegration {
 
 export const SpectrogramIntegrationContext = createContext<SpectrogramIntegration | null>(null);
 
-export const SpectrogramIntegrationProvider = SpectrogramIntegrationContext.Provider;
-
 /**
  * Hook to access spectrogram integration provided by @waveform-playlist/spectrogram.
  * Throws if used without <SpectrogramProvider> wrapping the component tree.

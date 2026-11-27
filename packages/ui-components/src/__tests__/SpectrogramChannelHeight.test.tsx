@@ -30,7 +30,6 @@ describe('SpectrogramChannel and its height', () => {
     const props = {
       index: 0,
       length: 300,
-      samplesPerPixel: 1000,
       clipId: 'clip',
       onCanvasRegister,
       onCanvasUnregister,
@@ -59,7 +58,6 @@ describe('SpectrogramChannel and its height', () => {
       index: 0,
       length: 300,
       waveHeight: 100,
-      samplesPerPixel: 1000,
       clipId: '',
       onCanvasRegister: () => {},
       onCanvasUnregister: () => {},

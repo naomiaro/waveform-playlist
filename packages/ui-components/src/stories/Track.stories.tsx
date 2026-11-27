@@ -112,18 +112,6 @@ export const Selected: Story = {
   ),
 };
 
-export const WithOffset: Story = {
-  args: {
-    numChannels: 1,
-    offset: 100,
-  },
-  render: (args) => (
-    <Track {...args}>
-      <ThemedChannel index={0} data={sampleData} bits={8} length={500} waveHeight={80} />
-    </Track>
-  ),
-};
-
 export const WithClipHeaders: Story = {
   args: {
     numChannels: 1,

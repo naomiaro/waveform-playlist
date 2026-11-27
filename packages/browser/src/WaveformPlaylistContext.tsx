@@ -151,8 +151,22 @@ export interface WaveformPlaylistProviderProps {
    * view option: the provider computes the peaks with it.
    */
   mono?: boolean;
+  /**
+   * The zoom level the provider starts at, in samples per pixel (default
+   * 1024). The initial value only: afterwards the engine owns the level,
+   * which `useEditorControls().zoomIn()` / `zoomOut()` change. A later change
+   * of this prop is not followed.
+   */
   samplesPerPixel?: number;
   zoomLevels?: number[]; // Array of zoom levels in samples per pixel (lower = more zoomed in)
+  /**
+   * Whether automatic scroll (the view keeps the playhead centred during
+   * playback) starts on; default false. The initial value only: afterwards
+   * the provider owns the setting, which
+   * `usePlaybackControls().setAutomaticScroll` (or the
+   * `AutomaticScrollCheckbox`) changes. A later change of this prop is not
+   * followed.
+   */
   automaticScroll?: boolean;
   theme?: Partial<WaveformPlaylistTheme>;
   /**

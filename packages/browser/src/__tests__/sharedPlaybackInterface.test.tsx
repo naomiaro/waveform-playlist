@@ -404,8 +404,6 @@ describe('the shared hooks under MediaElementPlaylistProvider', () => {
     expect(Object.keys(readers.values.rate).sort()).toEqual(['playbackRate', 'setPlaybackRate']);
     expect(Object.keys(readers.values.track).sort()).toEqual([
       'duration',
-      'fadeIn',
-      'fadeOut',
       'isReady',
       'peaksDataArray',
       'playoutRef',

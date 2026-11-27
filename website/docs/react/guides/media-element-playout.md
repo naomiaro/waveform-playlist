@@ -273,7 +273,7 @@ The controls follow the same rules as `WaveformPlaylistProvider`'s:
 | `usePlaylistSettings()` | the user changing either setting | `timeFormat`, `isAutomaticScroll` |
 | `usePlaylistZoom()` | a zoom level change | `samplesPerPixel` (`canZoomIn` and `canZoomOut` are always `false` here) |
 | `usePlaybackRate()` | the speed changing | `playbackRate`, `setPlaybackRate` |
-| `useMediaElementTrack()` | the track or the zoom level changing, the player becoming ready | `duration`, `isReady`, `peaksDataArray`, `fadeIn`, `fadeOut`, `playoutRef` |
+| `useMediaElementTrack()` | the track or the zoom level changing, the player becoming ready | `duration`, `isReady`, `peaksDataArray`, `playoutRef` |
 
 `usePlaybackRate()` and `useMediaElementTrack()` exist under this provider only. The hooks that only `WaveformPlaylistProvider` serves (`useEditorControls()`, `useEngineRefs()`, `useLoop()`, `usePlaylistTimeline()`, `usePlaylistMixer()` and the others listed in the [hooks reference](/docs/react/api/hooks#core-context-hooks)) throw here.
 

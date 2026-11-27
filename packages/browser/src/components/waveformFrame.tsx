@@ -227,7 +227,6 @@ export function useWaveformFrame({
               <SelectionPreviewContext value={selectionPreview}>
                 <Playlist
                   className={className}
-                  theme={theme}
                   backgroundColor={
                     theme.playlistBackgroundColor || waveformColorToCss(theme.waveOutlineColor)
                   }

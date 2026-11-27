@@ -24,14 +24,9 @@ const Container = styled.div.attrs<ContainerWithHeaderProps>((props) => ({
 
 interface ChannelContainerProps {
   readonly $backgroundColor?: string;
-  readonly $offset?: number;
   readonly $isSelected?: boolean;
 }
-const ChannelContainer = styled.div.attrs<ChannelContainerProps>((props) => ({
-  style: {
-    paddingLeft: `${props.$offset || 0}px`,
-  },
-}))<ChannelContainerProps>`
+const ChannelContainer = styled.div<ChannelContainerProps>`
   position: relative;
   background: ${(props) => {
     if (props.$isSelected) {
@@ -47,7 +42,6 @@ export interface TrackProps {
   children?: ReactNode;
   numChannels: number;
   backgroundColor?: string;
-  offset?: number; // Offset in pixels to shift the waveform right
   width?: number; // Total width of the track (for consistent backgrounds across tracks)
   hasClipHeaders?: boolean; // Whether clips have headers (for multi-clip editing)
   onClick?: () => void; // Called when track is clicked (for track selection)
@@ -60,7 +54,6 @@ export const Track: FunctionComponent<TrackProps> = ({
   children,
   className,
   backgroundColor,
-  offset = 0,
   width,
   hasClipHeaders = false,
   onClick,
@@ -78,7 +71,6 @@ export const Track: FunctionComponent<TrackProps> = ({
     >
       <ChannelContainer
         $backgroundColor={backgroundColor}
-        $offset={offset}
         $isSelected={isSelected}
         onClick={onClick}
         data-track-id={trackId}

@@ -178,7 +178,6 @@ const ClipView = React.memo(function ClipView({
           clipOffsetSeconds={
             clip.offsetSamples != null ? clip.offsetSamples / (clip.sampleRate || sampleRate) : 0
           }
-          samplesPerPixel={samplesPerPixel}
           spectrogramClipId={clip.clipId}
           spectrogramOnCanvasRegister={registerSpectrogramCanvas}
           spectrogramOnCanvasUnregister={unregisterSpectrogramCanvas}
@@ -355,7 +354,6 @@ const TrackRow = React.memo(function TrackRow({
             ? theme.pianoRollBackgroundColor || '#1a1a2e'
             : waveformColorToCss(theme.waveOutlineColor)
         }
-        offset={0}
         width={width}
         hasClipHeaders={showClipHeaders}
         trackId={trackId}

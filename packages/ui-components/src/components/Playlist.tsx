@@ -1,4 +1,4 @@
-import styled, { DefaultTheme, withTheme } from 'styled-components';
+import styled from 'styled-components';
 import React, { FunctionComponent, useRef, useCallback } from 'react';
 import { ScrollViewportProvider } from '../contexts/ScrollViewport';
 
@@ -97,7 +97,6 @@ const ClickOverlay = styled.div<ClickOverlayProps>`
 `;
 
 export interface PlaylistProps {
-  readonly theme: DefaultTheme;
   readonly children?: React.ReactNode;
   readonly backgroundColor?: string;
   readonly timescaleBackgroundColor?: string;
@@ -186,5 +185,3 @@ export const Playlist: FunctionComponent<PlaylistProps> = ({
     </Wrapper>
   );
 };
-
-export const StyledPlaylist = withTheme(Playlist);

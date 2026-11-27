@@ -34,9 +34,9 @@ interface WaveformPlaylistProviderProps {
   /** Draw and analyse every track as one channel. A provider option, not a
    *  view option: the provider computes the peaks with it. */
   mono?: boolean;                         // Default: false
-  samplesPerPixel?: number;               // Default: 1024
+  samplesPerPixel?: number;               // Default: 1024. Initial value: zoomIn()/zoomOut() change it; a later prop change is not followed
   zoomLevels?: number[];
-  automaticScroll?: boolean;              // Default: false. While on, a drag during playback is one seek to the press, no range
+  automaticScroll?: boolean;              // Default: false. Initial value: setAutomaticScroll() changes it; a later prop change is not followed. While on, a drag during playback is one seek to the press, no range
   theme?: Partial<WaveformPlaylistTheme>; // merged over defaultTheme: { ...defaultTheme, ...theme }
   /** The owner of the annotations (#867): make it with `useCreateAnnotationStore`
    *  (see "Annotation Store") and change the annotations with its methods. The
@@ -120,10 +120,10 @@ interface MediaElementPlaylistProviderProps {
   track: MediaElementTrackConfig;
   children: ReactNode;
   audioContext?: AudioContext;            // Enables Web Audio routing (fades, effects)
-  samplesPerPixel?: number;              // Default: 1024
+  samplesPerPixel?: number;              // Default: 1024. Followed: a new value redraws the waveform at it (no zoom control here)
   playbackRate?: number; // Default: 1. Not clamped by the provider (setPlaybackRate clamps to 0.5–2.0)
   preservesPitch?: boolean;              // Default: true (set false for external pitch processor)
-  automaticScroll?: boolean;             // Default: false. While on, a drag during playback is one seek to the press, no range
+  automaticScroll?: boolean;             // Default: false. Initial value: setAutomaticScroll() changes it; a later prop change is not followed. While on, a drag during playback is one seek to the press, no range
   theme?: Partial<WaveformPlaylistTheme>;
   annotationStore?: AnnotationStore;        // the same prop as on WaveformPlaylistProvider
   annotationList?: AnnotationListProp;      // the same prop as on WaveformPlaylistProvider
@@ -667,8 +667,6 @@ interface MediaElementTrackContextValue {
   isReady: boolean;
   /** One track with one clip (`[]` when the peak data could not be read). The clip carries the track's fadeIn / fadeOut. */
   peaksDataArray: TrackClipPeaks[];
-  fadeIn?: FadeConfig;
-  fadeOut?: FadeConfig;
   /** The player. `current` is null until it has been created. */
   playoutRef: React.RefObject<MediaElementPlayout | null>;
 }
@@ -1467,20 +1465,19 @@ Each move is worked out over the store's current list with the bounds of every a
 ### useClipDragHandlers
 
 ```typescript
-function useClipDragHandlers(options: UseClipDragHandlersOptions): {
+function useClipDragHandlers(options?: UseClipDragHandlersOptions): {
   onDragStart: (event: DragStartEvent) => void; // DragStartEvent, DragMoveEvent, DragEndEvent: @dnd-kit/abstract
   onDragMove: (event: DragMoveEvent) => void;
   onDragEnd: (event: DragEndEvent) => void;
 };
 
 interface UseClipDragHandlersOptions {
-  samplesPerPixel: number;
   /** Optional snap function for boundary trims — snaps a sample position to nearest grid line */
   snapSamplePosition?: (samplePos: number) => number;
 }
 ```
 
-Reads the provider's arrangement (`useArrangement()`): throws outside `WaveformPlaylistProvider` and under `MediaElementPlaylistProvider` (#812; options `tracks` and `engineRef` removed). A move is one `arrangement.moveClip()` on drop and a trim one `arrangement.trimClip()` on release: each is one undo step, and neither opens a transaction. A move, trim or split made while no engine is attached (before the first build, during a rebuild) is kept, and the next engine plays it. While a trim handle is dragged, each move is constrained by `arrangement.constrainTrimDelta` and drawn as a preview of the dragged clip only (the preview is internal: no exported hook or context reads it); the tracks do not change until the release. Escape (`event.canceled`) clears the preview and changes nothing. From `onDragStart` of a clip to its `onDragEnd` (or the unmount of the component that holds the handlers) `useEditorControls().undo()` / `redo()` do nothing (#848); a setup that calls `onDragStart` must also call `onDragEnd`, or undo stays off until that component unmounts. A move or a trim commits the clip and track picked up at drag start, by their ids (also if the row moves or other clips change position during the drag); a move whose clip is no longer among the track's loaded clips at the drop is dropped with a console warning; `clipIndex` of the drag data is not read. The draggable ids are `clip/<trackId>/<clipId>`, `clip-boundary-left/<trackId>/<clipId>` and `clip-boundary-right/<trackId>/<clipId>` (each part `encodeURIComponent`-encoded). A clip still loading has no handles. Collision detection is handled separately by `ClipCollisionModifier` (passed to DragDropProvider's `modifiers` prop; give it `usePlaylistTimeline().tracks`). Within one provider mount (the arrangement and the provider's trim preview do not change then) `onDragStart` keeps its identity, `onDragMove` changes with `samplesPerPixel` or the sample rate and `onDragEnd` with `samplesPerPixel`.
+Reads the provider's arrangement (`useArrangement()`) and zoom level (`usePlaylistZoom().samplesPerPixel`): throws outside `WaveformPlaylistProvider` and under `MediaElementPlaylistProvider` (#812 removed the options `tracks` and `engineRef`, #828 `samplesPerPixel`). A move is one `arrangement.moveClip()` on drop and a trim one `arrangement.trimClip()` on release: each is one undo step, and neither opens a transaction. A move, trim or split made while no engine is attached (before the first build, during a rebuild) is kept, and the next engine plays it. While a trim handle is dragged, each move is constrained by `arrangement.constrainTrimDelta` and drawn as a preview of the dragged clip only (the preview is internal: no exported hook or context reads it); the tracks do not change until the release. Escape (`event.canceled`) clears the preview and changes nothing. From `onDragStart` of a clip to its `onDragEnd` (or the unmount of the component that holds the handlers) `useEditorControls().undo()` / `redo()` do nothing (#848); a setup that calls `onDragStart` must also call `onDragEnd`, or undo stays off until that component unmounts. A move or a trim commits the clip and track picked up at drag start, by their ids (also if the row moves or other clips change position during the drag); a move whose clip is no longer among the track's loaded clips at the drop is dropped with a console warning; `clipIndex` of the drag data is not read. The draggable ids are `clip/<trackId>/<clipId>`, `clip-boundary-left/<trackId>/<clipId>` and `clip-boundary-right/<trackId>/<clipId>` (each part `encodeURIComponent`-encoded). A clip still loading has no handles. Collision detection is handled separately by `ClipCollisionModifier` (passed to DragDropProvider's `modifiers` prop; give it `usePlaylistTimeline().tracks`). Within one provider mount (the arrangement and the provider's trim preview do not change then) `onDragStart` keeps its identity, `onDragMove` changes with `samplesPerPixel` or the sample rate and `onDragEnd` with `samplesPerPixel`.
 
 ### useDragSensors
 
@@ -1532,11 +1529,7 @@ Snap-to-grid modifier for clip moves. `'beats'` mode quantizes in PPQN tick spac
 ### useClipSplitting
 
 ```typescript
-function useClipSplitting(options: UseClipSplittingOptions): UseClipSplittingResult;
-
-interface UseClipSplittingOptions {
-  samplesPerPixel: number; // options tracks and engineRef removed (#812)
-}
+function useClipSplitting(): UseClipSplittingResult; // no options: tracks and engineRef removed (#812), samplesPerPixel (#828)
 
 interface UseClipSplittingResult {
   splitClipAtPlayhead: () => boolean;
@@ -1544,7 +1537,7 @@ interface UseClipSplittingResult {
 }
 ```
 
-Each split is one `arrangement.splitClip()` on the provider's arrangement (`useArrangement()`): an undo step, kept with no engine attached. Throws outside `WaveformPlaylistProvider` and under `MediaElementPlaylistProvider`. `splitClipAt` takes ids and returns `false`, changing nothing, for a track id or clip id that is not in the arrangement, for a clip still loading, and for a split point outside the clip or too close to an edge (with a console warning); otherwise `true`, also with no engine.
+Each split is one `arrangement.splitClip()` on the provider's arrangement (`useArrangement()`), snapped at the provider's zoom level (`usePlaylistZoom()`): an undo step, kept with no engine attached. Throws outside `WaveformPlaylistProvider` and under `MediaElementPlaylistProvider`. `splitClipAt` takes ids and returns `false`, changing nothing, for a track id or clip id that is not in the arrangement, for a clip still loading, and for a split point outside the clip or too close to an edge (with a console warning); otherwise `true`, also with no engine.
 
 ---
 
@@ -2211,7 +2204,7 @@ interface SegmentedVUMeterProps {
   orientation?: 'vertical' | 'horizontal';
   segmentCount?: number;
   dBRange?: [number, number];
-  showScale?: boolean;
+  hideScale?: boolean;
   colorStops?: ColorStop[];
   segmentWidth?: number;
   segmentHeight?: number;
@@ -3089,7 +3082,7 @@ class SpectrogramAbortError extends Error {}  // instanceof check for aborted FF
 export { computeSpectrogram, computeSpectrogramMono, getColorMap, getFrequencyScale } from '@dawcore/spectrogram';
 export { createSpectrogramWorker, createSpectrogramWorkerPool, SpectrogramAbortError } from '@dawcore/spectrogram';
 export { SpectrogramOrchestrator } from '@dawcore/spectrogram/orchestrator';
-export { SpectrogramProvider, SpectrogramMenuItems, SpectrogramSettingsModal } from '@waveform-playlist/spectrogram';
+export { SpectrogramProvider, spectrogramMenuItems, SpectrogramSettingsModal } from '@waveform-playlist/spectrogram';
 
 interface SpectrogramSettingsModalProps {
   open: boolean;
@@ -3104,7 +3097,7 @@ interface SpectrogramSettingsModalProps {
 }
 
 // Integration context (from @waveform-playlist/browser)
-export { useSpectrogramIntegration, SpectrogramIntegrationProvider } from '@waveform-playlist/browser';
+export { useSpectrogramIntegration, SpectrogramIntegrationContext } from '@waveform-playlist/browser'; // <SpectrogramIntegrationContext value>
 export type { SpectrogramIntegration } from '@waveform-playlist/browser';
 // SpectrogramWorkerApi (above) is a type of @dawcore/spectrogram; browser does not export it.
 // SpectrogramCanvasRegistration (what a spectrogram canvas registers with) is declared once,
@@ -3116,7 +3109,7 @@ export type { SpectrogramIntegration } from '@waveform-playlist/browser';
 // the range its canvases registered with, and for the clip's own when they are omitted.
 // SpectrogramChannel (ui-components) takes them as optional props of the same names (SmartChannel:
 // spectrogramOffsetSamples, spectrogramDurationSamples) and mounts new canvases when they change.
-// TrackMenuItem (what SpectrogramMenuItems returns an array of) is from
+// TrackMenuItem (what spectrogramMenuItems returns an array of) is from
 // @waveform-playlist/ui-components; the spectrogram package does not export it.
 ```
 

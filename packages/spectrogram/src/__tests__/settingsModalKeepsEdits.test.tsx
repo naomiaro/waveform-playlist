@@ -12,7 +12,7 @@ import {
   WaveformPlaylistProvider,
   useCreateArrangement,
   Waveform,
-  SpectrogramIntegrationProvider,
+  SpectrogramIntegrationContext,
   useEditorControls,
   usePlaylistZoom,
   type SpectrogramIntegration,
@@ -148,10 +148,10 @@ describe('spectrogram settings modal on a track with no config', () => {
 
     render(
       <Playlist>
-        <SpectrogramIntegrationProvider value={INTEGRATION}>
+        <SpectrogramIntegrationContext value={INTEGRATION}>
           <Probe />
           <Waveform />
-        </SpectrogramIntegrationProvider>
+        </SpectrogramIntegrationContext>
       </Playlist>
     );
 
@@ -197,9 +197,9 @@ describe('spectrogram settings modal: the default top frequency', () => {
 
     render(
       <At44k>
-        <SpectrogramIntegrationProvider value={INTEGRATION}>
+        <SpectrogramIntegrationContext value={INTEGRATION}>
           <Waveform />
-        </SpectrogramIntegrationProvider>
+        </SpectrogramIntegrationContext>
       </At44k>
     );
 

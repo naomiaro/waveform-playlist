@@ -39,8 +39,6 @@ const mockDragHandleProps = {
 export const LeftEdge: Story = {
   args: {
     clipId: 'clip-1',
-    trackIndex: 0,
-    clipIndex: 0,
     edge: 'left',
     dragHandleProps: mockDragHandleProps,
   },
@@ -49,8 +47,6 @@ export const LeftEdge: Story = {
 export const RightEdge: Story = {
   args: {
     clipId: 'clip-1',
-    trackIndex: 0,
-    clipIndex: 0,
     edge: 'right',
     dragHandleProps: mockDragHandleProps,
   },
@@ -59,8 +55,6 @@ export const RightEdge: Story = {
 export const LeftEdgeDragging: Story = {
   args: {
     clipId: 'clip-1',
-    trackIndex: 0,
-    clipIndex: 0,
     edge: 'left',
     dragHandleProps: { ...mockDragHandleProps, isDragging: true },
   },
@@ -69,8 +63,6 @@ export const LeftEdgeDragging: Story = {
 export const RightEdgeDragging: Story = {
   args: {
     clipId: 'clip-1',
-    trackIndex: 0,
-    clipIndex: 0,
     edge: 'right',
     dragHandleProps: { ...mockDragHandleProps, isDragging: true },
   },
@@ -79,20 +71,8 @@ export const RightEdgeDragging: Story = {
 export const BothEdges: Story = {
   render: () => (
     <>
-      <ClipBoundary
-        clipId="clip-1"
-        trackIndex={0}
-        clipIndex={0}
-        edge="left"
-        dragHandleProps={mockDragHandleProps}
-      />
-      <ClipBoundary
-        clipId="clip-1"
-        trackIndex={0}
-        clipIndex={0}
-        edge="right"
-        dragHandleProps={mockDragHandleProps}
-      />
+      <ClipBoundary clipId="clip-1" edge="left" dragHandleProps={mockDragHandleProps} />
+      <ClipBoundary clipId="clip-1" edge="right" dragHandleProps={mockDragHandleProps} />
     </>
   ),
 };
@@ -113,20 +93,8 @@ export const InteractiveHover: Story = {
             border: '1px solid #ccc',
           }}
         >
-          <ClipBoundary
-            clipId="clip-1"
-            trackIndex={0}
-            clipIndex={0}
-            edge="left"
-            dragHandleProps={mockDragHandleProps}
-          />
-          <ClipBoundary
-            clipId="clip-1"
-            trackIndex={0}
-            clipIndex={0}
-            edge="right"
-            dragHandleProps={mockDragHandleProps}
-          />
+          <ClipBoundary clipId="clip-1" edge="left" dragHandleProps={mockDragHandleProps} />
+          <ClipBoundary clipId="clip-1" edge="right" dragHandleProps={mockDragHandleProps} />
         </div>
       </div>
     );

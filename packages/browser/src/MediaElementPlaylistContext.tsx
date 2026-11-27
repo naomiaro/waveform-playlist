@@ -91,7 +91,9 @@ export interface MediaElementTrackConfig {
 export interface MediaElementPlaylistProviderProps {
   /** Single track configuration with source URL and waveform data */
   track: MediaElementTrackConfig;
-  /** Initial samples per pixel (zoom level) */
+  /** Samples per pixel (the zoom level; default 1024). Followed: a new value
+   *  redraws the waveform at it. There is no zoom control under this
+   *  provider, so the prop is the only place the level is set. */
   samplesPerPixel?: number;
   /** Playback rate (default 1). Not clamped by the provider: the bundled
    *  engine is created at it as given, while `setPlaybackRate` clamps to
@@ -101,7 +103,11 @@ export interface MediaElementPlaylistProviderProps {
   /** Whether to preserve pitch when changing playback rate (default: true).
    *  Set to false when using an external pitch processor like SoundTouch. */
   preservesPitch?: boolean;
-  /** Enable automatic scroll to keep playhead centered */
+  /** Whether automatic scroll (the view keeps the playhead centred during
+   *  playback) starts on; default false. The initial value only: afterwards
+   *  the provider owns the setting, which `usePlaybackControls().setAutomaticScroll`
+   *  (or the `AutomaticScrollCheckbox`) changes. A later change of this prop
+   *  is not followed. */
   automaticScroll?: boolean;
   /** Theme configuration */
   theme?: Partial<WaveformPlaylistTheme>;
@@ -163,7 +169,7 @@ export interface MediaElementPlaylistProviderProps {
  */
 export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProviderProps> = ({
   track,
-  samplesPerPixel: initialSamplesPerPixel = 1024,
+  samplesPerPixel = 1024,
   playbackRate: initialPlaybackRate = 1,
   preservesPitch = true,
   automaticScroll = false,
@@ -258,13 +264,15 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   });
   const selectionRef = useRef(selection);
 
-  const [samplesPerPixel] = useState(initialSamplesPerPixel);
   const { timeFormat, setTimeFormat } = useTimeFormat();
 
   // Refs
   const playoutRef = useRef<MediaElementPlayout | null>(null);
   const currentTimeRef = useRef<number>(0);
-  const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
+  // For the animation loop. Written during render: the prop is followed
+  // (#828) and the loop reads the level of the latest render.
+  const samplesPerPixelRef = useRef<number>(samplesPerPixel);
+  samplesPerPixelRef.current = samplesPerPixel;
   const { startAnimationFrameLoop, stopAnimationFrameLoop } = useAnimationFrameLoop();
 
   // What the play that is running (or queued) is, in the WebAudio provider's
@@ -956,11 +964,9 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
       duration,
       isReady,
       peaksDataArray,
-      fadeIn: trackFadeIn,
-      fadeOut: trackFadeOut,
       playoutRef,
     }),
-    [duration, isReady, peaksDataArray, trackFadeIn, trackFadeOut]
+    [duration, isReady, peaksDataArray]
   );
 
   // The twelve contexts only the WebAudio provider serves are blocked, so that

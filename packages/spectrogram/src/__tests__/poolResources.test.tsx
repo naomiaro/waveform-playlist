@@ -78,7 +78,7 @@ vi.mock('@dawcore/spectrogram', async (importOriginal) => {
 });
 
 vi.mock('@waveform-playlist/browser', () => ({
-  SpectrogramIntegrationProvider: ({
+  SpectrogramIntegrationContext: ({
     value,
     children,
   }: {

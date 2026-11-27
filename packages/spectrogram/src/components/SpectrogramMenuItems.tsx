@@ -54,7 +54,7 @@ const RENDER_MODES: { value: RenderMode; label: string }[] = [
   { value: 'both', label: 'Both' },
 ];
 
-export interface SpectrogramMenuItemsProps {
+export interface SpectrogramMenuItemsOptions {
   renderMode: RenderMode;
   onRenderModeChange: (mode: RenderMode) => void;
   onOpenSettings: () => void;
@@ -65,16 +65,15 @@ export interface SpectrogramMenuItemsProps {
  * Returns the track menu items (`TrackMenuItem[]` of ui-components) for the
  * spectrogram display mode radios and settings button.
  */
-export function SpectrogramMenuItems({
+export function spectrogramMenuItems({
   renderMode,
   onRenderModeChange,
   onOpenSettings,
   onClose,
-}: SpectrogramMenuItemsProps): MenuItems {
+}: SpectrogramMenuItemsOptions): MenuItems {
   return [
     {
       id: 'spectrogram-display',
-      label: 'Display',
       content: (
         <DropdownSection>
           <SectionLabel>Display</SectionLabel>

@@ -13,7 +13,7 @@ const SAMPLE_RATE = 48000;
 
 // The hooks read sampleRate (and the provider reads more) from the playlist
 // contexts. The tests supply those values directly.
-let playlistData: Record<string, unknown> = { sampleRate: SAMPLE_RATE };
+let playlistData: Record<string, unknown> = { sampleRate: SAMPLE_RATE, samplesPerPixel: 1000 };
 const playlistControls = {
   setSelectedTrackId: vi.fn(),
   reorderTrack: vi.fn(),
@@ -124,7 +124,7 @@ describe('useClipDragHandlers', () => {
     const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
       <TrimPreviewContext value={preview}>{children}</TrimPreviewContext>
     );
-    const hook = renderHook(() => useClipDragHandlers({ samplesPerPixel: 1000 }), { wrapper });
+    const hook = renderHook(() => useClipDragHandlers(), { wrapper });
     return {
       hook,
       engine,

@@ -34,7 +34,7 @@ describe('SegmentedVUMeter with a meter source', () => {
   it('draws the source value at mount', () => {
     const { source } = createValueSource(levelsOf([1.0, 0]));
     const { container } = renderWithTheme(
-      <SegmentedVUMeter meter={source} segmentCount={12} showScale={false} />
+      <SegmentedVUMeter meter={source} segmentCount={12} hideScale />
     );
     // Same expectations as the `levels` prop: 0 dB lights 11 of 12, silence none.
     // The peak marker replaces one lit segment of the first channel.
@@ -47,7 +47,7 @@ describe('SegmentedVUMeter with a meter source', () => {
     const onRender = vi.fn();
     const { container } = renderWithTheme(
       <Profiler id="meter" onRender={onRender}>
-        <SegmentedVUMeter meter={source} segmentCount={12} showScale={false} />
+        <SegmentedVUMeter meter={source} segmentCount={12} hideScale />
       </Profiler>
     );
     expect(activeCounts(container)).toEqual([0]);
@@ -104,7 +104,7 @@ describe('SegmentedVUMeter with a meter source', () => {
   it('moves the peak marker as the held peak changes', () => {
     const { source, publish } = createValueSource(levelsOf([0], [1.0]));
     const { container } = renderWithTheme(
-      <SegmentedVUMeter meter={source} segmentCount={12} showScale={false} />
+      <SegmentedVUMeter meter={source} segmentCount={12} hideScale />
     );
     const peakIndex = () =>
       Array.from(container.querySelectorAll('[data-segment]')).findIndex((segment) =>
@@ -126,7 +126,7 @@ describe('SegmentedVUMeter with a meter source', () => {
     const onRender = vi.fn();
     const { container } = renderWithTheme(
       <Profiler id="meter" onRender={onRender}>
-        <SegmentedVUMeter meter={source} segmentCount={12} showScale={false} />
+        <SegmentedVUMeter meter={source} segmentCount={12} hideScale />
       </Profiler>
     );
     expect(container.querySelectorAll('[data-channel]').length).toBe(1);
@@ -144,7 +144,7 @@ describe('SegmentedVUMeter with a meter source', () => {
   it('keeps the drawn levels when a prop changes', () => {
     const { source, publish } = createValueSource(silentMeterLevels(1));
     const { container, rerender } = renderWithTheme(
-      <SegmentedVUMeter meter={source} segmentCount={12} showScale={false} />
+      <SegmentedVUMeter meter={source} segmentCount={12} hideScale />
     );
     act(() => {
       publish(levelsOf([1.0], [0]));
@@ -153,7 +153,7 @@ describe('SegmentedVUMeter with a meter source', () => {
 
     rerender(
       <ThemeProvider theme={defaultTheme}>
-        <SegmentedVUMeter meter={source} segmentCount={12} showScale={false} labelColor="#fff" />
+        <SegmentedVUMeter meter={source} segmentCount={12} hideScale labelColor="#fff" />
       </ThemeProvider>
     );
     expect(activeCounts(container)).toEqual([10]);
@@ -167,7 +167,7 @@ describe('SegmentedVUMeter with a meter source', () => {
   it('shows the levels prop again once the meter is removed', () => {
     const { source, publish } = createValueSource(silentMeterLevels(1));
     const { container, rerender } = renderWithTheme(
-      <SegmentedVUMeter meter={source} levels={[0]} segmentCount={12} showScale={false} />
+      <SegmentedVUMeter meter={source} levels={[0]} segmentCount={12} hideScale />
     );
     act(() => {
       publish(levelsOf([1.0]));
@@ -176,7 +176,7 @@ describe('SegmentedVUMeter with a meter source', () => {
 
     rerender(
       <ThemeProvider theme={defaultTheme}>
-        <SegmentedVUMeter levels={[0]} segmentCount={12} showScale={false} />
+        <SegmentedVUMeter levels={[0]} segmentCount={12} hideScale />
       </ThemeProvider>
     );
 
@@ -188,19 +188,14 @@ describe('SegmentedVUMeter with a meter source', () => {
   it('redraws the current value after every render', () => {
     const { source, publish } = createValueSource(silentMeterLevels(1));
     const { container, rerender } = renderWithTheme(
-      <SegmentedVUMeter meter={source} segmentCount={12} showScale={false} />
+      <SegmentedVUMeter meter={source} segmentCount={12} hideScale />
     );
     act(() => {
       publish(levelsOf([1.0], [0]));
     });
     const withProps = (className: string) => (
       <ThemeProvider theme={defaultTheme}>
-        <SegmentedVUMeter
-          meter={source}
-          segmentCount={12}
-          showScale={false}
-          className={className}
-        />
+        <SegmentedVUMeter meter={source} segmentCount={12} hideScale className={className} />
       </ThemeProvider>
     );
     // A render at the current value, so React's own record of the styles is

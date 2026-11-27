@@ -71,24 +71,20 @@ function clipDraggableIds(
 }
 
 interface ClipContainerProps {
-  readonly $left?: number; // Horizontal position in pixels (optional for overlay)
-  readonly $width?: number; // Width in pixels (optional for overlay)
-  readonly $isOverlay?: boolean; // Whether this is rendering in overlay mode
+  readonly $left: number; // Horizontal position in pixels
+  readonly $width: number; // Width in pixels
   readonly $isPlaceholder?: boolean; // The clip's audio is still loading: drawn dimmed
 }
 
 const ClipContainer = styled.div.attrs<ClipContainerProps>((props) => ({
-  style: props.$isOverlay
-    ? {}
-    : {
-        left: `${props.$left}px`,
-        width: `${props.$width}px`,
-      },
+  style: {
+    left: `${props.$left}px`,
+    width: `${props.$width}px`,
+  },
 }))<ClipContainerProps>`
-  position: ${(props) => (props.$isOverlay ? 'relative' : 'absolute')};
+  position: absolute;
   top: 0;
-  height: ${(props) => (props.$isOverlay ? 'auto' : '100%')};
-  width: ${(props) => (props.$isOverlay ? `${props.$width}px` : 'auto')};
+  height: 100%;
   display: flex;
   flex-direction: column;
   z-index: 10; /* Above progress overlay (z-index: 2) but below controls/playhead */
@@ -101,14 +97,10 @@ const ClipContainer = styled.div.attrs<ClipContainerProps>((props) => ({
       : ''}
 `;
 
-interface ChannelsWrapperProps {
-  readonly $isOverlay?: boolean;
-}
-
-const ChannelsWrapper = styled.div<ChannelsWrapperProps>`
+const ChannelsWrapper = styled.div`
   flex: 1;
   position: relative;
-  overflow: ${(props) => (props.$isOverlay ? 'visible' : 'hidden')};
+  overflow: hidden;
 `;
 
 export interface ClipProps {
@@ -124,7 +116,6 @@ export interface ClipProps {
   // Optional header (for multi-clip editing with drag-to-move)
   showHeader?: boolean;
   disableHeaderDrag?: boolean; // Disable drag on header (for presentation-only rendering)
-  isOverlay?: boolean; // Rendering in overlay mode (disables absolute positioning)
   // Track selection
   isSelected?: boolean; // Whether the track is selected
   onMouseDown?: (e: React.MouseEvent<HTMLDivElement>) => void; // Called when clip is pressed (for track selection - fires before drag)
@@ -170,7 +161,6 @@ export const Clip: FunctionComponent<ClipProps> = ({
   samplesPerPixel,
   showHeader = false,
   disableHeaderDrag = false,
-  isOverlay = false,
   isSelected = false,
   onMouseDown,
   trackId,
@@ -190,7 +180,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
 
   // Use draggable only if header is shown and drag is enabled
   const headerDragDisabled = disableHeaderDrag || isPlaceholder;
-  const enableDrag = showHeader && !headerDragDisabled && !isOverlay;
+  const enableDrag = showHeader && !headerDragDisabled;
 
   const ids = clipDraggableIds(trackId, clipId, trackIndex, clipIndex);
 
@@ -232,7 +222,6 @@ export const Clip: FunctionComponent<ClipProps> = ({
       className={className}
       $left={left}
       $width={width}
-      $isOverlay={isOverlay}
       $isPlaceholder={isPlaceholder}
       data-clip-container="true"
       data-clip-placeholder={isPlaceholder ? 'true' : undefined}
@@ -247,8 +236,6 @@ export const Clip: FunctionComponent<ClipProps> = ({
       {showHeader && (
         <ClipHeader
           clipId={clipId}
-          trackIndex={trackIndex}
-          clipIndex={clipIndex}
           trackName={trackName}
           isSelected={isSelected}
           disableDrag={headerDragDisabled}
@@ -256,7 +243,7 @@ export const Clip: FunctionComponent<ClipProps> = ({
         />
       )}
       <ClipViewportOriginProvider originX={left}>
-        <ChannelsWrapper $isOverlay={isOverlay}>
+        <ChannelsWrapper>
           {children}
           {/* Fade overlays */}
           {showFades && fadeIn && fadeIn.duration > 0 && (
@@ -278,12 +265,10 @@ export const Clip: FunctionComponent<ClipProps> = ({
         </ChannelsWrapper>
       </ClipViewportOriginProvider>
       {/* Clip boundaries - outside ChannelsWrapper to avoid overflow:hidden clipping */}
-      {showHeader && !headerDragDisabled && !isOverlay && (
+      {showHeader && !headerDragDisabled && (
         <>
           <ClipBoundary
             clipId={clipId}
-            trackIndex={trackIndex}
-            clipIndex={clipIndex}
             edge="left"
             touchOptimized={touchOptimized}
             dragHandleProps={{
@@ -293,8 +278,6 @@ export const Clip: FunctionComponent<ClipProps> = ({
           />
           <ClipBoundary
             clipId={clipId}
-            trackIndex={trackIndex}
-            clipIndex={clipIndex}
             edge="right"
             touchOptimized={touchOptimized}
             dragHandleProps={{
