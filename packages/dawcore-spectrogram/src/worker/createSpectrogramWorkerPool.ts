@@ -33,11 +33,13 @@ function parseChannelFromCanvasId(canvasId: string): number {
  * The pool exposes the same `SpectrogramWorkerApi` interface, so it's
  * a drop-in replacement for a single worker in SpectrogramProvider.
  *
- * Audio data is registered in ALL workers (each needs full data for mono
- * mode) and kept for replay so lazily-created workers can serve
- * pre-registered clips. Canvases are routed to the worker for their channel.
- * computeFFT fans out with channelFilter so each worker computes only its
- * channel.
+ * Each worker is given only the audio it can be asked to compute (#925): worker 0 holds every
+ * channel of a registered clip (it also computes the mono mix), worker k ≥ 1
+ * holds channel k alone, at index 0 (`channelsForWorker`). Registrations are
+ * kept for replay so lazily-created workers can serve pre-registered clips.
+ * Canvases are routed to the worker for their channel. A multi-channel
+ * computeFFT fans out one channel per worker, each asked for index 0; audio
+ * sent with the request is cut to that one channel (`payloadForChannel`).
  *
  * The one-channel-per-worker invariant is load-bearing: the worker's FFT
  * cache key is channel-agnostic (each worker stores its channel at index 0
@@ -53,6 +55,30 @@ function parseChannelFromCanvasId(canvasId: string): number {
  */
 function defaultPoolSize(): number {
   return 2;
+}
+
+/**
+ * The audio worker `workerIndex` gets of a clip: worker 0 every channel (the
+ * mono mix reads them all; its channel 0 stays at index 0), worker k ≥ 1
+ * channel k alone, at index 0. Worker k computes nothing else, so a copy of
+ * the other channels would be memory it never reads (#925). An empty list
+ * (audio registered earlier, sent by reference) stays empty.
+ */
+function channelsForWorker(channelDataArrays: Float32Array[], workerIndex: number): Float32Array[] {
+  if (workerIndex === 0 || channelDataArrays.length === 0) return channelDataArrays;
+  return [channelDataArrays[workerIndex]];
+}
+
+/**
+ * The audio sent with a one-channel compute-fft to worker `channelIndex`:
+ * that channel alone, at index 0, since the request computes nothing else
+ * (worker 0 included). An empty list (audio registered earlier) stays empty.
+ */
+function payloadForChannel(
+  channelDataArrays: Float32Array[],
+  channelIndex: number
+): Float32Array[] {
+  return channelDataArrays.length === 0 ? [] : [channelDataArrays[channelIndex]];
 }
 
 /**
@@ -131,9 +157,9 @@ export function createSpectrogramWorkerPool(
   /**
    * Return the worker owning `channelIndex`, growing the pool if needed.
    * New workers get the registered clips replayed — but only clips that
-   * actually have this worker's channel: worker k computes only
-   * channelFilter k (worker 0 additionally serves mono mixes), so a clip
-   * with fewer than k+1 channels is dead weight on worker k.
+   * actually have this worker's channel, and only that channel
+   * (`channelsForWorker`): worker k computes only channel k, so a clip with
+   * fewer than k+1 channels is dead weight on worker k.
    */
   function ensureWorkerForChannel(channelIndex: number): SpectrogramWorkerApi {
     assertValidChannelIndex(channelIndex);
@@ -145,7 +171,11 @@ export function createSpectrogramWorkerPool(
       const workerIndex = workers.length;
       for (const [clipId, entry] of registeredAudio) {
         if (entry.channelDataArrays.length > workerIndex) {
-          w.registerAudioData(clipId, entry.channelDataArrays, entry.sampleRate);
+          w.registerAudioData(
+            clipId,
+            channelsForWorker(entry.channelDataArrays, workerIndex),
+            entry.sampleRate
+          );
         }
       }
       workers.push(w);
@@ -189,10 +219,19 @@ export function createSpectrogramWorkerPool(
         );
       }
 
-      // Multi-channel: fan out with channelFilter, one worker per channel,
-      // growing the pool when audio has more channels than workers.
+      // Multi-channel: fan out one channel per worker, growing the pool when
+      // audio has more channels than workers. Each worker finds its channel at
+      // index 0 (registered: channelsForWorker; sent: payloadForChannel), so
+      // each is asked for channelFilter 0.
       const promises = Array.from({ length: channelCount }, (_, i) =>
-        ensureWorkerForChannel(i).computeFFT({ ...params, channelFilter: i }, generation)
+        ensureWorkerForChannel(i).computeFFT(
+          {
+            ...params,
+            channelDataArrays: payloadForChannel(params.channelDataArrays, i),
+            channelFilter: 0,
+          },
+          generation
+        )
       );
       // Use allSettled so one channel's failure doesn't drop surviving channel results.
       const settled = await Promise.allSettled(promises);
@@ -258,14 +297,21 @@ export function createSpectrogramWorkerPool(
 
     registerAudioData(clipId: string, channelDataArrays: Float32Array[], sampleRate: number): void {
       if (terminated) return;
+      // An id registered again with fewer channels: the workers past the new
+      // count still hold the old audio's channels, and nothing else would
+      // tell them to drop it.
+      const previousCount = registeredAudio.get(clipId)?.channelDataArrays.length ?? 0;
+      for (let i = channelDataArrays.length; i < Math.min(previousCount, workers.length); i++) {
+        workers[i].unregisterAudioData(clipId);
+      }
       // Retained for replay into lazily-created workers.
       registeredAudio.set(clipId, { channelDataArrays, sampleRate });
       // Worker k computes only channel k (worker 0 additionally serves mono
-      // with the clip's full data), so workers beyond the clip's channel
-      // count would never touch these arrays — don't copy into them.
+      // with the clip's full data), so each gets only that (channelsForWorker),
+      // and workers beyond the clip's channel count get nothing.
       const relevantWorkers = Math.min(channelDataArrays.length, workers.length);
       for (let i = 0; i < relevantWorkers; i++) {
-        workers[i].registerAudioData(clipId, channelDataArrays, sampleRate);
+        workers[i].registerAudioData(clipId, channelsForWorker(channelDataArrays, i), sampleRate);
       }
     },
 

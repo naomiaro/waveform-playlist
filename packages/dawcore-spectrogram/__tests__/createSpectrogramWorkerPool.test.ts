@@ -237,7 +237,7 @@ describe('createSpectrogramWorkerPool', () => {
 
       pool.computeFFT({
         clipId: 'clip1',
-        channelDataArrays: [new Float32Array(10), new Float32Array(10)],
+        channelDataArrays: [new Float32Array(10).fill(1), new Float32Array(10).fill(2)],
         config: {},
         sampleRate: 44100,
         offsetSamples: 0,
@@ -245,7 +245,8 @@ describe('createSpectrogramWorkerPool', () => {
         mono: false,
       });
 
-      // Both workers should receive compute-fft with different channelFilter
+      // Each worker computes its own channel: the channel at the index it is
+      // asked for (worker 1 holds channel 1 alone, at index 0, #925).
       for (let i = 0; i < 2; i++) {
         const calls = (nativeWorkers[i] as unknown as { postMessage: ReturnType<typeof vi.fn> })
           .postMessage.mock.calls;
@@ -253,7 +254,8 @@ describe('createSpectrogramWorkerPool', () => {
           (c: unknown[]) => (c[0] as { type: string }).type === 'compute-fft'
         );
         expect(fftCall).toBeTruthy();
-        expect((fftCall![0] as { channelFilter: number }).channelFilter).toBe(i);
+        const msg = fftCall![0] as { channelFilter: number; channelDataArrays: Float32Array[] };
+        expect(msg.channelDataArrays[msg.channelFilter][0]).toBe(i + 1);
       }
     });
 
