@@ -155,7 +155,7 @@ export interface WaveformPlaylistProviderProps {
   mono?: boolean;
   /**
    * The zoom level the provider starts at, in samples per pixel (default
-   * 1024). The initial value only: afterwards the engine owns the level,
+   * 1024). The initial value only: afterwards the provider owns the level,
    * which `useEditorControls().zoomIn()` / `zoomOut()` change. A later change
    * of this prop is not followed.
    */

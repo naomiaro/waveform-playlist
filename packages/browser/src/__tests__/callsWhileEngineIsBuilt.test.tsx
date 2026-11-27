@@ -3,10 +3,11 @@
 // Selection, loop, track selection and zoom calls made while there is no
 // engine (#826).
 //
-// The engine owns these values while it lives. It is null from a dispose
-// until the next adapter resolves (a new `effects` function, other zoom
-// levels), and on a mount until the first adapter arrives. A call in that
-// window used to be `engineRef.current?.…`: dropped, with nothing said.
+// Until #826 the engine owned these values while it lived. It is null from a
+// dispose until the next adapter resolves (a new `effects` function, other
+// zoom levels), and on a mount until the first adapter arrives. A call in
+// that window used to be `engineRef.current?.…`: dropped, with nothing said.
+// The provider's hooks own them now and hand them to the engine there is.
 //
 // The provider is mounted with one recording adapter per build; `holdNext()`
 // keeps a build open, as the default engine's dynamic import does.
@@ -14,13 +15,18 @@ import './jsdom-polyfills'; // must be first — sets globals the import graph n
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, waitFor, cleanup } from '@testing-library/react';
 import React from 'react';
-import { renderWithArrangement, type ArrangementRender } from './helpers/arrangementProvider';
+import {
+  renderWithArrangement,
+  testArrangement,
+  type ArrangementRender,
+} from './helpers/arrangementProvider';
 import {
   useArrangement,
   useEditorControls,
   useEngineRefs,
   useLoop,
   usePlaybackControls,
+  usePlaylistMixer,
   usePlaylistTimeline,
   usePlaylistZoom,
   useSelectedTrackId,
@@ -64,7 +70,9 @@ type Probe = ReturnType<typeof useSelection> &
     | 'setSelectedTrackId'
     | 'zoomIn'
     | 'zoomOut'
+    | 'setMasterVolume'
   > & {
+    masterVolume: number;
     isReady: boolean;
     arrangement: ReturnType<typeof useArrangement>;
     engine: () => PlaylistEngine | null;
@@ -78,8 +86,16 @@ const ProbeChild: React.FC = () => {
   const zoom = usePlaylistZoom();
   const selectedTrack = useSelectedTrackId();
   const { setSelection, play } = usePlaybackControls();
-  const { setLoopEnabled, setLoopRegion, clearLoopRegion, setSelectedTrackId, zoomIn, zoomOut } =
-    useEditorControls();
+  const {
+    setLoopEnabled,
+    setLoopRegion,
+    clearLoopRegion,
+    setSelectedTrackId,
+    zoomIn,
+    zoomOut,
+    setMasterVolume,
+  } = useEditorControls();
+  const { masterVolume } = usePlaylistMixer();
   const { isReady } = usePlaylistTimeline();
   const arrangement = useArrangement();
   const { playoutRef } = useEngineRefs();
@@ -98,6 +114,8 @@ const ProbeChild: React.FC = () => {
     setSelectedTrackId,
     zoomIn,
     zoomOut,
+    setMasterVolume,
+    masterVolume,
     isReady,
   };
   return null;
@@ -374,8 +392,10 @@ describe('calls made while the engine is being rebuilt (#826)', () => {
       probe.setLoopEnabled(true);
       probe.setSelectedTrackId('track-a');
       probe.zoomIn();
+      probe.setMasterVolume(0.25);
     });
     expect(probe.engine()!.getState()).toMatchObject({
+      masterVolume: 0.25,
       selectionStart: 1,
       selectionEnd: 2,
       loopStart: 3,
@@ -384,6 +404,94 @@ describe('calls made while the engine is being rebuilt (#826)', () => {
       selectedTrackId: 'track-a',
       samplesPerPixel: 512,
     });
+  });
+
+  it('setMasterVolume is kept and reaches the new adapter', async () => {
+    const view = await mountReady();
+    const finishBuild = startHeldRebuild(view);
+    act(() => probe.setMasterVolume(0.4));
+    expect(probe.masterVolume).toBe(0.4);
+    await finishBuild();
+    expect(probe.masterVolume).toBe(0.4);
+    const volumeCalls = view.adapters[1].calls.filter((call) => call.method === 'setMasterVolume');
+    expect(volumeCalls[volumeCalls.length - 1].args).toEqual([0.4]);
+  });
+
+  it('a level that occurs twice in zoomLevels is one step, in both directions', async () => {
+    renderWithArrangement([makeTrack('track-a')], {
+      zoomLevels: [512, 1024, 1024, 2048],
+      samplesPerPixel: 512,
+      children: <ProbeChild />,
+    });
+    await waitFor(() => expect(probe.isReady).toBe(true));
+    act(() => probe.zoomOut());
+    await waitFor(() => expect(probe.samplesPerPixel).toBe(1024));
+    expect(probe.canZoomOut).toBe(true);
+    act(() => probe.zoomOut());
+    await waitFor(() => expect(probe.samplesPerPixel).toBe(2048));
+    expect(probe.canZoomOut).toBe(false);
+    expect(probe.engine()!.getState().samplesPerPixel).toBe(2048);
+    act(() => probe.zoomIn());
+    await waitFor(() => expect(probe.samplesPerPixel).toBe(1024));
+    act(() => probe.zoomIn());
+    await waitFor(() => expect(probe.samplesPerPixel).toBe(512));
+    expect(probe.canZoomIn).toBe(false);
+  });
+
+  it('a level that is not one of zoomLevels has no step in either direction', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const onError = vi.fn();
+    renderWithArrangement([makeTrack('track-a')], {
+      samplesPerPixel: 1000,
+      onError,
+      children: <ProbeChild />,
+    });
+    // No engine can be built for it: the build fails and says so.
+    await waitFor(() => expect(onError).toHaveBeenCalledTimes(1));
+    expect([probe.canZoomIn, probe.canZoomOut]).toEqual([false, false]);
+    act(() => {
+      probe.zoomIn();
+      probe.zoomOut();
+    });
+    expect(probe.samplesPerPixel).toBe(1000);
+  });
+
+  it('a selected track that is given a new id is no longer selected', async () => {
+    await mountReady();
+    act(() => probe.setSelectedTrackId('track-b'));
+    act(() => probe.arrangement.updateTrack('track-b', makeTrack('track-c')));
+    expect(probe.selectedTrackId).toBeNull();
+    expect(probe.engine()!.getState().selectedTrackId).toBeNull();
+  });
+
+  it('an undo that takes the selected track away selects nothing', async () => {
+    await mountReady();
+    act(() => probe.arrangement.addTrack(makeTrack('track-c')));
+    act(() => probe.setSelectedTrackId('track-c'));
+    act(() => probe.arrangement.undo());
+    expect(probe.selectedTrackId).toBeNull();
+    act(() => probe.arrangement.redo());
+    expect(probe.selectedTrackId).toBeNull();
+  });
+
+  it('an arrangement that does not say what changed: a removed selected track is still cleared', async () => {
+    // An arrangement made by an older copy of the engine package calls its
+    // subscribers with no argument.
+    const arrangement = testArrangement([makeTrack('track-a'), makeTrack('track-b')]);
+    const subscribe = arrangement.subscribe.bind(arrangement);
+    vi.spyOn(arrangement, 'subscribe').mockImplementation((listener) =>
+      subscribe(() => (listener as () => void)())
+    );
+    renderWithArrangement([], { arrangement, children: <ProbeChild /> });
+    await waitFor(() => expect(probe.isReady).toBe(true));
+    act(() => probe.setSelectedTrackId('track-b'));
+    act(() => arrangement.removeTrack('track-b'));
+    expect(probe.selectedTrackId).toBeNull();
+    // The listener did not throw (a subscriber that throws is reported so).
+    expect(console.warn).not.toHaveBeenCalledWith(
+      expect.stringContaining('arrangement subscriber'),
+      expect.anything()
+    );
   });
 
   it('a play queued behind the rebuild plays the range the highlight shows', async () => {

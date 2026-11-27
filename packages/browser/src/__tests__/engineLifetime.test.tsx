@@ -122,7 +122,7 @@ describe('useEngineLifetime', () => {
     expect(lifetime.engineEpoch).toBe(1);
     expect(lifetime.isEngineAttached).toBe(true);
     expect(lifetime.engineBuildInFlightRef.current).toBe(false);
-    // Seeded, subscribed and told its first state before it is assigned.
+    // Seeded and subscribed before it is assigned.
     expect(calls).toEqual(['seed', 'onEngine']);
     expect(seen.engineRefDuringCallbacks).toEqual([null]);
   });

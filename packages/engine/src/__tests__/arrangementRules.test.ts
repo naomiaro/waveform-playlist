@@ -547,6 +547,17 @@ describe('what a subscriber is told', () => {
     ]);
   });
 
+  it('what it is told cannot be changed for the next subscriber', () => {
+    const arrangement = new Arrangement({ tracks: [] });
+    const seen: unknown[] = [];
+    arrangement.subscribe((change) => {
+      expect(Object.isFrozen(change)).toBe(true);
+    });
+    arrangement.subscribe((change) => seen.push(change.type));
+    arrangement.addTrack(track('A', []));
+    expect(seen).toEqual(['add']);
+  });
+
   it('a listener that takes no argument still works', () => {
     const arrangement = new Arrangement({ tracks: [] });
     const listener = vi.fn(() => {});

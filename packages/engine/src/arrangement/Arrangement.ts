@@ -1099,8 +1099,9 @@ export class ArrangementImpl implements Arrangement {
           }
         }
         // The engine has brought its adapter in step; now everyone else,
-        // told the kind of change and nothing of the engine's payload.
-        const info: ArrangementChangeInfo = { type: next.change.type };
+        // told the kind of change and nothing of the engine's payload (one
+        // object for all of them, frozen so that none can change it for the next).
+        const info: ArrangementChangeInfo = Object.freeze({ type: next.change.type });
         for (const subscriber of [...this._subscribers]) {
           try {
             subscriber(info);

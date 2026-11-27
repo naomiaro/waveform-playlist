@@ -1094,9 +1094,9 @@ type ArrangementChangeType =
   | 'restore' // an undo, a redo or an abort changed the tracks (and maybe the mix)
   | 'restoreMix' // an undo, a redo or an abort changed the mix only
   | 'load' // audio arrived: loading clips became loaded clips
-  | 'mixer' // a volume, mute, solo, pan or pan law changed
+  | 'mixer' // one of the mixer setters changed a volume, mute, solo, pan or pan law
   | 'recording' // a take started or stopped recording onto a track
-  | 'recompute' // clip positions were recomputed after a tempo change
+  | 'recompute' // every track was gone through again: clip positions after a tempo change, or clip ticks when an engine attached
   | 'history'; // only what can be undone or redone changed
 
 interface ArrangementChangeInfo {

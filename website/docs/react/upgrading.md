@@ -4983,7 +4983,7 @@ In plain JavaScript a leftover `showScale={false}` is ignored and the scale is d
 
 **Package:** `@waveform-playlist/browser`, with the types `ZoomControls` and `MasterVolumeControls`.
 
-They are the provider's own hooks: they take an engine ref and hold a copy of the engine's state, which follows the engine only when its `onEngineState` is handed every `statechange`, as the provider does for its own call. The provider's hooks give the same values and setters.
+They were the provider's own hooks: they took an engine ref and held a copy of the engine's state, which followed the engine only when its `onEngineState` was handed every `statechange`, as the provider did for its own call. The provider's hooks give the same values and setters.
 
 **Find:** `useZoomControls`, `useMasterVolume`, `ZoomControls` and `MasterVolumeControls` in an import from `@waveform-playlist/browser`.
 

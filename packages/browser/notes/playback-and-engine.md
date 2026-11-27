@@ -117,14 +117,14 @@ A rebuild (a new `effects` function, other zoom levels, a remount or an `<Activi
 
 ## Engine State Subscription Pattern
 
-**Pattern (#826):** the provider owns the state. A hook's setter writes its ref and its React state, engine or not, and then calls the engine there is; nothing is read back from an engine, and the provider does not subscribe to `statechange`. (Until #826 the engine owned these five and each hook mirrored it through an `onEngineState()`; a call made while no engine existed, from a dispose until the next adapter resolved and before the first engine of a mount, was dropped: `engineRef.current?.…`.)
+**Pattern (#826):** the provider owns the state. A hook's setter writes its ref and its React state, engine or not, and then calls the engine there is; nothing is read back from an engine, and the provider does not subscribe to `statechange`. (Until #826 the engine owned these five and each hook mirrored it through an `onEngineState()`; a call to four of them made while no engine existed, from a dispose until the next adapter resolved and before the first engine of a mount, was dropped: `engineRef.current?.…`; the master volume was kept in its hook.)
 
 **The five hooks:**
 
 - `useSelectionState` — selectionStart, selectionEnd (published through `SelectionContext`, #733). Puts the two ends in order, as the engine does
 - `useLoopState` — isLoopEnabled, loopStart, loopEnd
-- `useSelectedTrack` — selectedTrackId. It subscribes to the arrangement and clears the id when its track is gone after a `remove`, a `restore` (undo, redo, abort) or an `update` (a track given a new id), and not after a `set`: the engine's rule for its own copy (`_clearSelectionIfGone()`), read from the change type `arrangement.subscribe` hands its listener. An arrangement made by an older copy of the engine package hands over nothing; the hook then looks at every change, `setTracks` included (not covered by a test)
-- `useZoomControls` — samplesPerPixel. `zoomIn` / `zoomOut` step through the provider's zoom levels (`zoomLevels` or `DEFAULT_ZOOM_LEVELS`, the same array the engine is built with) and call `engine.setZoomLevel(next)`; `canZoomIn` / `canZoomOut` are computed during render from the level and the levels, so they are right before the first engine exists
+- `useSelectedTrack` — selectedTrackId. It subscribes to the arrangement and clears the id when its track is gone after a `remove`, a `restore` (undo, redo, abort) or an `update` (a track given a new id), and not after a `set`: the engine's rule for its own copy (`_clearSelectionIfGone()`), read from the change type `arrangement.subscribe` hands its listener. An arrangement made by an older copy of the engine package hands over nothing; the hook then looks at every change, `setTracks` included
+- `useZoomControls` — samplesPerPixel. `zoomIn` / `zoomOut` step through the provider's zoom levels (`zoomLevels` or `DEFAULT_ZOOM_LEVELS`, the same array the engine is built with) and call `engine.setZoomLevel(next)`; a level given twice is one step (a step in starts from its first place, a step out from its last; the engine, stepping by index, made a step that changed nothing); `canZoomIn` / `canZoomOut` are computed during render from the level and the levels, so they are right before the first engine exists
 - `useMasterVolume` — masterVolume
 
 **A call on the engine itself is not followed.** `useEngineRefs().playoutRef.current.setSelection(…)`, `.zoomIn()`, `.selectTrack(…)`, `.setLoopRegion(…)` or `.setMasterVolume(…)` changes that engine's copy only: the provider's value and the view stay, and the next engine is built with the provider's value (upgrade guide, "Selection, loop, zoom, selected track and master volume are the provider's").
@@ -147,7 +147,7 @@ A rebuild (a new `effects` function, other zoom levels, a remount or an `<Activi
 - Zoom has no call in `seed`: `buildEngine` passes the provider's `zoomSamplesPerPixelRef` to the `PlaylistEngine` constructor (`samplesPerPixel`). `useZoomControls` is its only writer; the ref is made in the provider because `useEngineLifetime` is set up before the hook. It is not the committed view zoom (`samplesPerPixelRef` from `useZoomAnchor`, written in a layout effect on each commit with a new level). Before #828 that ref was written only when a view was mounted and the timeline was not empty, and seeding from it undid a zoom made on an empty timeline at the next rebuild (#901, `providerOnArrangement.test.tsx`, "preserves zoom on an empty timeline across rebuilds").
 - Tracks, mix and undo history need no seed: the new engine is constructed on the same arrangement, which holds them. The history survives a rebuild (until #812 a rebuild cleared it).
 
-**Tests:** `callsWhileEngineIsBuilt.test.tsx` holds a build open (`factory.holdNext()`) and calls each setter in the window and before the first engine.
+**Tests:** `callsWhileEngineIsBuilt.test.tsx` holds a build open (`factory.holdNext()`) and calls each setter in the window, and the selection, selected-track, loop-region and zoom setters before the first engine.
 
 ## SoundFont Late-Load Wiring
 

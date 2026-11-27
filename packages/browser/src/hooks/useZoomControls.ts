@@ -4,6 +4,15 @@ import type { PlaylistEngine } from '@waveform-playlist/engine';
 /** The levels zoom steps through when the provider is given none. */
 export const DEFAULT_ZOOM_LEVELS: readonly number[] = [256, 512, 1024, 2048, 4096, 8192];
 
+/**
+ * Where a step in direction `by` starts from: the first place of the level
+ * for a step in, the last for a step out, so that a level given twice is one
+ * step and not a step that changes nothing. -1 for a level that is not there.
+ */
+function levelIndex(levels: readonly number[], level: number, by: -1 | 1): number {
+  return by === -1 ? levels.indexOf(level) : levels.lastIndexOf(level);
+}
+
 export interface ZoomControls {
   samplesPerPixel: number;
   zoomIn: () => void;
@@ -47,7 +56,7 @@ export function useZoomControls({
 
   const step = useCallback(
     (by: -1 | 1) => {
-      const index = zoomLevels.indexOf(samplesPerPixelRef.current);
+      const index = levelIndex(zoomLevels, samplesPerPixelRef.current, by);
       if (index === -1) return;
       const next = zoomLevels[index + by];
       if (next === undefined) return;
@@ -63,13 +72,14 @@ export function useZoomControls({
   const zoomIn = useCallback(() => step(-1), [step]);
   const zoomOut = useCallback(() => step(1), [step]);
 
-  const index = zoomLevels.indexOf(samplesPerPixel);
+  const inFrom = levelIndex(zoomLevels, samplesPerPixel, -1);
+  const outFrom = levelIndex(zoomLevels, samplesPerPixel, 1);
 
   return {
     samplesPerPixel,
     zoomIn,
     zoomOut,
-    canZoomIn: index > 0,
-    canZoomOut: index !== -1 && index < zoomLevels.length - 1,
+    canZoomIn: inFrom > 0,
+    canZoomOut: outFrom !== -1 && outFrom < zoomLevels.length - 1,
   };
 }
