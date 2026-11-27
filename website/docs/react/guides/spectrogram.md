@@ -46,7 +46,7 @@ function MyEditor() {
 }
 ```
 
-The provider exposes one config + one color map at a time. Per-track overrides come from the track's own `spectrogramConfig` / `spectrogramColorMap` fields.
+The provider exposes one config + one color map at a time. Per-track settings come from the track's own `spectrogramConfig` / `spectrogramColorMap` fields.
 
 The track menu, `useTrack().setRenderMode` and the settings dialog change the track's own `renderMode`, `spectrogramConfig` and `spectrogramColorMap` in the arrangement. Each change is an undo step, and `arrangement.getTracks()` holds it, so an app that saves its tracks saves the user's choices.
 

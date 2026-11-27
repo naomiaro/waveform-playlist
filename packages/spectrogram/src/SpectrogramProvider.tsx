@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, type ReactNode } from 'react';
 import {
   MAX_CANVAS_WIDTH,
+  trackKind,
   type SpectrogramConfig,
   type ColorMapValue,
   type RenderMode,
@@ -572,11 +573,15 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
   ]);
 
   // Setters: each a change of the track in the arrangement, so an undo step
-  // (#814). Returning the track as it is changes nothing and pushes no step.
+  // (#814). Returning the track as it is changes nothing and pushes no step:
+  // the mode it is already drawn with (an unset one is 'waveform'), and any
+  // mode for a MIDI track, which is drawn as a piano roll (review of #930).
   const setTrackRenderMode = useCallback(
     (trackId: string, mode: RenderMode) => {
       arrangement.updateTrack(trackId, (track: ArrangementTrack) =>
-        track.renderMode === mode ? track : { ...track, renderMode: mode }
+        trackKind(track) === 'midi' || resolveRenderMode(track.renderMode) === mode
+          ? track
+          : { ...track, renderMode: mode }
       );
     },
     [arrangement]

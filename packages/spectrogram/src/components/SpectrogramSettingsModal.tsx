@@ -286,7 +286,12 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
           <Select
             id={`${id}-color-map`}
             value={colorMapValue}
-            onChange={(e) => setEditedColorMap(e.target.value as ColorMapName)}
+            onChange={(e) =>
+              // "custom" is the colour map given (an array): no edit.
+              setEditedColorMap(
+                e.target.value === CUSTOM_COLOR_MAP ? undefined : (e.target.value as ColorMapName)
+              )
+            }
           >
             {isCustomColorMap && <option value={CUSTOM_COLOR_MAP}>{CUSTOM_COLOR_MAP}</option>}
             {COLOR_MAPS.map((c) => (

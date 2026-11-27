@@ -12,9 +12,10 @@ export interface SpectrogramIntegration {
   spectrogramConfig?: SpectrogramConfig;
   spectrogramColorMap?: ColorMapValue;
   /**
-   * Set a track's `renderMode` in the arrangement (an undo step; the mode the
-   * track already has changes nothing). The track menu and
-   * `useTrack().setRenderMode` call it.
+   * Set a track's `renderMode` in the arrangement (an undo step). The mode
+   * the track is already drawn with (an unset one is `'waveform'`) changes
+   * nothing, and so does any mode for a MIDI track (drawn as a piano roll).
+   * The track menu and `useTrack().setRenderMode` call it.
    */
   setTrackRenderMode: (trackId: string, mode: RenderMode) => void;
   /**

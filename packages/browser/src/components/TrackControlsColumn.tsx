@@ -252,9 +252,9 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
   // `null` and `undefined` both mean "not given".
   const template = useStableTemplate(children ?? DEFAULT_TEMPLATE);
 
-  // The spectrogram integration's value changes with every per-track
-  // override; the slots and the pieces get functions that read the latest
-  // one, in a value that changes only when a menu comes or goes.
+  // The spectrogram integration's value changes with the provider's config
+  // and colour map; the slots and the pieces get functions that read the
+  // latest one, in a value that changes only when a menu comes or goes.
   const spectrogramRef = useRef(spectrogram);
   spectrogramRef.current = spectrogram;
   const menuAvailable = Boolean(spectrogram?.renderMenuItems);

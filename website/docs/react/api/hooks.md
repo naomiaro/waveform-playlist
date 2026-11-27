@@ -1084,8 +1084,9 @@ interface TrackContextValue {
   /** Moves the track one position down. Nothing happens for the last track. */
   moveDown: () => void;
   /**
-   * Sets the track's `renderMode` in the arrangement: an undo step (the mode
-   * the track already has changes nothing). Nothing happens without a
+   * Sets the track's `renderMode` in the arrangement: an undo step. The mode
+   * the track is already drawn with (an unset one is `'waveform'`) changes
+   * nothing, and so does any mode for a MIDI track. Nothing happens without a
    * `<SpectrogramProvider>`.
    */
   setRenderMode: (mode: RenderMode) => void;

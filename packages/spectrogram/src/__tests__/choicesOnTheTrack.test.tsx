@@ -255,6 +255,27 @@ describe('a spectrogram choice is stored on the track (#814)', () => {
     expect(livePool()?.audio.size).toBe(0);
   });
 
+  it('choosing waveform for a track with no mode is no undo step: it is drawn as one already', async () => {
+    mount([makeTrack('t1')]);
+    await settle();
+
+    await act(async () => integration().setTrackRenderMode('t1', 'waveform'));
+
+    expect(arrangement().canUndo).toBe(false);
+    expect(track('t1').renderMode).toBeUndefined();
+  });
+
+  it('a mode chosen for a MIDI track changes nothing: it is drawn as a piano roll', async () => {
+    const midi: ClipTrack = { ...makeTrack('m1'), kind: 'midi', clips: [] };
+    mount([makeTrack('t1'), midi]);
+    await settle();
+
+    await act(async () => integration().setTrackRenderMode('m1', 'spectrogram'));
+
+    expect(arrangement().canUndo).toBe(false);
+    expect(track('m1').renderMode).toBeUndefined();
+  });
+
   it('a new track with the id of a removed one starts from its own fields', async () => {
     mount([makeTrack('t1')]);
     await settle();

@@ -321,6 +321,28 @@ describe('SpectrogramSettingsModal: Apply changes only what was edited (#814)', 
     expect(onApply.mock.lastCall?.[1]).toBe('roseus');
   });
 
+  it('picking custom again after a named map keeps the given colour map', () => {
+    const custom: ColorMapValue = [
+      [0, 0, 0],
+      [255, 255, 255],
+    ];
+    const { onApply, selects, numbers } = renderModal({ colorMap: custom });
+    fireEvent.change(selects()[5], { target: { value: 'magma' } });
+    fireEvent.change(selects()[5], { target: { value: 'custom' } });
+    expect(selects()[5].value).toBe('custom');
+    fireEvent.change(numbers()[3], { target: { value: '35' } }); // gain
+    apply();
+    expect(onApply.mock.lastCall?.[1]).toBe(custom);
+  });
+
+  it('picking custom again and changing nothing else is no change', () => {
+    const { onApply, selects } = renderModal({ colorMap: [[0, 0, 0]] });
+    fireEvent.change(selects()[5], { target: { value: 'magma' } });
+    fireEvent.change(selects()[5], { target: { value: 'custom' } });
+    apply();
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
   it('offers no custom option for a named colour map', () => {
     const { selects } = renderModal({ colorMap: 'magma' });
     const texts = Array.from(selects()[5].options, (o) => o.textContent);

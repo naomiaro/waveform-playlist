@@ -2473,8 +2473,9 @@ interface TrackContextValue {
   /** Moves the track one position down. Nothing happens for the last track. */
   moveDown: () => void;
   /**
-   * Sets the track's `renderMode` in the arrangement: an undo step (the mode
-   * the track already has changes nothing). Nothing happens without a
+   * Sets the track's `renderMode` in the arrangement: an undo step. The mode
+   * the track is already drawn with (an unset one is `'waveform'`) changes
+   * nothing, and so does any mode for a MIDI track. Nothing happens without a
    * `<SpectrogramProvider>`.
    */
   setRenderMode: (mode: RenderMode) => void;
@@ -3089,6 +3090,18 @@ export { computeSpectrogram, computeSpectrogramMono, getColorMap, getFrequencySc
 export { createSpectrogramWorker, createSpectrogramWorkerPool, SpectrogramAbortError } from '@dawcore/spectrogram';
 export { SpectrogramOrchestrator } from '@dawcore/spectrogram/orchestrator';
 export { SpectrogramProvider, SpectrogramMenuItems, SpectrogramSettingsModal } from '@waveform-playlist/spectrogram';
+
+interface SpectrogramSettingsModalProps {
+  open: boolean;
+  onClose: () => void;
+  config: SpectrogramConfig;
+  colorMap: ColorMapValue;
+  /** On Apply: `config` with the fields the user changed on top, and the colour map
+   *  (the one given unless a named one was picked). Not called when nothing changed. */
+  onApply: (config: SpectrogramConfig, colorMap: ColorMapValue) => void;
+  /** With no `maxFrequency` in `config`, the field shows half of it (the default top). */
+  sampleRate?: number;
+}
 
 // Integration context (from @waveform-playlist/browser)
 export { useSpectrogramIntegration, SpectrogramIntegrationProvider } from '@waveform-playlist/browser';
