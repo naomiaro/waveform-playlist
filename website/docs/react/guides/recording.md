@@ -200,7 +200,7 @@ const { error, audioBuffer } = useRecording(stream);
 React runs the hooks' effect cleanups when the component unmounts, when an `<Activity>` around it is hidden, and on Fast Refresh. The cleanups stop the recording worklet and the microphone stream, and the hooks' state says so:
 
 - `useRecording`: `isRecording` and `isPaused` are `false`, and `audioBuffer` holds what was received until then (the worklet's last partial block, about 16 ms, and anything it had sent that had not arrived yet are not in it; `progress` keeps the last duration it published). `useIntegratedRecording` adds it to the take's track, also on an unmount.
-- `useMicrophoneAccess`: `stream` is `null` and `hasPermission` is `false`, as after `stopStream()`. Call `requestAccess()` again when the component is shown (`requestMicAccess()` of `useIntegratedRecording`, which asks for the `selectedDevice` it still shows).
+- `useMicrophoneAccess`: `stream` is `null` and `hasPermission` is `false`, as after `stopStream()`. Call `requestAccess()` again when the component is shown (`requestMicAccess()` of `useIntegratedRecording`, which asks for the device chosen with `changeDevice()` while it is still in the list).
 
 ### Without `navigator.mediaDevices`
 

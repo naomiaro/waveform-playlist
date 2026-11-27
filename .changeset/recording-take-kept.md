@@ -13,7 +13,7 @@ Recording hooks: a take is no longer lost when it ends without `stopRecording()`
 - `useIntegratedRecording` does not fall back to another microphone while a take is running (asking for it stopped the stream the take was reading); the fallback happens when the take ends. `requestMicAccess` and `changeDevice` keep their identity when `audioConstraints` is written inline.
 - `useMicrophoneAccess` logs failures with `console.warn` and the `[waveform-playlist]` prefix, the error as text.
 
-- `useIntegratedRecording`: two `stopRecording()` calls for one take add it once (the second added it again, as a second undo step). A `startRecording()` still waiting when the component is hidden and shown again resolves `false` (it started a take on the stopped stream); the same in `useRecording`. `requestMicAccess()` asks for the selected device while it is in the list (it asked for the default one, so after a `changeDevice` the stream and `selectedDevice` could differ).
+- `useIntegratedRecording`: two `stopRecording()` calls for one take add it once (the second added it again, as a second undo step). A `startRecording()` still waiting when the component is hidden and shown again resolves `false` (it started a take on the stopped stream); the same in `useRecording`. After a `changeDevice(id)`, `requestMicAccess()` asks for that device while it is in the list (it asked for the default one, so the stream and `selectedDevice` could differ). Without a `changeDevice` it asks as before.
 
 **Changed:** `UseIntegratedRecordingReturn.stopRecording` is typed `() => Promise<void>` (it always returned a promise; the type said `void`).
 

@@ -195,9 +195,10 @@ export function useIntegratedRecording(
   // that a cleanup has stopped meanwhile (a hide and a reveal).
   const startRecRef = useRef(startRec);
   startRecRef.current = startRec;
-  // What requestMicAccess asks for, read when it is called.
-  const selectedDeviceRef = useRef(selectedDevice);
-  selectedDeviceRef.current = selectedDevice;
+  // The device the app chose with changeDevice(), which requestMicAccess asks
+  // for again; null while the selection is the hook's own (the first of the
+  // list, or a fallback). The list is read when requestMicAccess is called.
+  const appChosenDeviceRef = useRef<string | null>(null);
   const devicesRef = useRef(devices);
   devicesRef.current = devices;
 
@@ -360,6 +361,7 @@ export function useIntegratedRecording(
       // runs again when the take ends.
       if (isRecording) return;
       const fallbackId = devices[0].deviceId;
+      appChosenDeviceRef.current = null;
       setSelectedDevice(fallbackId);
       resetPeak();
       requestAccess(fallbackId, audioConstraintsRef.current);
@@ -382,15 +384,17 @@ export function useIntegratedRecording(
     }
     try {
       setHookError(null);
-      // The device the picker shows, while it is still there: after a hide
-      // the app asks again, and must get the microphone it had chosen. An
+      // The device the app chose with changeDevice(), while it is still
+      // there: after a hide the app asks again, and must get the microphone
+      // it had chosen. A selection the hook made itself is asked for as the
+      // first time (the default device, or what audioConstraints names). An
       // exact id of a device that has left the list would fail the request,
-      // so that case asks for the default one (the fallback effect then
-      // corrects the selection).
-      const selected = selectedDeviceRef.current;
+      // so that case asks the same way (the fallback effect then corrects
+      // the selection).
+      const chosen = appChosenDeviceRef.current;
       const deviceId =
-        selected !== null && devicesRef.current.some((d) => d.deviceId === selected)
-          ? selected
+        chosen !== null && devicesRef.current.some((d) => d.deviceId === chosen)
+          ? chosen
           : undefined;
       await requestAccess(deviceId, audioConstraintsRef.current);
       await resumeGlobalAudioContext();
@@ -410,6 +414,7 @@ export function useIntegratedRecording(
       }
       try {
         setHookError(null);
+        appChosenDeviceRef.current = deviceId;
         setSelectedDevice(deviceId);
         resetPeak();
         await requestAccess(deviceId, audioConstraintsRef.current);

@@ -393,7 +393,7 @@ describe('useIntegratedRecording: asking for the microphone again', () => {
     expect(result.current.selectedDevice).toBe('dev-b');
   });
 
-  it('asks for the default device when the selected one has left the list', async () => {
+  it('asks for the default device when the chosen one has left the list', async () => {
     const arrangement = arrangementOf('track-1');
     const { result, hide, show } = renderHookInActivity(() =>
       useIntegratedRecording(arrangement, 'track-1')
@@ -401,7 +401,13 @@ describe('useIntegratedRecording: asking for the microphone again', () => {
     await act(async () => {
       await result.current.requestMicAccess();
     });
-    expect(result.current.selectedDevice).toBe('dev-a');
+    await act(async () => {
+      changeDevices(['dev-a', 'dev-b']);
+      await settle();
+    });
+    await act(async () => {
+      await result.current.changeDevice('dev-b');
+    });
     await act(async () => {
       hide();
     });
@@ -409,7 +415,7 @@ describe('useIntegratedRecording: asking for the microphone again', () => {
       show();
     });
     await act(async () => {
-      changeDevices(['dev-b']);
+      changeDevices(['dev-a']);
       await settle();
     });
     env.getUserMedia.mockClear();
@@ -425,6 +431,51 @@ describe('useIntegratedRecording: asking for the microphone again', () => {
 
     // An exact id of a device that is gone would make getUserMedia fail.
     expect(firstRequest).toBeUndefined();
+  });
+
+  it('asks as the first time when the app never chose a device: audioConstraints decides', async () => {
+    const arrangement = arrangementOf('track-1');
+    const { result } = renderHook(() =>
+      useIntegratedRecording(arrangement, 'track-1', { audioConstraints: { deviceId: 'mine' } })
+    );
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+    // Selected by the hook (the first of the list), not by the app.
+    expect(result.current.selectedDevice).toBe('dev-a');
+
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+
+    expect(env.getUserMedia.mock.calls.map(([c]) => c.audio.deviceId)).toEqual(['mine', 'mine']);
+  });
+
+  it('asks for the default device again after the fallback replaced the chosen one', async () => {
+    const arrangement = arrangementOf('track-1');
+    const { result } = renderHook(() => useIntegratedRecording(arrangement, 'track-1'));
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+    await act(async () => {
+      changeDevices(['dev-a', 'dev-b']);
+      await settle();
+    });
+    await act(async () => {
+      await result.current.changeDevice('dev-b');
+    });
+    // dev-b is unplugged: the hook falls back to dev-a by itself.
+    await act(async () => {
+      changeDevices(['dev-a']);
+      await settle();
+    });
+    expect(result.current.selectedDevice).toBe('dev-a');
+
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+
+    expect(requestedDevice()).toBeUndefined();
   });
 
   it('does not start a take when the start was waiting on the audio context across a hide', async () => {
