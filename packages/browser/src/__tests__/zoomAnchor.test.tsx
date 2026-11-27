@@ -1,20 +1,50 @@
 // @vitest-environment jsdom
 //
-// #828. A zoom change keeps the time under the hovering pointer where it is
-// when the pointer is over the scroll container, and the time at the centre
-// otherwise (a zoom button is outside the container). Both providers use
-// `useZoomAnchor`; jsdom has no layout, so the container's size, position and
-// scroll are given by hand.
+// #828. Where a zoom change keeps the view, in both providers: the time under
+// a hovering mouse over the timeline, else a range selection on screen, else
+// the cursor on screen, else the centre (the maintainer's order, after
+// Audacity's). jsdom has no layout, so the container's size, position and
+// scroll are given by hand. With the sample rate equal to the zoom level, one
+// pixel is one second before the zoom.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import React, { StrictMode, useRef } from 'react';
-import { anchoredScrollLeft, useZoomAnchor } from '../providerInternals/zoomAnchor';
+import {
+  anchoredScrollLeft,
+  useZoomAnchor,
+  zoomAnchorX,
+  type ZoomAnchorTimes,
+} from '../providerInternals/zoomAnchor';
+
+// `layout.maxScroll` is the browser's clamp: the content's width minus the
+// container's, which a zoom out lowers in the same commit as the zoom.
+const layout = { maxScroll: Infinity };
+// The container: 400 px wide, its left edge at client x 100, scrolled 1000 px.
+const RECT = { left: 100, top: 50, right: 500, bottom: 250, width: 400, height: 200 };
+function fakeLayout(element: HTMLElement, scrollLeft = 1000) {
+  let value = scrollLeft;
+  Object.defineProperty(element, 'clientWidth', { configurable: true, value: RECT.width });
+  Object.defineProperty(element, 'scrollWidth', {
+    configurable: true,
+    get: () => layout.maxScroll + RECT.width,
+  });
+  Object.defineProperty(element, 'scrollLeft', {
+    configurable: true,
+    get: () => Math.min(value, layout.maxScroll),
+    set: (v: number) => {
+      value = Math.min(v, layout.maxScroll);
+    },
+  });
+  element.getBoundingClientRect = () => ({ ...RECT, x: RECT.left, y: RECT.top, toJSON() {} });
+}
 
 afterEach(() => {
   cleanup();
   layout.maxScroll = Infinity;
 });
+
+const NONE: ZoomAnchorTimes = { selectionStart: 0, selectionEnd: 0, cursorTime: 0 };
 
 describe('anchoredScrollLeft', () => {
   it('keeps the content under the anchor at the anchor', () => {
@@ -49,32 +79,84 @@ describe('anchoredScrollLeft', () => {
   });
 });
 
-// The container: 400 px wide, its left edge at client x 100, scrolled 1000 px.
-const RECT = { left: 100, top: 50, right: 500, bottom: 250, width: 400, height: 200 };
-// `layout.maxScroll` is the browser's clamp: the content's width minus the
-// container's, which a zoom out lowers in the same commit as the zoom.
-const layout = { maxScroll: Infinity };
-function fakeLayout(element: HTMLDivElement, scrollLeft = 1000) {
-  let value = scrollLeft;
-  Object.defineProperty(element, 'clientWidth', { configurable: true, value: RECT.width });
-  Object.defineProperty(element, 'scrollLeft', {
-    configurable: true,
-    get: () => Math.min(value, layout.maxScroll),
-    set: (v: number) => {
-      value = Math.min(v, layout.maxScroll);
-    },
-  });
-  element.getBoundingClientRect = () => ({ ...RECT, x: RECT.left, y: RECT.top, toJSON() {} });
-}
+describe('zoomAnchorX: the order', () => {
+  const container = document.createElement('div');
+  const inside = document.createElement('span');
+  container.appendChild(inside);
+  fakeLayout(container);
+  const anchor = (
+    times: ZoomAnchorTimes,
+    hover: Parameters<typeof zoomAnchorX>[0]['hover'] = null
+  ) =>
+    zoomAnchorX({
+      container,
+      hover,
+      scrollLeft: 1000,
+      samplesPerPixel: 1000,
+      sampleRate: 1000,
+      times,
+    });
 
-const laidOut = new WeakSet<HTMLDivElement>();
+  it('1. a hovering pointer over the timeline wins over a selection and the cursor', () => {
+    expect(
+      anchor(
+        { selectionStart: 1100, selectionEnd: 1200, cursorTime: 1300 },
+        { x: 150, y: 100, target: inside }
+      )
+    ).toBe(50);
+  });
+
+  it('1. a pointer over an overlay above the timeline does not count', () => {
+    // Inside the container's rectangle, but over an element outside it.
+    expect(anchor({ ...NONE, cursorTime: 1300 }, { x: 150, y: 100, target: document.body })).toBe(
+      300
+    );
+  });
+
+  it('2. a range on screen: its centre', () => {
+    expect(anchor({ selectionStart: 1100, selectionEnd: 1200, cursorTime: 1300 })).toBe(150);
+  });
+
+  it('2. a range whose centre is off screen: the centre of its visible part', () => {
+    // 600 s to 1200 s: its centre (900) is left of the view (1000-1400).
+    expect(anchor({ ...NONE, selectionStart: 600, selectionEnd: 1200 })).toBe(100);
+    // 1300 s to 2000 s: its centre (1650) is right of the view.
+    expect(anchor({ ...NONE, selectionStart: 1300, selectionEnd: 2000 })).toBe(350);
+  });
+
+  it('2. a range off screen, or one that fills the view, is passed over: the cursor, else the centre', () => {
+    expect(anchor({ selectionStart: 100, selectionEnd: 200, cursorTime: 1300 })).toBe(300);
+    expect(anchor({ selectionStart: 900, selectionEnd: 1500, cursorTime: 1300 })).toBe(300);
+    expect(anchor({ selectionStart: 900, selectionEnd: 1500, cursorTime: 0 })).toBe(200);
+  });
+
+  it('2. a point selection is not a range', () => {
+    expect(anchor({ selectionStart: 1100, selectionEnd: 1100, cursorTime: 1300 })).toBe(300);
+  });
+
+  it('3. the cursor on screen', () => {
+    expect(anchor({ ...NONE, cursorTime: 1050 })).toBe(50);
+  });
+
+  it('4. the centre: nothing else on screen', () => {
+    expect(anchor({ ...NONE, cursorTime: 5000 })).toBe(200);
+  });
+});
+
+const laidOut = new WeakSet<HTMLElement>();
 const state = {
   element: null as HTMLDivElement | null,
   committed: null as React.RefObject<number> | null,
+  times: NONE,
 };
 const Harness: React.FC<{ spp: number }> = ({ spp }) => {
   const ref = useRef<HTMLDivElement | null>(null);
-  state.committed = useZoomAnchor(ref, spp);
+  state.committed = useZoomAnchor({
+    scrollContainerRef: ref,
+    samplesPerPixel: spp,
+    sampleRate: 1000,
+    getTimes: () => state.times,
+  });
   return (
     <div
       ref={(el) => {
@@ -93,7 +175,7 @@ const Harness: React.FC<{ spp: number }> = ({ spp }) => {
 function pointer(
   type: string,
   init: { clientX?: number; clientY?: number; pointerType?: string; relatedTarget?: null },
-  target: EventTarget = window
+  target: EventTarget
 ) {
   const event = new Event(type, { bubbles: true });
   for (const [key, value] of Object.entries(init)) {
@@ -105,39 +187,47 @@ function pointer(
 }
 
 describe('useZoomAnchor', () => {
-  it('keeps the time under a mouse that is over the container', () => {
+  afterEach(() => {
+    state.times = NONE;
+  });
+
+  it('keeps the time under a mouse over the container (a keyboard zoom does not move it)', () => {
     const view = render(<Harness spp={1000} />);
-    pointer('pointermove', { clientX: 200, clientY: 100, pointerType: 'mouse' });
+    pointer('pointermove', { clientX: 200, clientY: 100, pointerType: 'mouse' }, state.element!);
+    state.times = { selectionStart: 1100, selectionEnd: 1200, cursorTime: 1300 };
     view.rerender(<Harness spp={500} />);
+    // Content pixel 1100 at 1000 spp is 2200 at 500 spp, minus the anchor 100.
     expect(state.element!.scrollLeft).toBe(2100);
     expect(state.committed!.current).toBe(500);
   });
 
-  it('keeps the centre when the mouse is outside the container (a zoom button)', () => {
+  it('a mouse outside the container (on a zoom button): the selection first', () => {
     const view = render(<Harness spp={1000} />);
-    pointer('pointermove', { clientX: 600, clientY: 100, pointerType: 'mouse' });
+    pointer('pointermove', { clientX: 600, clientY: 100, pointerType: 'mouse' }, document.body);
+    state.times = { selectionStart: 1100, selectionEnd: 1200, cursorTime: 1300 };
+    view.rerender(<Harness spp={500} />);
+    // The selection's centre, 1150 s, at anchor 150: 2300 - 150.
+    expect(state.element!.scrollLeft).toBe(2150);
+  });
+
+  it('keeps the centre before any pointer has moved, with nothing on screen', () => {
+    const view = render(<Harness spp={1000} />);
     view.rerender(<Harness spp={500} />);
     // Centre: content pixel 1200 at 1000 spp is 2400 at 500 spp, minus 200.
     expect(state.element!.scrollLeft).toBe(2200);
   });
 
-  it('keeps the centre before any pointer has moved', () => {
+  it('a touch does not hover', () => {
     const view = render(<Harness spp={1000} />);
-    view.rerender(<Harness spp={500} />);
-    expect(state.element!.scrollLeft).toBe(2200);
-  });
-
-  it('a touch does not hover: the centre is kept', () => {
-    const view = render(<Harness spp={1000} />);
-    pointer('pointermove', { clientX: 200, clientY: 100, pointerType: 'mouse' });
-    pointer('pointerdown', { clientX: 200, clientY: 100, pointerType: 'touch' });
+    pointer('pointermove', { clientX: 200, clientY: 100, pointerType: 'mouse' }, state.element!);
+    pointer('pointerdown', { clientX: 200, clientY: 100, pointerType: 'touch' }, state.element!);
     view.rerender(<Harness spp={500} />);
     expect(state.element!.scrollLeft).toBe(2200);
   });
 
   it('a pointer that left the window is not over the container', () => {
     const view = render(<Harness spp={1000} />);
-    pointer('pointermove', { clientX: 200, clientY: 100, pointerType: 'mouse' });
+    pointer('pointermove', { clientX: 200, clientY: 100, pointerType: 'mouse' }, state.element!);
     pointer('pointerout', { relatedTarget: null }, document);
     view.rerender(<Harness spp={500} />);
     expect(state.element!.scrollLeft).toBe(2200);
@@ -155,6 +245,20 @@ describe('useZoomAnchor', () => {
     view.rerender(<Harness spp={1000} />);
     // Centre: content pixel 1422 + 200 at 500 spp is 811 at 1000 spp, minus 200.
     expect(state.element!.scrollLeft).toBe(611);
+  });
+
+  it('a scroll written by code just before the zoom is the one anchored from', () => {
+    const view = render(<Harness spp={1000} />);
+    act(() => {
+      state.element!.dispatchEvent(new Event('scroll'));
+    });
+    // "Go to the start, then zoom": the write's scroll event has not fired yet.
+    // (The cursor is off screen, so the centre is the anchor.)
+    state.element!.scrollLeft = 0;
+    state.times = { ...NONE, cursorTime: 5000 };
+    view.rerender(<Harness spp={500} />);
+    // Centre: content pixel 200 at 1000 spp is 400 at 500 spp, minus 200.
+    expect(state.element!.scrollLeft).toBe(200);
   });
 
   it('a render at the same level leaves the scroll alone, StrictMode included', () => {

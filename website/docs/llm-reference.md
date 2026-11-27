@@ -20,7 +20,7 @@ This page contains all TypeScript interfaces extracted from source code. Designe
 
 ## Provider Props (WaveformPlaylistProvider)
 
-The props type is exported: `import type { WaveformPlaylistProviderProps } from '@waveform-playlist/browser'` (since #828). On a zoom change either provider keeps the time under a hovering mouse or pen where it is when the pointer is over the waveform, and the time at the centre otherwise (a zoom button keeps the centre).
+The props type is exported: `import type { WaveformPlaylistProviderProps } from '@waveform-playlist/browser'` (since #828). On a zoom change either provider keeps one point of the view in place, as far as the scroll range allows: the time under a mouse or pen hovering over the timeline (the tracks or the ruler); without one, a selected range on screen (its centre, or the centre of its visible part); else the cursor, when it is on screen; else the centre of the view. A click on a zoom button puts the pointer on the button, so it uses the range, the cursor or the centre; the button pressed from the keyboard while the mouse rests over the timeline keeps the time under the mouse.
 
 ```typescript
 interface WaveformPlaylistProviderProps {

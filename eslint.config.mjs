@@ -103,7 +103,8 @@ export default [
     // because the plugin otherwise looks `react` up from the working directory
     // and turns these rules off for a version below 19. The two integration
     // contexts are provided as `<XContext value>` since #828 (their
-    // `…Provider` aliases were removed), so this rule sees them.
+    // `…Provider` aliases were removed), so a `<…Context.Provider>` of either
+    // would be reported by `no-context-provider`.
     plugins: {
       '@eslint-react': eslintReact,
     },

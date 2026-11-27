@@ -93,8 +93,9 @@ export interface MediaElementPlaylistProviderProps {
   /** Single track configuration with source URL and waveform data */
   track: MediaElementTrackConfig;
   /** Samples per pixel (the zoom level; default 1024). Followed: a new value
-   *  redraws the waveform at it, keeping the time under the hovering pointer
-   *  in place (the centre when the pointer is not over the waveform). A value
+   *  redraws the waveform at it, keeping one point of the view in place: a
+   *  hovering pointer over the timeline, else a selected range on screen,
+   *  else the cursor on screen, else the centre. A value
    *  finer than the waveform data (its `scale`) is drawn at the data's own
    *  resolution, which `usePlaylistZoom().samplesPerPixel` reports. There is
    *  no zoom control under this provider, so the prop is the only place the
@@ -292,9 +293,6 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // The zoom level follows the prop (#828), no finer than the waveform data:
   // peaks cannot be drawn below the data's own samples per pixel.
   const samplesPerPixel = Math.max(samplesPerPixelProp, dataSamplesPerPixel(track.waveformData));
-  // The committed level for the animation loop; a change keeps the time under
-  // the hovering pointer (or the centre) in place, as the WebAudio provider does.
-  const samplesPerPixelRef = useZoomAnchor(scrollContainerRef, samplesPerPixel);
   const { startAnimationFrameLoop, stopAnimationFrameLoop } = useAnimationFrameLoop();
 
   // What the play that is running (or queued) is, in the WebAudio provider's
@@ -321,6 +319,19 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
 
   // Get sample rate from waveform data
   const sampleRate = track.waveformData.sample_rate;
+  // The committed level for the animation loop. A change keeps a point of the
+  // view in place, as under the WebAudio provider: the hovering pointer, else
+  // the selection, else the cursor, else the centre (#828; `zoomAnchorX`).
+  const getZoomAnchorTimes = useCallback(
+    () => ({ ...selectionRef.current, cursorTime: currentTimeRef.current }),
+    []
+  );
+  const samplesPerPixelRef = useZoomAnchor({
+    scrollContainerRef,
+    samplesPerPixel,
+    sampleRate,
+    getTimes: getZoomAnchorTimes,
+  });
   // The length of the audio is known from the waveform data: it does not wait
   // for the player (#688). "The player can be used" is `isReady`.
   const duration = track.waveformData.duration;

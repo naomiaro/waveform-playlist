@@ -142,7 +142,7 @@ A rebuild (a new `effects` function, other zoom levels, a remount or an `<Activi
 - `if (isLoopEnabledRef.current) engine.setLoopEnabled(true)`
 - `engine.setMasterVolume(masterVolumeRef.current ?? 1.0)`
 - `if (selectedTrackIdRef.current) engine.selectTrack(selectedTrackIdRef.current)`
-- Zoom has no call in `seed`: `buildEngine` passes the provider's `engineSamplesPerPixelRef` to the `PlaylistEngine` constructor (`samplesPerPixel`). It is not the viewport's `samplesPerPixelRef`, which the zoom-scroll effect writes only when a view is mounted and the timeline is not empty; seeding from that one undid a zoom made on an empty timeline at the next rebuild (#901, `providerOnArrangement.test.tsx`, "preserves zoom on an empty timeline across rebuilds").
+- Zoom has no call in `seed`: `buildEngine` passes the provider's `engineSamplesPerPixelRef` to the `PlaylistEngine` constructor (`samplesPerPixel`). It is not the committed view zoom (`samplesPerPixelRef` from `useZoomAnchor`, written in a layout effect on each commit with a new level). Before #828 that ref was written only when a view was mounted and the timeline was not empty, and seeding from it undid a zoom made on an empty timeline at the next rebuild (#901, `providerOnArrangement.test.tsx`, "preserves zoom on an empty timeline across rebuilds").
 - Tracks, mix and undo history need no seed: the new engine is constructed on the same arrangement, which holds them. The history survives a rebuild (until #812 a rebuild cleared it).
 
 **Guard handler with ref comparisons:** Each hook's `onEngineState()` compares `state.field !== ref.current` before calling `setState` to skip unnecessary React updates. Ref assignments are synchronous; `setState` calls are batched by React.

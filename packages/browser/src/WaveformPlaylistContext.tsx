@@ -450,9 +450,6 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   const { timeFormat, setTimeFormat } = useTimeFormat();
   const zoom = useZoomControls({ engineRef, initialSamplesPerPixel });
   const { samplesPerPixel, onEngineState: onZoomEngineState } = zoom;
-  // The committed zoom level for the animation loop; a zoom change keeps the
-  // time under the hovering pointer (or the centre) in place (#828).
-  const samplesPerPixelRef = useZoomAnchor(scrollContainerRef, samplesPerPixel);
   const volume = useMasterVolume({ engineRef, initialVolume: 1.0 });
   const {
     masterVolume,
@@ -468,6 +465,23 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     selectionEndRef,
     onEngineState: onSelectionEngineState,
   } = useSelectionState({ engineRef });
+  // The committed zoom level for the animation loop. A zoom change keeps a
+  // point of the view in place: the hovering pointer, else the selection,
+  // else the cursor, else the centre (#828; `zoomAnchorX`).
+  const getZoomAnchorTimes = useCallback(
+    () => ({
+      selectionStart: selectionStartRef.current ?? 0,
+      selectionEnd: selectionEndRef.current ?? 0,
+      cursorTime: visualTimeRef.current,
+    }),
+    [selectionStartRef, selectionEndRef]
+  );
+  const samplesPerPixelRef = useZoomAnchor({
+    scrollContainerRef,
+    samplesPerPixel,
+    sampleRate,
+    getTimes: getZoomAnchorTimes,
+  });
   const {
     isLoopEnabled,
     loopStart,
