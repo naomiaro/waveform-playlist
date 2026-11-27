@@ -4897,14 +4897,14 @@ A value finer than the waveform data (below its `scale`, the samples per pixel t
 
 **Package:** `@waveform-playlist/browser` (both providers).
 
-When the zoom level changes (`zoomIn()` / `zoomOut()` of `useEditorControls()`, the MediaElement provider's `samplesPerPixel` prop), the view keeps one point in place, as far as the scroll range allows. Before, `WaveformPlaylistProvider` always kept the centre of the view; the MediaElement player could not change its zoom until this release. The point is the first of:
+When the zoom level changes (`zoomIn()` / `zoomOut()` of `useEditorControls()`, the MediaElement provider's `samplesPerPixel` prop), the view keeps one point in place, as far as the scroll range allows. Before, `WaveformPlaylistProvider` kept the centre of the view (except on an empty timeline, below); the MediaElement player could not change its zoom until this release. The point is the first of:
 
-1. **The time under a mouse or pen hovering over the timeline** (the tracks or the ruler). An element drawn above the timeline (a toolbar, a popover) is not the timeline. A touch does not hover: after a tap this step is passed over.
+1. **The time under a mouse or pen hovering over the timeline** (the tracks or the ruler), hit-tested at the zoom: an element drawn above the timeline (a toolbar, a popover) is not the timeline. A touch does not hover: after a tap this step is passed over.
 2. **A selected range that is on screen** and does not fill the view: its centre, or the centre of its visible part when its centre is off screen. A point selection (after a click) is not a range.
 3. **The cursor** (where Play starts; the playhead during playback), when it is on screen.
 4. **The centre of the view.**
 
-A click on the Zoom In or Zoom Out button puts the pointer on the button, so the buttons use the range, the cursor or the centre. Pressed from the keyboard while the mouse rests over the timeline, they keep the time under the mouse. On an empty timeline `WaveformPlaylistProvider` left the view alone on a zoom; it now anchors too (at scroll 0 with the cursor at 0, the start stays in view). With automatic scroll on, the playhead is centred again on the next frame of playback.
+A click on the Zoom In or Zoom Out button puts the pointer on the button, so the buttons use the range, the cursor or the centre. Pressed from the keyboard while the mouse rests over the timeline, they keep the time under the mouse. On an empty timeline `WaveformPlaylistProvider` left the view alone on a zoom; it now anchors too (at scroll 0 with the cursor at 0, the start stays in view). With automatic scroll on (and audio on the timeline), the playhead is centred again on the next frame of playback.
 
 Two more changes:
 
@@ -4915,7 +4915,7 @@ A Ctrl/⌘ + wheel or pinch zoom gesture is not part of the library yet: [#933](
 
 **Find:** code that sets the scroll container's `scrollLeft` after a zoom of its own, to keep a point in view: in a `useEffect` it now runs after the provider's adjustment and replaces it (before, the provider's ran after it).
 
-**Replace with:** nothing for most apps. To keep another point than the pointer or the centre (the playhead, a selection), set `scrollLeft` in a `useEffect` that depends on `usePlaylistZoom().samplesPerPixel`, in a component below the provider. A `useLayoutEffect` there would not do: a child's layout effects run before the provider's, whose adjustment would replace the value.
+**Replace with:** nothing for most apps. To keep a point the four steps do not cover (a marker, an annotation, the playhead while a range is on screen), set `scrollLeft` in a `useEffect` that depends on `usePlaylistZoom().samplesPerPixel`, in a component below the provider. A `useLayoutEffect` there would not do: a child's layout effects run before the provider's, whose adjustment would replace the value.
 
 ## `AnnotationIntegrationProvider` and `SpectrogramIntegrationProvider` are replaced by their contexts
 

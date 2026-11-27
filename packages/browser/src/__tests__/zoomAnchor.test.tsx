@@ -7,7 +7,7 @@
 // scroll are given by hand. With the sample rate equal to the zoom level, one
 // pixel is one second before the zoom.
 import './jsdom-polyfills'; // must be first — sets globals the import graph needs
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import React, { StrictMode, useRef } from 'react';
 import {
@@ -39,9 +39,15 @@ function fakeLayout(element: HTMLElement, scrollLeft = 1000) {
   element.getBoundingClientRect = () => ({ ...RECT, x: RECT.left, y: RECT.top, toJSON() {} });
 }
 
+// What the browser's hit test finds at a point: jsdom has no layout.
+const hitTest = { element: null as Element | null };
+beforeEach(() => {
+  document.elementFromPoint = () => hitTest.element;
+});
 afterEach(() => {
   cleanup();
   layout.maxScroll = Infinity;
+  hitTest.element = null;
 });
 
 const NONE: ZoomAnchorTimes = { selectionStart: 0, selectionEnd: 0, cursorTime: 0 };
@@ -98,19 +104,22 @@ describe('zoomAnchorX: the order', () => {
     });
 
   it('1. a hovering pointer over the timeline wins over a selection and the cursor', () => {
+    hitTest.element = inside;
     expect(
-      anchor(
-        { selectionStart: 1100, selectionEnd: 1200, cursorTime: 1300 },
-        { x: 150, y: 100, target: inside }
-      )
+      anchor({ selectionStart: 1100, selectionEnd: 1200, cursorTime: 1300 }, { x: 150, y: 100 })
     ).toBe(50);
   });
 
   it('1. a pointer over an overlay above the timeline does not count', () => {
-    // Inside the container's rectangle, but over an element outside it.
-    expect(anchor({ ...NONE, cursorTime: 1300 }, { x: 150, y: 100, target: document.body })).toBe(
-      300
-    );
+    // Inside the container's rectangle, but the hit test finds an element
+    // outside it (drawn above the timeline).
+    hitTest.element = document.body;
+    expect(anchor({ ...NONE, cursorTime: 1300 }, { x: 150, y: 100 })).toBe(300);
+  });
+
+  it("1. a pointer outside the container's rectangle does not count", () => {
+    hitTest.element = inside;
+    expect(anchor({ ...NONE, cursorTime: 1300 }, { x: 600, y: 100 })).toBe(300);
   });
 
   it('2. a range on screen: its centre', () => {
@@ -193,12 +202,25 @@ describe('useZoomAnchor', () => {
 
   it('keeps the time under a mouse over the container (a keyboard zoom does not move it)', () => {
     const view = render(<Harness spp={1000} />);
+    hitTest.element = state.element;
     pointer('pointermove', { clientX: 200, clientY: 100, pointerType: 'mouse' }, state.element!);
     state.times = { selectionStart: 1100, selectionEnd: 1200, cursorTime: 1300 };
     view.rerender(<Harness spp={500} />);
     // Content pixel 1100 at 1000 spp is 2200 at 500 spp, minus the anchor 100.
     expect(state.element!.scrollLeft).toBe(2100);
     expect(state.committed!.current).toBe(500);
+  });
+
+  it('a resting mouse over an element that the zoom replaces still counts (a ruler chunk)', () => {
+    const view = render(<Harness spp={1000} />);
+    const chunk = document.createElement('canvas');
+    state.element!.appendChild(chunk);
+    pointer('pointermove', { clientX: 200, clientY: 100, pointerType: 'mouse' }, chunk);
+    // The chunk is replaced; the hit test now finds the container itself.
+    chunk.remove();
+    hitTest.element = state.element;
+    view.rerender(<Harness spp={500} />);
+    expect(state.element!.scrollLeft).toBe(2100);
   });
 
   it('a mouse outside the container (on a zoom button): the selection first', () => {
@@ -219,14 +241,24 @@ describe('useZoomAnchor', () => {
 
   it('a touch does not hover', () => {
     const view = render(<Harness spp={1000} />);
+    hitTest.element = state.element;
     pointer('pointermove', { clientX: 200, clientY: 100, pointerType: 'mouse' }, state.element!);
     pointer('pointerdown', { clientX: 200, clientY: 100, pointerType: 'touch' }, state.element!);
     view.rerender(<Harness spp={500} />);
     expect(state.element!.scrollLeft).toBe(2200);
   });
 
+  it('a touch moving over the container does not hover either', () => {
+    const view = render(<Harness spp={1000} />);
+    hitTest.element = state.element;
+    pointer('pointermove', { clientX: 200, clientY: 100, pointerType: 'touch' }, state.element!);
+    view.rerender(<Harness spp={500} />);
+    expect(state.element!.scrollLeft).toBe(2200);
+  });
+
   it('a pointer that left the window is not over the container', () => {
     const view = render(<Harness spp={1000} />);
+    hitTest.element = state.element;
     pointer('pointermove', { clientX: 200, clientY: 100, pointerType: 'mouse' }, state.element!);
     pointer('pointerout', { relatedTarget: null }, document);
     view.rerender(<Harness spp={500} />);

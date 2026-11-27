@@ -94,8 +94,8 @@ export interface MediaElementPlaylistProviderProps {
   track: MediaElementTrackConfig;
   /** Samples per pixel (the zoom level; default 1024). Followed: a new value
    *  redraws the waveform at it, keeping one point of the view in place: a
-   *  hovering pointer over the timeline, else a selected range on screen,
-   *  else the cursor on screen, else the centre. A value
+   *  pointer hovering over the timeline, else a selected range on screen that
+   *  does not fill the view, else the cursor on screen, else the centre. A value
    *  finer than the waveform data (its `scale`) is drawn at the data's own
    *  resolution, which `usePlaylistZoom().samplesPerPixel` reports. There is
    *  no zoom control under this provider, so the prop is the only place the

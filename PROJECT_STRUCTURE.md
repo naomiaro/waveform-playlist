@@ -333,7 +333,7 @@ const clip = createClipFromSeconds({
   │   ├── useReadyOnce.ts               # WaveformPlaylistProvider: isReady, onReady and the ready event once per mount; Play refused before the first ready
   │   ├── useAnnotationState.ts         # the annotationStore prop's list (read, never written), getAnnotations for the loop, preview, active id, the three options (state that follows the annotationList prop); AnnotationListProp
   │   ├── useScrollFollow.ts            # scroll container, automatic scroll, centrePlayhead()
-  │   ├── zoomAnchor.ts                 # useZoomAnchor: a zoom keeps the time under the hovering pointer (or the centre); the committed zoom for the loop
+  │   ├── zoomAnchor.ts                 # useZoomAnchor: a zoom keeps the hovering pointer, else the selection, else the cursor, else the centre in place; the committed zoom for the loop
   │   ├── useFrameCallbacks.ts          # frame-callback registry + FrameData
   │   ├── followAnnotations.ts          # annotation step of the animation loop (pure)
   │   ├── useMergedTheme.ts             # the theme prop merged over defaultTheme

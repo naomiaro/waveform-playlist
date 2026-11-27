@@ -34,9 +34,10 @@ test.describe('Multi-Clip Example', () => {
     }).toPass({ timeout: 10000 });
   });
 
-  // #828: a zoom keeps the time under the pointer where it is when the
-  // pointer is over the tracks, and the time at the centre of the view
-  // otherwise. A click on a zoom button puts the pointer on the button.
+  // #828: a zoom keeps the time under a pointer hovering over the timeline,
+  // else a selected range on screen, else the cursor on screen, else the
+  // centre. A click on a zoom button puts the pointer on the button; with
+  // nothing selected and the cursor at 0 (off screen here), the centre stays.
   // (Zoom In is disabled after two clicks on this page: the last zoom level.)
   test('a zoom button keeps the time at the centre of the view where it is', async ({ page }) => {
     const zoomIn = page.getByRole('button', { name: 'Zoom In' });

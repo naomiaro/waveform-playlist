@@ -442,7 +442,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     onErrorRef,
     onBuildFailure,
   });
-  // For the animation loop and the zoom scroll math, which run outside render.
+  // For the animation loop, which runs outside render.
   const sampleRateRef = useRef(sampleRate);
   sampleRateRef.current = sampleRate;
 

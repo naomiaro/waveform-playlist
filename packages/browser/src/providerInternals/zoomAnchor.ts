@@ -21,11 +21,10 @@ export function anchoredScrollLeft({
   return Math.max(0, Math.round(contentX - anchorX));
 }
 
-/** The last position of a hovering pointer (mouse or pen), and what it was over. */
+/** The last position of a hovering pointer (mouse or pen), in client coordinates. */
 export interface HoverPoint {
   x: number;
   y: number;
-  target: EventTarget | null;
 }
 
 /** What a zoom can be anchored on when no pointer hovers over the timeline, in seconds. */
@@ -41,10 +40,12 @@ export interface ZoomAnchorTimes {
  * area, in this order (the maintainer's choice on #828, after Audacity's):
  *
  * 1. A hovering mouse or pen over the scroll container (the timeline: the
- *    tracks and the ruler). The pointer's last move must have been over an
- *    element inside the container, so an overlay drawn above it does not
- *    count. A keyboard press on a zoom button does not move the pointer: a
- *    mouse resting over the timeline stays the anchor.
+ *    tracks and the ruler). What is under the pointer is hit-tested at the
+ *    zoom, not remembered from its last move: an overlay drawn above the
+ *    timeline does not count, and a ruler chunk replaced under a resting
+ *    pointer (by a zoom, by wheel scrolling) does not stop it counting. A
+ *    keyboard press on a zoom button does not move the pointer: a mouse
+ *    resting over the timeline stays the anchor.
  * 2. A range selection that is at least partly on screen and does not fill
  *    the view: its centre, or the centre of its visible part when its centre
  *    is off screen.
@@ -68,16 +69,12 @@ export function zoomAnchorX({
   times: ZoomAnchorTimes;
 }): number {
   const width = container.clientWidth;
-  if (hover && hover.target instanceof Node && container.contains(hover.target)) {
+  if (hover) {
     const rect = container.getBoundingClientRect();
-    if (
-      hover.x >= rect.left &&
-      hover.x < rect.right &&
-      hover.y >= rect.top &&
-      hover.y < rect.bottom
-    ) {
-      return hover.x - rect.left;
-    }
+    const inRect =
+      hover.x >= rect.left && hover.x < rect.right && hover.y >= rect.top && hover.y < rect.bottom;
+    const hit = inRect ? container.ownerDocument.elementFromPoint(hover.x, hover.y) : null;
+    if (hit && container.contains(hit)) return hover.x - rect.left;
   }
 
   const toX = (seconds: number) => (seconds * sampleRate) / samplesPerPixel - scrollLeft;
@@ -150,9 +147,7 @@ export function useZoomAnchor({
   useEffect(() => {
     const onMove = (event: PointerEvent) => {
       hoverRef.current =
-        event.pointerType === 'touch'
-          ? null
-          : { x: event.clientX, y: event.clientY, target: event.target };
+        event.pointerType === 'touch' ? null : { x: event.clientX, y: event.clientY };
     };
     const onDown = (event: PointerEvent) => {
       if (event.pointerType === 'touch') hoverRef.current = null;
