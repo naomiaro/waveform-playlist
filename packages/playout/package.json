@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/playout",
-  "version": "13.0.0-next.8",
+  "version": "13.0.0-next.9",
   "description": "Playout engine for waveform-playlist using Tone.js",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

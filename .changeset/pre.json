@@ -122,6 +122,7 @@
     "track-controls-disabled-style",
     "track-effects-prop",
     "track-kind",
+    "track-pan-law",
     "track-reorder-registers-the-slot",
     "trim-preview-clips-by-id",
     "ui-components-no-playout",
