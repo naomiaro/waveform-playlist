@@ -78,7 +78,13 @@ interface StatesCache {
 
 const EMPTY_ROWS: RowsCache = { byTrackId: new Map(), result: [] };
 const EMPTY_STATES: StatesCache = { byTrackId: new Map(), result: [] };
-const DEFAULT_MIX: TrackMixerValues = { volume: 1, muted: false, soloed: false, pan: 0 };
+const DEFAULT_MIX: TrackMixerValues = {
+  volume: 1,
+  muted: false,
+  soloed: false,
+  pan: 0,
+  panLaw: 'auto',
+};
 
 interface RowInputs {
   loadedPeaks: PeaksCache;
@@ -132,7 +138,8 @@ function sameState(a: TrackState, name: string, mix: TrackMixerValues, muted: bo
     a.volume === mix.volume &&
     a.muted === muted &&
     a.soloed === mix.soloed &&
-    a.pan === mix.pan
+    a.pan === mix.pan &&
+    a.panLaw === mix.panLaw
   );
 }
 
@@ -159,6 +166,7 @@ function deriveTrackStates(
             muted,
             soloed: mix.soloed,
             pan: mix.pan,
+            panLaw: mix.panLaw,
           };
     byTrackId.set(track.id, state);
     return state;

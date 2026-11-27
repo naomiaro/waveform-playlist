@@ -135,6 +135,7 @@ describe('useArrangementView', () => {
       muted: false,
       soloed: false,
       pan: 0,
+      panLaw: 'auto',
     });
     expect(after.trackStates[1]).toBe(before.trackStates[1]);
     expect(after.tracks).toBe(before.tracks);
@@ -213,6 +214,7 @@ describe('useArrangementView', () => {
       muted: false,
       soloed: false,
       pan: 0,
+      panLaw: 'auto',
     });
     expect(placeholdersEnd(result.current.peaksDataArray)).toBe(0);
   });

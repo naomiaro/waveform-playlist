@@ -6,8 +6,11 @@ import {
   createPanStage,
   applyFadeIn,
   applyFadeOut,
+  isDecidedPanLaw,
   type ClipTrack,
+  type DecidedPanLaw,
   type FadeType,
+  type PanLaw,
 } from '@waveform-playlist/core';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import type { Volume, Gain, ToneAudioNode } from 'tone';
@@ -102,6 +105,13 @@ interface TrackState {
   soloed: boolean;
   volume: number;
   pan: number;
+  /** The track's pan law. Left out or `'auto'`: the track's own, else the law of its clips. */
+  panLaw?: PanLaw;
+}
+
+/** The law a track is rendered with: the state's when decided, else the track's (`trackPanLaw`). */
+function renderPanLaw(track: ClipTrack, state: TrackState): DecidedPanLaw {
+  return isDecidedPanLaw(state.panLaw) ? state.panLaw : trackPanLaw(track);
 }
 
 /**
@@ -273,10 +283,12 @@ async function renderOffline(
     if (hasSolo && !state.soloed) return false;
     return true;
   });
-  const outputChannels = audibleTracks.reduce(
-    (max, { track }) => Math.max(max, trackChannelCount(track)),
-    1
-  );
+  // Two channels when any audible track has the stereo law or a stereo clip.
+  const outputChannels = audibleTracks.some(
+    ({ track, state }) => renderPanLaw(track, state) === 'stereo' || trackChannelCount(track) >= 2
+  )
+    ? 2
+    : 1;
 
   const cleanups: Array<() => void> = [];
   try {
@@ -303,7 +315,7 @@ async function renderOffline(
           const trackPan = createPanStage(
             context.rawContext as BaseAudioContext,
             state.pan,
-            trackPanLaw(track)
+            renderPanLaw(track, state)
           );
           const trackMute = new Gain(state.muted ? 0 : 1);
 

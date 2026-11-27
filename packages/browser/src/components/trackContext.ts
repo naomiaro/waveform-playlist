@@ -9,7 +9,7 @@
  * This file imports no provider and no engine.
  */
 import { createContext, use, type RefObject } from 'react';
-import type { RenderMode, TrackKind } from '@waveform-playlist/core';
+import type { DecidedPanLaw, PanLaw, RenderMode, TrackKind } from '@waveform-playlist/core';
 import type { MixerChangeOptions } from '@waveform-playlist/engine';
 import type { TrackMenuItem } from '@waveform-playlist/ui-components';
 
@@ -31,6 +31,8 @@ export interface TrackContextValue {
   volume: number;
   /** -1 (left) to 1 (right). */
   pan: number;
+  /** The pan law: `'auto'` until the track's first decoded audio decides it (#684). */
+  panLaw: PanLaw;
   /** How the track is drawn. Always `'waveform'` for a MIDI track. */
   renderMode: RenderMode;
 
@@ -63,6 +65,12 @@ export interface TrackContextValue {
   setSoloed: (soloed: boolean, options?: MixerChangeOptions) => void;
   setVolume: (volume: number, options?: MixerChangeOptions) => void;
   setPan: (pan: number, options?: MixerChangeOptions) => void;
+  /**
+   * Sets the track's pan law (#684): `'mono'` or `'stereo'`, an undo step
+   * like the four above. Any other value, `'auto'` included, throws a
+   * `TypeError`. Nothing happens for a MIDI track.
+   */
+  setPanLaw: (panLaw: DecidedPanLaw, options?: MixerChangeOptions) => void;
   /** Makes this the selected track. */
   select: () => void;
   /** Moves the track one position up. Nothing happens for the first track. */

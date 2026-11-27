@@ -1,5 +1,5 @@
 import React, { use, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { RenderMode, TrackKind } from '@waveform-playlist/core';
+import type { DecidedPanLaw, PanLaw, RenderMode, TrackKind } from '@waveform-playlist/core';
 import type { MixerChangeOptions } from '@waveform-playlist/engine';
 import { warnMisplacedPart } from './partWarnings';
 import {
@@ -56,6 +56,7 @@ interface TrackControlsSlotProps {
   soloed: boolean;
   volume: number;
   pan: number;
+  panLaw: PanLaw;
   isSelected: boolean;
   isFirst: boolean;
   isLast: boolean;
@@ -88,6 +89,7 @@ function TrackControlsSlotImpl({
   soloed,
   volume,
   pan,
+  panLaw,
   isSelected,
   isFirst,
   isLast,
@@ -104,6 +106,7 @@ function TrackControlsSlotImpl({
     setTrackSolo,
     setTrackVolume,
     setTrackPan,
+    setTrackPanLaw,
     reorderTrack,
     setSelectedTrackId,
   } = useEditorControls();
@@ -123,6 +126,8 @@ function TrackControlsSlotImpl({
       setVolume: (value: number, options?: MixerChangeOptions) =>
         setTrackVolume(trackId, value, options),
       setPan: (value: number, options?: MixerChangeOptions) => setTrackPan(trackId, value, options),
+      setPanLaw: (value: DecidedPanLaw, options?: MixerChangeOptions) =>
+        setTrackPanLaw(trackId, value, options),
       select: () => setSelectedTrackId(trackId),
       // The engine clamps the target and ignores a move to the same place.
       moveUp: () => reorderTrack(trackId, indexRef.current - 1),
@@ -136,6 +141,7 @@ function TrackControlsSlotImpl({
       setTrackSolo,
       setTrackVolume,
       setTrackPan,
+      setTrackPanLaw,
       setSelectedTrackId,
       reorderTrack,
       shared,
@@ -152,6 +158,7 @@ function TrackControlsSlotImpl({
       soloed,
       volume,
       pan,
+      panLaw,
       renderMode,
       isSelected,
       isFirst,
@@ -169,6 +176,7 @@ function TrackControlsSlotImpl({
       soloed,
       volume,
       pan,
+      panLaw,
       renderMode,
       isSelected,
       isFirst,
@@ -289,6 +297,7 @@ function WaveformTrackControlsImpl({ children }: WaveformTrackControlsProps) {
               soloed={state.soloed}
               volume={state.volume}
               pan={state.pan}
+              panLaw={state.panLaw}
               isSelected={track.id === selectedTrackId}
               isFirst={trackIndex === 0}
               isLast={trackIndex === tracks.length - 1}
