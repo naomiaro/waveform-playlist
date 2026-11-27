@@ -337,8 +337,8 @@ export class SpectrogramOrchestrator extends EventTarget {
         // Phase 1a: viewport tier — render synchronously (priority)
         const viewportDrawn = await this.renderTier(tiers.viewport, generation, viewport);
         if (this.generation !== generation || this.disposed) return;
-        // A group whose clip was registered again mid-computation is drawn by
-        // the render registerClip scheduled: the track is ready then (#928).
+        // A group whose computation was dropped while another pass is queued
+        // is drawn by that pass: the track is ready then (#928).
         if (viewportDrawn && !this.readyDispatched.has(trackId)) {
           this.readyDispatched.add(trackId);
           this.dispatchEvent(
@@ -394,10 +394,10 @@ export class SpectrogramOrchestrator extends EventTarget {
   }
 
   /**
-   * Renders one group. Returns false when its computation was dropped while
-   * its clip is still registered (registered again mid-computation, #928): the
-   * render registerClip scheduled draws it. True otherwise, also when there is
-   * nothing to draw.
+   * Renders one group. Returns false when its computation was dropped and
+   * another pass is queued (registerClip queues one for a clip registered again
+   * mid-computation that still has canvases, #928): that pass draws it. True
+   * otherwise, also when there is nothing to draw or nothing will draw it.
    */
 
   protected async renderGroup(
@@ -427,9 +427,10 @@ export class SpectrogramOrchestrator extends EventTarget {
       if (err instanceof SpectrogramAbortError) {
         // Same generation: the worker dropped a computation whose clip audio
         // was replaced or removed while it ran (#928). Skip this group only;
-        // the rest of the pass still draws. A clip registered again has its
-        // own render scheduled (registerClip); a removed one has nothing to draw.
-        return !this.clips.has(first.clipId);
+        // the rest of the pass still draws. Wait for the next pass only when
+        // one is queued: an unregister, or a register of a clip with no
+        // canvas left, queues none, and the track is ready in this pass.
+        return !this.renderQueued;
       }
       // Concurrent computes can LRU-evict the FFT entry between computeFFT
       // resolving and renderChunks executing (16-entry cache). Recompute once

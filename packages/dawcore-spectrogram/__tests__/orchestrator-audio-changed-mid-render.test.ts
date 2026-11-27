@@ -224,4 +224,37 @@ describe('orchestrator — a clip registered again while its FFT runs (#928)', (
 
     orchestrator.dispose();
   });
+
+  it('a clip whose canvas was removed first does not hold back the track’s viewport-ready', async () => {
+    const orchestrator = makeOrchestrator();
+    const readyTracks: string[] = [];
+    orchestrator.addEventListener('viewport-ready', (e) => {
+      readyTracks.push((e as CustomEvent<{ trackId: string }>).detail.trackId);
+    });
+    const long: ClipSpec = {
+      clipId: 'canvasless-long',
+      trackId: 'canvasless-A',
+      length: LONG_LENGTH,
+    };
+    const fromIndex = intoModule.length;
+    const captured = addClips(orchestrator, [
+      long,
+      { clipId: 'canvasless-short', trackId: 'canvasless-A', length: SHORT_LENGTH },
+    ]);
+
+    const first = await suspendedCompute(fromIndex);
+    expect(first.clipId).toBe(long.clipId);
+
+    // No canvas is left for the clip, so registerClip schedules no render:
+    // nothing would draw the skipped group, and no later pass would fire.
+    orchestrator.unregisterCanvas(long.clipId + '-ch0-chunk0');
+    registerAudio(orchestrator, long, new Float32Array(LONG_LENGTH));
+
+    await settle(() => readyTracks.length >= 1);
+    expect(replies.find((r) => r.id === first.id)?.type).toBe('aborted');
+    expect(brightestRed(captured.get('canvasless-short')!), 'the other clip of track A').toBe(255);
+    expect(readyTracks).toEqual(['canvasless-A']);
+
+    orchestrator.dispose();
+  });
 });
