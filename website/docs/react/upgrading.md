@@ -2599,7 +2599,7 @@ const [snapTo, setSnapTo] = useState<BeatsAndBarsSnapTo>('beat');
 
 **Find:** `SpectrogramCanvasRegistration` in an import from `@waveform-playlist/browser` or `@waveform-playlist/ui-components`; `TrackMenuItem` in an import from `@waveform-playlist/spectrogram`.
 
-**Replace with:** `SpectrogramCanvasRegistration` from `@waveform-playlist/core`; `TrackMenuItem` from `@waveform-playlist/ui-components`. Both types have the fields they had, except `TrackMenuItem.label`, which was never drawn and is removed (see [props and components the packages did not use](#props-and-components-the-packages-did-not-use-are-removed)).
+**Replace with:** `SpectrogramCanvasRegistration` from `@waveform-playlist/core`; `TrackMenuItem` from `@waveform-playlist/ui-components`. Both types have the fields they had, except `TrackMenuItem.label`, which was never drawn and is removed (see [props and components the packages did not use](#props-and-components-the-packages-did-not-use-are-removed)). `SpectrogramCanvasRegistration` also gains two optional fields, `offsetSamples` and `durationSamples`: the range of the audio the canvas is drawn for (omitted: the clip's own).
 
 **Find:** `TrackControlsContext`, `useTrackControls`.
 
@@ -3783,7 +3783,7 @@ setTracks(tracks: readonly PlayoutTrack[]): void {
 
 **Packages:** `@waveform-playlist/browser`.
 
-The provider no longer takes a tracks array from your state and hands changes back. It takes an **arrangement**, an `Arrangement` from `@waveform-playlist/engine` that you make with `useCreateArrangement` from `@waveform-playlist/browser`. The arrangement owns the tracks and their clips, the mix (volume, mute, solo, pan by track id), the undo history and the loading of the audio the clips name. The provider derives everything it publishes from it and writes nothing back. A clip move, trim or split, a reorder, an undo and a recorded take each change the arrangement, and you read the tracks there.
+The provider no longer takes a tracks array from your state and hands changes back. It takes an **arrangement**, an `Arrangement` from `@waveform-playlist/engine` that you make with `useCreateArrangement` from `@waveform-playlist/browser`. The arrangement owns the tracks and their clips, the mix (volume, mute, solo, pan by track id), the undo history and the loading of the audio the clips name. The provider derives everything it publishes from it and writes nothing back, except the mark on the track a take records onto (`setTrackRecording`, see below). A clip move, trim or split, a reorder, an undo and a recorded take each change the arrangement, and you read the tracks there.
 
 What goes with it:
 
