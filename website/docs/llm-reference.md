@@ -3064,7 +3064,7 @@ interface SpectrogramData {
 }
 
 interface TrackSpectrogramOverrides {
-  renderMode: RenderMode;
+  renderMode?: RenderMode;  // set only from the track menu; absent = the track's own renderMode
   config?: SpectrogramConfig;
   colorMap?: ColorMapValue;
 }
@@ -3078,7 +3078,7 @@ interface SpectrogramWorkerApi {
   unregisterCanvas(canvasId: string): void;
   registerAudioData(clipId: string, channelDataArrays: Float32Array[], sampleRate: number): void;
   unregisterAudioData(clipId: string): void;
-  registeredAudioClipIds(): string[];  // registered now; empty once terminated; a new array per call
+  registeredAudioClipIds(): string[];  // the ids audio is registered under now; terminate() empties it; a new array per call
   terminate(): void;
 }
 
