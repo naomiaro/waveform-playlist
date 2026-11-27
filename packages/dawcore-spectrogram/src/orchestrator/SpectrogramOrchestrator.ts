@@ -335,9 +335,11 @@ export class SpectrogramOrchestrator extends EventTarget {
       try {
         const tiers = classifyViewport(trackCanvases, viewport);
         // Phase 1a: viewport tier — render synchronously (priority)
-        await this.renderTier(tiers.viewport, generation, viewport);
+        const viewportDrawn = await this.renderTier(tiers.viewport, generation, viewport);
         if (this.generation !== generation || this.disposed) return;
-        if (!this.readyDispatched.has(trackId)) {
+        // A group whose clip was registered again mid-computation is drawn by
+        // the render registerClip scheduled: the track is ready then (#928).
+        if (viewportDrawn && !this.readyDispatched.has(trackId)) {
           this.readyDispatched.add(trackId);
           this.dispatchEvent(
             new CustomEvent('viewport-ready', { detail: { trackId, generation } })
@@ -375,25 +377,35 @@ export class SpectrogramOrchestrator extends EventTarget {
     }
   }
 
+  /** Renders the tier's groups; false when a group waits for a render already scheduled. */
   protected async renderTier(
     canvases: CanvasEntry[],
     generation: number,
     viewport: ViewportState
-  ): Promise<void> {
-    if (canvases.length === 0) return;
+  ): Promise<boolean> {
+    let drawn = true;
+    if (canvases.length === 0) return drawn;
     const groups = groupRenderableChunks(canvases);
     for (const group of groups) {
-      if (this.generation !== generation || this.disposed) return;
-      await this.renderGroup(group, generation, viewport);
+      if (this.generation !== generation || this.disposed) return drawn;
+      if (!(await this.renderGroup(group, generation, viewport))) drawn = false;
     }
+    return drawn;
   }
+
+  /**
+   * Renders one group. Returns false when its computation was dropped while
+   * its clip is still registered (registered again mid-computation, #928): the
+   * render registerClip scheduled draws it. True otherwise, also when there is
+   * nothing to draw.
+   */
 
   protected async renderGroup(
     group: CanvasEntry[],
     generation: number,
     viewport: ViewportState
-  ): Promise<void> {
-    if (group.length === 0) return;
+  ): Promise<boolean> {
+    if (group.length === 0) return true;
     const first = group[0];
     const clip = this.clips.get(first.clipId);
     if (!clip) {
@@ -404,19 +416,20 @@ export class SpectrogramOrchestrator extends EventTarget {
           first.canvasId +
           ') — canvas will stay black until registerClip is called'
       );
-      return;
+      return true;
     }
 
     try {
       await this.renderGroupOnce(group, generation, viewport, clip);
+      return true;
     } catch (err) {
       if (this.generation !== generation || this.disposed) throw err;
       if (err instanceof SpectrogramAbortError) {
         // Same generation: the worker dropped a computation whose clip audio
         // was replaced or removed while it ran (#928). Skip this group only;
-        // the rest of the pass still draws, and a clip registered again
-        // schedules its own render (registerClip).
-        return;
+        // the rest of the pass still draws. A clip registered again has its
+        // own render scheduled (registerClip); a removed one has nothing to draw.
+        return !this.clips.has(first.clipId);
       }
       // Concurrent computes can LRU-evict the FFT entry between computeFFT
       // resolving and renderChunks executing (16-entry cache). Recompute once
@@ -426,7 +439,7 @@ export class SpectrogramOrchestrator extends EventTarget {
           '[dawcore-spectrogram] FFT cache entry evicted between compute and render — retrying group once'
         );
         await this.renderGroupOnce(group, generation, viewport, clip);
-        return;
+        return true;
       }
       throw err;
     }
