@@ -24,7 +24,8 @@ export interface SpectrogramWorkerFFTParams {
    * If set, compute only the channel at this index of the arrays the worker
    * has for the clip. A worker with one array computes that array whatever
    * this says. The pool gives each worker its one channel at index 0, or
-   * (worker 0, registered audio) every channel, and asks for index 0 (#925).
+   * (worker 0, registered audio) every channel, and its multi-channel fan-out
+   * asks for index 0 (a mono request sends no filter) (#925).
    */
   channelFilter?: number;
 }

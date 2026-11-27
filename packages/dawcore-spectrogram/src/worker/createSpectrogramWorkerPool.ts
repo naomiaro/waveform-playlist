@@ -33,7 +33,7 @@ function parseChannelFromCanvasId(canvasId: string): number {
  * The pool exposes the same `SpectrogramWorkerApi` interface, so it's
  * a drop-in replacement for a single worker in SpectrogramProvider.
  *
- * Each worker is given only the audio it computes (#925): worker 0 holds every
+ * Each worker is given only the audio it can be asked to compute (#925): worker 0 holds every
  * channel of a registered clip (it also computes the mono mix), worker k ≥ 1
  * holds channel k alone, at index 0 (`channelsForWorker`). Registrations are
  * kept for replay so lazily-created workers can serve pre-registered clips.
