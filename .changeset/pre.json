@@ -101,6 +101,7 @@
     "smartscale-tick-pixels",
     "spectrogram-override-mode-optional",
     "spectrogram-pool-audio",
+    "spectrogram-pool-channel-per-worker",
     "spectrogram-pool-registered-audio",
     "spectrogram-settings-modal-draft",
     "spectrogram-unregister-once",

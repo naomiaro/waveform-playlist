@@ -1,6 +1,6 @@
 {
   "name": "@dawcore/spectrogram",
-  "version": "0.0.9-next.5",
+  "version": "0.0.9-next.6",
   "description": "Spectrogram computation, worker, and viewport orchestrator — framework-agnostic",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
