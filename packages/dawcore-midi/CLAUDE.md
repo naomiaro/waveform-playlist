@@ -67,7 +67,7 @@ Flatten would merge `midiNotes` into one visual track but keep separate `ClipTra
 
 `cd packages/dawcore-midi && npx vitest run` (Node environment; tests in `__tests__/` at the package root, not under `src/`).
 
-Test data is synthesized via `@tonejs/midi`'s `Midi` constructor — no binary fixture files. `loadMidiTracks.test.ts` uses Node's own `Blob` (it has `arrayBuffer()`, which jsdom's did not, the reason for a workaround in two tests while the file lived in `@waveform-playlist/midi`) and `createArrangement` from `@waveform-playlist/engine`, a devDependency for that test only.
+Test data is synthesized via `@tonejs/midi`'s `Midi` constructor — no binary fixture files. `loadMidiTracks.test.ts` uses Node's own `Blob` (it has `arrayBuffer()`, which jsdom's did not, the reason for a workaround in its Blob helper and in one test while the file lived in `@waveform-playlist/midi`) and `createArrangement` from `@waveform-playlist/engine`, a devDependency for that test only.
 
 ### @tonejs/midi gotchas
 
