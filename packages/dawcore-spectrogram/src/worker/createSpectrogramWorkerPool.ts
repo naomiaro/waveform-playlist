@@ -33,12 +33,13 @@ function parseChannelFromCanvasId(canvasId: string): number {
  * The pool exposes the same `SpectrogramWorkerApi` interface, so it's
  * a drop-in replacement for a single worker in SpectrogramProvider.
  *
- * Each worker holds only the audio it computes (#925): worker 0 holds every
- * channel of a clip (it also computes the mono mix), worker k ≥ 1 holds
- * channel k alone, at index 0. Registrations are kept for replay so
- * lazily-created workers can serve pre-registered clips. Canvases are routed
- * to the worker for their channel. computeFFT fans out one channel per worker,
- * each asked for index 0 of what it holds (`channelsForWorker`).
+ * Each worker is given only the audio it computes (#925): worker 0 holds every
+ * channel of a registered clip (it also computes the mono mix), worker k ≥ 1
+ * holds channel k alone, at index 0 (`channelsForWorker`). Registrations are
+ * kept for replay so lazily-created workers can serve pre-registered clips.
+ * Canvases are routed to the worker for their channel. A multi-channel
+ * computeFFT fans out one channel per worker, each asked for index 0; audio
+ * sent with the request is cut to that one channel (`payloadForChannel`).
  *
  * The one-channel-per-worker invariant is load-bearing: the worker's FFT
  * cache key is channel-agnostic (each worker stores its channel at index 0
@@ -66,6 +67,18 @@ function defaultPoolSize(): number {
 function channelsForWorker(channelDataArrays: Float32Array[], workerIndex: number): Float32Array[] {
   if (workerIndex === 0 || channelDataArrays.length === 0) return channelDataArrays;
   return [channelDataArrays[workerIndex]];
+}
+
+/**
+ * The audio sent with a one-channel compute-fft to worker `channelIndex`:
+ * that channel alone, at index 0, since the request computes nothing else
+ * (worker 0 included). An empty list (audio registered earlier) stays empty.
+ */
+function payloadForChannel(
+  channelDataArrays: Float32Array[],
+  channelIndex: number
+): Float32Array[] {
+  return channelDataArrays.length === 0 ? [] : [channelDataArrays[channelIndex]];
 }
 
 /**
@@ -144,9 +157,9 @@ export function createSpectrogramWorkerPool(
   /**
    * Return the worker owning `channelIndex`, growing the pool if needed.
    * New workers get the registered clips replayed — but only clips that
-   * actually have this worker's channel: worker k computes only
-   * channelFilter k (worker 0 additionally serves mono mixes), so a clip
-   * with fewer than k+1 channels is dead weight on worker k.
+   * actually have this worker's channel, and only that channel
+   * (`channelsForWorker`): worker k computes only channel k, so a clip with
+   * fewer than k+1 channels is dead weight on worker k.
    */
   function ensureWorkerForChannel(channelIndex: number): SpectrogramWorkerApi {
     assertValidChannelIndex(channelIndex);
@@ -207,13 +220,14 @@ export function createSpectrogramWorkerPool(
       }
 
       // Multi-channel: fan out one channel per worker, growing the pool when
-      // audio has more channels than workers. Each worker holds its channel at
-      // index 0 (channelsForWorker), so each is asked for channelFilter 0.
+      // audio has more channels than workers. Each worker finds its channel at
+      // index 0 (registered: channelsForWorker; sent: payloadForChannel), so
+      // each is asked for channelFilter 0.
       const promises = Array.from({ length: channelCount }, (_, i) =>
         ensureWorkerForChannel(i).computeFFT(
           {
             ...params,
-            channelDataArrays: channelsForWorker(params.channelDataArrays, i),
+            channelDataArrays: payloadForChannel(params.channelDataArrays, i),
             channelFilter: 0,
           },
           generation

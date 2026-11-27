@@ -22,8 +22,9 @@ export interface SpectrogramWorkerFFTParams {
   sampleRange?: { start: number; end: number };
   /**
    * If set, compute only the channel at this index of the arrays the worker
-   * holds for the clip. The pool gives worker k ≥ 1 channel k alone and asks
-   * for index 0 (#925).
+   * has for the clip. A worker with one array computes that array whatever
+   * this says. The pool gives each worker its one channel at index 0, or
+   * (worker 0, registered audio) every channel, and asks for index 0 (#925).
    */
   channelFilter?: number;
 }

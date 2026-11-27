@@ -102,7 +102,7 @@ describe('worker pool — each worker holds only the channels it computes (#925)
     await promise;
   });
 
-  it('a compute-fft for audio that was not registered sends worker k ≥ 1 channel k only', async () => {
+  it('a compute-fft for audio that was not registered sends each worker its channel only', async () => {
     const { factory, workers } = trackingWorkerFactory();
     const pool = createSpectrogramWorkerPool(factory, 2);
 
@@ -111,7 +111,8 @@ describe('worker pool — each worker holds only the channels it computes (#925)
       1
     );
 
-    expect(workers.map((w) => channelsIn(w, 'compute-fft'))).toEqual([[[0, 1, 2]], [[1]], [[2]]]);
+    // Worker 0 too: this request computes channel 0 there, not the mono mix.
+    expect(workers.map((w) => channelsIn(w, 'compute-fft'))).toEqual([[[0]], [[1]], [[2]]]);
 
     for (const w of workers) ackComputeFFTs(w);
     await promise;
