@@ -143,7 +143,8 @@ export interface AnnotationBoxComponentProps {
   color?: string;
   isActive?: boolean;
   onClick?: () => void;
-  editable?: boolean; // Whether to show drag handles
+  /** Whether the two edge handles are drawn. Default false. */
+  editable?: boolean;
 }
 
 export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
@@ -155,7 +156,7 @@ export const AnnotationBox: FunctionComponent<AnnotationBoxComponentProps> = ({
   color = '#ff9800',
   isActive = false,
   onClick,
-  editable = true,
+  editable = false,
 }) => {
   const width = Math.max(0, endPosition - startPosition);
 

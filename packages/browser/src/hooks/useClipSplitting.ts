@@ -4,13 +4,10 @@ import {
   useArrangement,
   usePlaylistView,
   usePlaybackRefs,
+  usePlaylistZoom,
   useSelectedTrackId,
 } from '../contexts/playlistContexts';
 import { loadedClipsOf } from '../utils/loadedTracks';
-
-export interface UseClipSplittingOptions {
-  samplesPerPixel: number;
-}
 
 export interface UseClipSplittingResult {
   splitClipAtPlayhead: () => boolean;
@@ -22,15 +19,14 @@ export interface UseClipSplittingResult {
  *
  * Splitting is one `arrangement.splitClip()` on the provider's arrangement
  * (`useArrangement()`): an undo step, engine or not; the engine and the view
- * follow the arrangement. Throws outside `WaveformPlaylistProvider`.
+ * follow the arrangement. Throws outside `WaveformPlaylistProvider`. The
+ * split point is snapped at the provider's zoom level (`usePlaylistZoom()`).
  *
- * @param options - Configuration options
  * @returns Object with split functions
  *
  * @example
  * ```tsx
- * const { samplesPerPixel } = usePlaylistZoom();
- * const { splitClipAtPlayhead } = useClipSplitting({ samplesPerPixel });
+ * const { splitClipAtPlayhead } = useClipSplitting();
  *
  * // In keyboard handler
  * const handleKeyPress = (e: KeyboardEvent) => {
@@ -40,9 +36,9 @@ export interface UseClipSplittingResult {
  * };
  * ```
  */
-export const useClipSplitting = (options: UseClipSplittingOptions): UseClipSplittingResult => {
-  const { samplesPerPixel } = options;
+export const useClipSplitting = (): UseClipSplittingResult => {
   const arrangement = useArrangement();
+  const { samplesPerPixel } = usePlaylistZoom();
   const { sampleRate } = usePlaylistView();
   const { currentTimeRef } = usePlaybackRefs();
   const { selectedTrackId } = useSelectedTrackId();

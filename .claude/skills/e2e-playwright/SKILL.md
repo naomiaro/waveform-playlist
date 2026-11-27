@@ -54,6 +54,8 @@ For measuring a page from an ad-hoc script or an MCP browser (render counts, aud
 - **Escape in a test also reaches the Stop shortcut** when focus is on a plain button. Close a menu with its own button unless Escape is what the test is about.
 - **A probe or test that finds a control by a loose accessible name can press another control.** `probes/split768.cjs` matched `name: 'Volume'` and pressed "Master Volume": the "track volume" baselines of two sessions (16 and 33) were the master slider (real: 32 and 63; `probes/track687.cjs`). On #687 a new "Remove track" title made `getByRole('button', { name: 'Remove' }).last()` in `effects.spec.ts` remove a track. Use `exact: true`.
 
+- **Zoom In is disabled before the zoomed width commits** (`canZoomIn` is set outside `useZoomControls`' transition). A test that measures after `toBeDisabled()` can read the width of the step before: wait for `scrollWidth` itself (#932).
+
 ## Pointer and input
 
 - **A drag that ends in the bottom or top 20% of the viewport makes dnd-kit auto-scroll the page.** On #812 a page that became 31 px taller moved a track-reorder drop from y=566 to y=597 (viewport 720, band from 576): the page scrolled about 108 px mid-drag, the track landed two slots down, and the test passed 5 of 20. Scroll the drag source to mid-viewport first (`scrollIntoView({ block: 'center' })`), then read positions. To tell a regression from a flake, run the one test with `--repeat-each=20` on the head and again with the previous commit's pages (`git checkout <sha> -- website/src` under my own server, then `git restore --source=HEAD --staged --worktree -- website`): 5 of 20 against 20 of 20 named the commit. Commit before such a swap: the restore takes uncommitted edits with it.

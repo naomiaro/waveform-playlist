@@ -77,7 +77,7 @@ import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 | `orientation` | `'vertical' \| 'horizontal'` | `'vertical'` | Meter orientation |
 | `segmentCount` | `number` | `24` | Number of LED segments |
 | `dBRange` | `[number, number]` | `[-50, 5]` | dB scale range (supports above 0 dB for output meters) |
-| `showScale` | `boolean` | `true` | Show dB scale labels |
+| `hideScale` | `boolean` | `false` | Hide the dB scale labels |
 | `colorStops` | `ColorStop[]` | Built-in | Custom color scheme |
 | `segmentWidth` | `number` | `20` | Segment width in pixels |
 | `segmentHeight` | `number` | `8` | Segment height in pixels |
@@ -303,7 +303,7 @@ By default, inactive segments are a flat dark color. Enable `coloredInactive` to
   segmentWidth={30}
   segmentHeight={6}
   dBRange={[-60, 5]}
-  showScale={false}
+  hideScale
 />
 ```
 

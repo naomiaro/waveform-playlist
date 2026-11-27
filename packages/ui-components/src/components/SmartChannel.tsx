@@ -23,8 +23,6 @@ export interface SmartChannelProps {
   gain?: number;
   /** Render mode: waveform, spectrogram, or both */
   renderMode?: RenderMode;
-  /** Samples per pixel at current zoom level */
-  samplesPerPixel?: number;
   /** Clip ID for spectrogram canvas registration */
   spectrogramClipId?: string;
   /** Single-call registration for spectrogram canvases (from SpectrogramIntegration). */
@@ -54,7 +52,6 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
   isSelected,
   transparentBackground,
   renderMode = 'waveform',
-  samplesPerPixel: sppProp,
   spectrogramClipId,
   spectrogramOnCanvasRegister,
   spectrogramOnCanvasUnregister,
@@ -71,11 +68,10 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
     barWidth,
     barGap,
     roundedBars,
-    samplesPerPixel: contextSpp,
+    samplesPerPixel,
     sampleRate: contextSampleRate,
   } = usePlaylistInfo();
   const devicePixelRatio = useDevicePixelRatio();
-  const samplesPerPixel = sppProp ?? contextSpp;
 
   // Use selected colors if track is selected
   const waveOutlineColor =
@@ -120,7 +116,6 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
         length={props.length}
         waveHeight={waveHeight}
         devicePixelRatio={devicePixelRatio}
-        samplesPerPixel={samplesPerPixel}
         clipId={spectrogramClipId}
         onCanvasRegister={spectrogramOnCanvasRegister}
         onCanvasUnregister={spectrogramOnCanvasUnregister}
@@ -142,7 +137,6 @@ export const SmartChannel: FunctionComponent<SmartChannelProps> = ({
           length={props.length}
           waveHeight={halfHeight}
           devicePixelRatio={devicePixelRatio}
-          samplesPerPixel={samplesPerPixel}
           clipId={spectrogramClipId}
           onCanvasRegister={spectrogramOnCanvasRegister}
           onCanvasUnregister={spectrogramOnCanvasUnregister}

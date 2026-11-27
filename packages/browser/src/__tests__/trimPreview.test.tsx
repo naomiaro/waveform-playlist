@@ -81,6 +81,7 @@ import { TestProvider, testArrangement } from './helpers/arrangementProvider';
 import {
   ArrangementContext,
   PlaylistViewContext,
+  PlaylistZoomContext,
   TrimPreviewContext,
   useEngineRefs,
   usePlaylistTimeline,
@@ -573,17 +574,19 @@ function renderHandlers(
     moveClip: vi.fn(),
   };
   const view = { sampleRate: SAMPLE_RATE, mono: false, indefinitePlayback: false };
+  const zoom = { samplesPerPixel: SPP, canZoomIn: false, canZoomOut: false };
   const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <ArrangementContext value={engine as unknown as Arrangement}>
       <PlaylistViewContext value={view}>
-        <TrimPreviewContext value={handle}>{children}</TrimPreviewContext>
+        <PlaylistZoomContext value={zoom}>
+          <TrimPreviewContext value={handle}>{children}</TrimPreviewContext>
+        </PlaylistZoomContext>
       </PlaylistViewContext>
     </ArrangementContext>
   );
   const hook = renderHook(
     () =>
       useClipDragHandlers({
-        samplesPerPixel: SPP,
         snapSamplePosition: options.snapSamplePosition,
       }),
     { wrapper }

@@ -17,7 +17,7 @@ describe('Playlist className', () => {
   it('puts className on the outermost element, next to the state attribute', () => {
     const { container } = render(
       <ThemeProvider theme={defaultTheme}>
-        <Playlist theme={defaultTheme} className="my-playlist" data-playlist-state="ready" />
+        <Playlist className="my-playlist" data-playlist-state="ready" />
       </ThemeProvider>
     );
     const root = container.firstElementChild as HTMLElement;

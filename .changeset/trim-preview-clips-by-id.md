@@ -10,7 +10,7 @@ A clip trim now previews in the view and changes the tracks once, on release. Wh
 Breaking:
 
 - `useEngineRefs().isDraggingRef` is removed, with no replacement. An app with its own trim gesture keeps the gesture in its own state and makes one `arrangement.trimClip()` on release.
-- `useClipDragHandlers` no longer takes `onTracksChange` or `isDraggingRef` (its options are `samplesPerPixel` and `snapSamplePosition`: see the changeset of the provider's `arrangement` prop). A move and a trim are one call each and no longer open a transaction.
+- `useClipDragHandlers` no longer takes `onTracksChange` or `isDraggingRef` (its one option is `snapSamplePosition`; the zoom level is read from the provider since #828: see the changeset of the provider's `arrangement` prop). A move and a trim are one call each and no longer open a transaction.
 - `useClipSplitting().splitClipAt` takes `(trackId, clipId, splitTime)` instead of `(trackIndex, clipIndex, splitTime)`; an unknown id returns `false`. The clip drags (`useClipDragHandlers`, `ClipCollisionModifier`) find a clip by its `clipId`, and `clipIndex` of the drag data is no longer read.
 
 Also visible:

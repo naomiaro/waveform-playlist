@@ -119,7 +119,7 @@ Under either provider:
 | Hook | Exposes | Re-renders on |
 |------|---------|---------------|
 | `usePlaybackRate` | `playbackRate`, `setPlaybackRate` | the speed changing |
-| `useMediaElementTrack` | `duration`, `isReady`, `peaksDataArray`, `fadeIn`, `fadeOut`, `playoutRef` (the player) | the track or the zoom level changing, the player becoming ready |
+| `useMediaElementTrack` | `duration`, `isReady`, `peaksDataArray` (its clip carries the fades), `playoutRef` (the player) | the track or the zoom level changing, the player becoming ready |
 
 `usePlaylistTimeline` and `usePlaylistMixer` change during an interaction; call them in the smallest component that needs them. `usePlaybackRefs` and `useEngineRefs` never re-render the component that calls them: read a ref's `.current` in a handler, an effect or a frame callback.
 

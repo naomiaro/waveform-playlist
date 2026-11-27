@@ -24,7 +24,6 @@ describe('SpectrogramChannel and the range of the audio it is drawn for', () => 
     index: 0,
     length: 1500,
     waveHeight: 80,
-    samplesPerPixel: 1000,
     clipId: 'clip',
     onCanvasUnregister: () => {},
   };

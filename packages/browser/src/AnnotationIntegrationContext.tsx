@@ -76,8 +76,6 @@ export interface AnnotationIntegration {
 
 export const AnnotationIntegrationContext = createContext<AnnotationIntegration | null>(null);
 
-export const AnnotationIntegrationProvider = AnnotationIntegrationContext.Provider;
-
 /**
  * Hook to access annotation integration provided by @waveform-playlist/annotations.
  * Throws if used without <AnnotationProvider> wrapping the component tree.

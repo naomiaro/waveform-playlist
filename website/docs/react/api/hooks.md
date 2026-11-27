@@ -53,13 +53,6 @@ import {
   // Specialized hooks
   useTimeFormat,
 
-  // Engine-delegation hooks (internal, used by provider)
-  useSelectionState,
-  useLoopState,
-  useSelectedTrack,
-  useZoomControls,
-  useMasterVolume,
-
   // Drag & drop
   useClipDragHandlers,
   useDragSensors,
@@ -139,7 +132,7 @@ These hooks read the nearest playlist provider. Each one returns a group of fiel
 | Hook | Returns | The component re-renders on |
 | --- | --- | --- |
 | [`usePlaybackRate()`](#useplaybackrate) | `playbackRate`, `setPlaybackRate` | the speed changing |
-| [`useMediaElementTrack()`](#usemediaelementtrack) | `duration`, `isReady`, `peaksDataArray`, `fadeIn`, `fadeOut`, `playoutRef` | the track or the zoom level changing, the player becoming ready |
+| [`useMediaElementTrack()`](#usemediaelementtrack) | `duration`, `isReady`, `peaksDataArray`, `playoutRef` | the track or the zoom level changing, the player becoming ready |
 
 A hook of the first group throws outside both providers: `useIsPlaying must be used within WaveformPlaylistProvider or MediaElementPlaylistProvider`. A hook of the other two groups throws outside its provider, and also when the nearest playlist provider is of the other kind, even if a provider of the right kind is further out: `useLoop needs WaveformPlaylistProvider, and the nearest playlist provider here is MediaElementPlaylistProvider, which does not provide it`. When providers are nested, every hook reads the nearest one.
 
@@ -198,7 +191,7 @@ interface PlaylistSettingsContextValue {
 
 ### usePlaylistZoom
 
-The zoom level. The value changes on a zoom. Under `MediaElementPlaylistProvider` the level is fixed: `canZoomIn` and `canZoomOut` are always `false`.
+The zoom level. The value changes on a zoom. Under `MediaElementPlaylistProvider` the level is its `samplesPerPixel` prop (followed, no finer than the waveform data): `canZoomIn` and `canZoomOut` are always `false`.
 
 ```typescript
 function usePlaylistZoom(): PlaylistZoomContextValue;
@@ -513,8 +506,6 @@ interface MediaElementTrackContextValue {
   isReady: boolean;
   /** One track with one clip (`[]` when the peak data could not be read). The clip carries the track's fadeIn / fadeOut. */
   peaksDataArray: TrackClipPeaks[];
-  fadeIn?: FadeConfig;
-  fadeOut?: FadeConfig;
   /** The player. `current` is null until it has been created. */
   playoutRef: RefObject<MediaElementPlayout | null>;
 }
@@ -1197,137 +1188,6 @@ function MyGrip() {
 
 ---
 
-## useZoomControls
-
-Zoom state management with engine delegation. Internal hook used by the provider — delegates `zoomIn()` / `zoomOut()` to the engine and mirrors state via `onEngineState()`.
-
-### Signature
-
-```typescript
-function useZoomControls(props: {
-  engineRef: RefObject<PlaylistEngine | null>;
-  initialSamplesPerPixel: number;
-}): {
-  samplesPerPixel: number;
-  zoomIn: () => void;
-  zoomOut: () => void;
-  canZoomIn: boolean;
-  canZoomOut: boolean;
-  onEngineState: (state: EngineState) => void;
-};
-```
-
-Note: For zooming in consumer components, use `zoomIn()` and `zoomOut()` from `useEditorControls()`, or the `ZoomInButton` / `ZoomOutButton` components. The `canZoomIn` / `canZoomOut` / `samplesPerPixel` values are also available from `usePlaylistZoom()`.
-
-### Example
-
-```tsx
-function ZoomControls() {
-  const { zoomIn, zoomOut } = useEditorControls();
-  const { canZoomIn, canZoomOut, samplesPerPixel } = usePlaylistZoom();
-
-  return (
-    <div>
-      <button onClick={zoomIn} disabled={!canZoomIn}>+</button>
-      <span>{samplesPerPixel} spp</span>
-      <button onClick={zoomOut} disabled={!canZoomOut}>-</button>
-    </div>
-  );
-}
-```
-
----
-
-## useMasterVolume
-
-Master volume state with engine delegation. Internal hook used by the provider.
-
-### Signature
-
-```typescript
-function useMasterVolume(props: {
-  engineRef: RefObject<PlaylistEngine | null>;
-  initialVolume?: number;  // Default: 1.0
-}): {
-  masterVolume: number;
-  setMasterVolume: (volume: number) => void;
-  masterVolumeRef: RefObject<number>;
-  onEngineState: (state: EngineState) => void;
-};
-```
-
-Note: For consumer components, use `setMasterVolume()` from `useEditorControls()` and `masterVolume` from `usePlaylistMixer()`, or the `MasterVolumeControl` component.
-
----
-
-## Engine-Delegation Hooks
-
-These hooks follow the **onEngineState pattern**: they delegate mutations to `PlaylistEngine` methods and mirror engine state into React via an `onEngineState()` callback. They are used internally by `WaveformPlaylistProvider` but can be useful for advanced custom providers.
-
-:::tip Using the engine without React?
-For Svelte, Vue, vanilla JS, or headless editing, see [Using the Engine Directly](/docs/framework-agnostic/engine) — the `PlaylistEngine` class works without any framework.
-:::
-
-### useSelectionState
-
-Selection state (start/end) with engine delegation.
-
-```typescript
-function useSelectionState(props: {
-  engineRef: RefObject<PlaylistEngine | null>;
-}): {
-  selectionStart: number;
-  selectionEnd: number;
-  setSelection: (start: number, end: number) => void;
-  selectionStartRef: RefObject<number>;
-  selectionEndRef: RefObject<number>;
-  onEngineState: (state: EngineState) => void;
-};
-```
-
-Note: For consumer components, use `setSelection()` from `usePlaybackControls()` and `selectionStart` / `selectionEnd` from `useSelection()`.
-
-### useLoopState
-
-Loop region state with engine delegation.
-
-```typescript
-function useLoopState(props: {
-  engineRef: RefObject<PlaylistEngine | null>;
-}): {
-  isLoopEnabled: boolean;
-  loopStart: number;
-  loopEnd: number;
-  setLoopEnabled: (enabled: boolean) => void;
-  setLoopRegion: (start: number, end: number) => void;
-  isLoopEnabledRef: RefObject<boolean>;
-  loopStartRef: RefObject<number>;
-  loopEndRef: RefObject<number>;
-  onEngineState: (state: EngineState) => void;
-};
-```
-
-Note: For consumer components, use `setLoopEnabled()` / `setLoopRegion()` / `clearLoopRegion()` from `useEditorControls()` and loop state from `useLoop()`.
-
-### useSelectedTrack
-
-Selected track ID with engine delegation.
-
-```typescript
-function useSelectedTrack(props: {
-  engineRef: RefObject<PlaylistEngine | null>;
-}): {
-  selectedTrackId: string | null;
-  setSelectedTrackId: (trackId: string | null) => void;
-  selectedTrackIdRef: RefObject<string | null>;
-  onEngineState: (state: EngineState) => void;
-};
-```
-
-Note: For consumer components, use `setSelectedTrackId()` from `useEditorControls()` and `selectedTrackId` from `useSelectedTrackId()`.
-
----
-
 ## useTimeFormat
 
 Control time format display.
@@ -1539,10 +1399,10 @@ Edges to know: if the take's track is removed during a take as an undo step, the
 
 ### useClipDragHandlers
 
-Handles clip dragging (move) and boundary trimming on the provider's arrangement (`useArrangement()`): `WaveformPlaylistProvider` only; it throws outside one and under `MediaElementPlaylistProvider`. A move is one `arrangement.moveClip()` on drop. A trim is previewed in the view while the handle is dragged (only the dragged clip's view follows; the tracks do not change) and is one `arrangement.trimClip()` on release, so each is one undo step. Escape clears the preview and changes nothing. From `onDragStart` of a clip to its `onDragEnd` (or the unmount of the component that holds the handlers) `useEditorControls().undo()` / `redo()` do nothing (#848); a setup that calls `onDragStart` must also call `onDragEnd`, or undo stays off until that component unmounts. A move or a trim released while no engine is attached (before the first build, during a rebuild) is kept, and the next engine plays it. A move or a trim commits the clip and track picked up at drag start (by their ids), also if the row moves or other clips change position during the drag. A move whose clip is no longer in that track at the drop is dropped with a console warning. A clip still loading cannot be dragged (its placeholder has no handles). Collision detection for moves is `ClipCollisionModifier`, passed to the `modifiers` prop of `DragDropProvider`.
+Handles clip dragging (move) and boundary trimming on the provider's arrangement (`useArrangement()`): `WaveformPlaylistProvider` only; it throws outside one and under `MediaElementPlaylistProvider`. A move is one `arrangement.moveClip()` on drop. A trim is previewed in the view while the handle is dragged (only the dragged clip's view follows; the tracks do not change) and is one `arrangement.trimClip()` on release, so each is one undo step. Escape clears the preview and changes nothing. From `onDragStart` of a clip to its `onDragEnd` (or the unmount of the component that holds the handlers) `useEditorControls().undo()` / `redo()` do nothing (#848); a setup that calls `onDragStart` must also call `onDragEnd`, or undo stays off until that component unmounts. A move or a trim released while no engine is attached (before the first build, during a rebuild) is kept, and the next engine plays it. A move or a trim commits the clip and track picked up at drag start (by their ids), also if the row moves or other clips change position during the drag. A move whose clip is no longer in that track at the drop is dropped with a console warning. A clip still loading cannot be dragged (its placeholder has no handles). Collision detection for moves is `ClipCollisionModifier`, passed to the `modifiers` prop of `DragDropProvider`. A pointer move is turned into samples at the provider's zoom level (`usePlaylistZoom().samplesPerPixel`), which the hook reads itself.
 
 ```typescript
-function useClipDragHandlers(options: UseClipDragHandlersOptions): {
+function useClipDragHandlers(options?: UseClipDragHandlersOptions): {
   onDragStart: (event: DragStartEvent) => void;
   onDragMove: (event: DragMoveEvent) => void;
   onDragEnd: (event: DragEndEvent) => void;
@@ -1553,7 +1413,6 @@ function useClipDragHandlers(options: UseClipDragHandlersOptions): {
 
 ```typescript
 interface UseClipDragHandlersOptions {
-  samplesPerPixel: number;
   /** Optional snap function for boundary trims: snaps a sample position to the nearest grid line. */
   snapSamplePosition?: (samplePosition: number) => number;
 }
@@ -1579,7 +1438,7 @@ function EditablePlaylist() {
   const { samplesPerPixel } = usePlaylistZoom();
   const sensors = useDragSensors();
 
-  const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({ samplesPerPixel });
+  const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers();
 
   return (
     <DragDropProvider
@@ -1646,16 +1505,10 @@ For a custom annotation list or row of boxes: returns the previewed annotations 
 Split clips at the playhead position. Each split is one `arrangement.splitClip()` on the provider's arrangement (`useArrangement()`): an undo step, kept also while no engine is attached; the engine and the view follow the arrangement. `WaveformPlaylistProvider` only: it throws outside one and under `MediaElementPlaylistProvider`.
 
 ```typescript
-function useClipSplitting(options: UseClipSplittingOptions): UseClipSplittingResult;
+function useClipSplitting(): UseClipSplittingResult;
 ```
 
-#### Options
-
-```typescript
-interface UseClipSplittingOptions {
-  samplesPerPixel: number;
-}
-```
+The split point is snapped at the provider's zoom level (`usePlaylistZoom().samplesPerPixel`), which the hook reads itself.
 
 #### Returns
 
@@ -1672,8 +1525,7 @@ interface UseClipSplittingResult {
 
 ```tsx
 function SplitButton() {
-  const { samplesPerPixel } = usePlaylistZoom();
-  const { splitClipAtPlayhead } = useClipSplitting({ samplesPerPixel });
+  const { splitClipAtPlayhead } = useClipSplitting();
 
   return (
     <button onClick={splitClipAtPlayhead}>

@@ -32,3 +32,4 @@ export {
   SliderWrapper,
 };
 export type { ReorderRailProps } from './ReorderRail';
+export type { CloseButtonProps } from './CloseButton';

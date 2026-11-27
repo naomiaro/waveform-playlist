@@ -5,7 +5,6 @@ import { useClipSplitting } from '../hooks/useClipSplitting';
 import { useAnnotationKeyboardControls } from '../hooks/useAnnotationKeyboardControls';
 import {
   useActiveAnnotation,
-  usePlaylistZoom,
   usePlaylistTimeline,
   useAnnotations,
   useAnnotationOptions,
@@ -45,8 +44,6 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
   undo: undoEnabled = false,
   additionalShortcuts = [],
 }) => {
-  // Clip splitting setup
-  const { samplesPerPixel } = usePlaylistZoom();
   const { duration } = usePlaylistTimeline();
   const { annotations: annotationList } = useAnnotations();
   const { linkEndpoints, continuousPlay } = useAnnotationOptions();
@@ -55,7 +52,7 @@ export const KeyboardShortcuts: React.FC<KeyboardShortcutsProps> = ({
     usePlaybackControls();
   const { undo, redo } = useEditorControls();
 
-  const { splitClipAtPlayhead } = useClipSplitting({ samplesPerPixel });
+  const { splitClipAtPlayhead } = useClipSplitting();
 
   // Build additional shortcuts from enabled features
   const allAdditional: KeyboardShortcut[] = [];

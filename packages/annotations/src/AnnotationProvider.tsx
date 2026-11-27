@@ -1,5 +1,5 @@
 import React from 'react';
-import { AnnotationIntegrationProvider } from '@waveform-playlist/browser';
+import { AnnotationIntegrationContext } from '@waveform-playlist/browser';
 import type { AnnotationIntegration } from '@waveform-playlist/browser';
 import { parseAeneas, serializeAeneas } from './parsers/aeneas';
 import { AnnotationText } from './components/AnnotationText';
@@ -18,8 +18,8 @@ const annotationIntegration: AnnotationIntegration = {
 
 export const AnnotationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
-    <AnnotationIntegrationProvider value={annotationIntegration}>
+    <AnnotationIntegrationContext value={annotationIntegration}>
       {children}
-    </AnnotationIntegrationProvider>
+    </AnnotationIntegrationContext>
   );
 };

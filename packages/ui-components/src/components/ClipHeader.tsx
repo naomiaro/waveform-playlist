@@ -73,8 +73,6 @@ export interface DragHandleProps {
 
 export interface ClipHeaderProps {
   clipId: string;
-  trackIndex: number;
-  clipIndex: number;
   trackName: string;
   isSelected?: boolean; // Whether the track is selected
   disableDrag?: boolean; // Disable drag behavior (for presentation-only rendering in overlays)
@@ -95,8 +93,6 @@ export interface ClipHeaderProps {
  */
 export const ClipHeader: FunctionComponent<ClipHeaderProps> = ({
   clipId,
-  trackIndex: _trackIndex,
-  clipIndex: _clipIndex,
   trackName,
   isSelected = false,
   disableDrag = false,

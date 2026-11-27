@@ -223,8 +223,8 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 
 **Key Hooks:**
 
-- `useClipDragHandlers` - Drag-to-move and boundary trimming on the provider's arrangement (`{ samplesPerPixel, snapSamplePosition? }`; no `tracks` or `engineRef` option): a move is one `arrangement.moveClip()` on drop, a trim a view-only preview and then one `arrangement.trimClip()` on release; clips found by id
-- `useClipSplitting` - Split clips at playhead (`{ samplesPerPixel }`); `splitClipAt(trackId, clipId, splitTime)` takes ids and makes one `arrangement.splitClip()`
+- `useClipDragHandlers` - Drag-to-move and boundary trimming on the provider's arrangement (`{ snapSamplePosition? }`, the zoom read from `usePlaylistZoom()`; no `tracks`, `engineRef` or `samplesPerPixel` option): a move is one `arrangement.moveClip()` on drop, a trim a view-only preview and then one `arrangement.trimClip()` on release; clips found by id
+- `useClipSplitting` - Split clips at playhead (no options: the zoom is read from `usePlaylistZoom()`); `splitClipAt(trackId, clipId, splitTime)` takes ids and makes one `arrangement.splitClip()`
 - `useKeyboardShortcuts` - Flexible keyboard shortcut system
 - `usePlaybackShortcuts` - Default playback shortcuts (0 = rewind to start)
 - `useAnnotationKeyboardControls` - Annotation navigation, editing, auto-scroll, and playback (`{ store, activeAnnotationId, … }`: the boundary keys update the store's current list, the active annotation found by id)
@@ -234,8 +234,8 @@ Uses tsup (same as all other packages). tsup auto-externalizes `dependencies` an
 - `useSelectionState` - Selection state (start/end) with engine delegation
 - `useLoopState` - Loop state (enabled, start, end) with engine delegation
 - `useSelectedTrack` - Selected track ID with engine delegation
-- `useZoomControls` - Zoom state (samplesPerPixel, canZoomIn/Out) with engine delegation
-- `useMasterVolume` - Master volume with engine delegation
+- `useZoomControls` - Zoom state (samplesPerPixel, canZoomIn/Out) with engine delegation (internal since #828, like the three above: consumers read `usePlaylistZoom()`)
+- `useMasterVolume` - Master volume with engine delegation (internal since #828: `usePlaylistMixer().masterVolume`, `useEditorControls().setMasterVolume`)
 - `useCreateArrangement`, `useArrangementTracks`, `useArrangementSources` - Over an engine `Arrangement` (`src/hooks/useCreate*.ts`, `useArrangement*.ts`; core entry). `useCreateArrangement` reads `init` and `options` once and an initializer that throws goes to the render's error boundary; the other two are `useSyncExternalStore` over `arrangement.subscribe` and `arrangement.sources` (`arrangementHooks.test.tsx`). `WaveformPlaylistProvider` takes the arrangement as its `arrangement` prop, and `useArrangement()` returns it below the provider: see "The Provider Plays an Arrangement".
 - `useRecordingSession` - Tells the provider that a take is recorded into a track while `isRecording` (`setRecordingActive` in an effect with cleanup)
 - `ClipPeaks.isPlaceholder` (required) marks the record of a clip that is still loading, built by the internal `placeholderPeaks` (`src/utils/placeholderPeaks.ts`, not exported from the entry); `ui-components`' `Clip` draws it without drag and trim handles. `WaveformPlaylistProvider` puts such a record in a track's row of `peaksDataArray` for each clip still loading that has usable `waveformData` or a `duration` (`deriveRows` in `providerInternals/useArrangementView.ts`); records of loaded clips (`derivePeaks.ts`) and every record of `MediaElementPlaylistProvider` have it `false`, and `sameClipPeaks` compares it.

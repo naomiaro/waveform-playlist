@@ -60,8 +60,6 @@ export interface SpectrogramChannelProps {
   waveHeight: number;
   /** Device pixel ratio for sharp rendering */
   devicePixelRatio?: number;
-  /** Samples per pixel at current zoom level */
-  samplesPerPixel: number;
   /** Clip ID used to construct unique canvas IDs */
   clipId: string;
   /** Single-call canvas registration. Receives the transferred OffscreenCanvas + metadata. */
@@ -111,7 +109,6 @@ export const SpectrogramChannel: FunctionComponent<SpectrogramChannelProps> = ({
   length,
   waveHeight,
   devicePixelRatio = 1,
-  samplesPerPixel: _samplesPerPixel,
   clipId,
   onCanvasRegister,
   onCanvasUnregister,

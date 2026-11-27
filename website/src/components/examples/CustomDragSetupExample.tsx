@@ -119,7 +119,7 @@ function ClipDragSetup({ touchOptimized, children }: ClipDragSetupProps) {
     onDragStart: handleDragStart,
     onDragMove,
     onDragEnd,
-  } = useClipDragHandlers({ samplesPerPixel });
+  } = useClipDragHandlers();
 
   // Select the track of the clip that is being dragged.
   const onDragStart: typeof handleDragStart = (event) => {

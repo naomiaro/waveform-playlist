@@ -1,11 +1,11 @@
 import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { SpectrogramMenuItems } from '../components/SpectrogramMenuItems';
+import { spectrogramMenuItems } from '../components/SpectrogramMenuItems';
 
 afterEach(() => cleanup());
 
-function setup(overrides: Partial<Parameters<typeof SpectrogramMenuItems>[0]> = {}) {
+function setup(overrides: Partial<Parameters<typeof spectrogramMenuItems>[0]> = {}) {
   const props = {
     renderMode: 'waveform' as const,
     onRenderModeChange: vi.fn(),
@@ -13,7 +13,7 @@ function setup(overrides: Partial<Parameters<typeof SpectrogramMenuItems>[0]> = 
     onClose: vi.fn(),
     ...overrides,
   };
-  const items = SpectrogramMenuItems(props);
+  const items = spectrogramMenuItems(props);
   // Render each item's content so we can interact with it.
   render(
     <div>
@@ -25,7 +25,7 @@ function setup(overrides: Partial<Parameters<typeof SpectrogramMenuItems>[0]> = 
   return { props, items };
 }
 
-describe('SpectrogramMenuItems', () => {
+describe('spectrogramMenuItems', () => {
   it('returns a display item and a settings item', () => {
     const { items } = setup();
     expect(items.map((i) => i.id)).toEqual(['spectrogram-display', 'spectrogram-settings']);
@@ -55,7 +55,7 @@ describe('SpectrogramMenuItems', () => {
 
   it('does not require an onClose handler', () => {
     const onRenderModeChange = vi.fn();
-    const items = SpectrogramMenuItems({
+    const items = spectrogramMenuItems({
       renderMode: 'waveform',
       onRenderModeChange,
       onOpenSettings: vi.fn(),

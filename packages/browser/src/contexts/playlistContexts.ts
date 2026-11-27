@@ -13,7 +13,7 @@
 import { createContext, use } from 'react';
 import type { ClipTrack, AnnotationData, AnnotationStore } from '@waveform-playlist/core';
 import type { Arrangement, MixerChangeOptions, PlaylistEngine } from '@waveform-playlist/engine';
-import type { MediaElementPlayout, FadeConfig } from '@waveform-playlist/media-element-playout';
+import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
 import type { TimeFormat } from '@waveform-playlist/ui-components';
 import type { AnnotationPreviewHandle } from '../hooks/useAnnotationDragHandlers';
 import type { FrameData } from '../providerInternals/useFrameCallbacks';
@@ -226,7 +226,8 @@ export interface PlaylistSettingsContextValue {
 
 /**
  * The zoom level (#768). Changes on a zoom. Under the MediaElement provider
- * the level is fixed: `canZoomIn` and `canZoomOut` are always false.
+ * the level is its `samplesPerPixel` prop (followed, no finer than the
+ * waveform data); `canZoomIn` and `canZoomOut` are always false.
  */
 export interface PlaylistZoomContextValue {
   samplesPerPixel: number;
@@ -437,8 +438,6 @@ export interface MediaElementTrackContextValue {
   isReady: boolean;
   /** One track with one clip (`[]` when the peak data could not be read). The clip carries the track's fadeIn / fadeOut. */
   peaksDataArray: TrackClipPeaks[];
-  fadeIn?: FadeConfig;
-  fadeOut?: FadeConfig;
   /** The player. `current` is null until it has been created. */
   playoutRef: React.RefObject<MediaElementPlayout | null>;
 }
@@ -666,7 +665,7 @@ export const useRecordingTrack = () =>
 export const usePlaybackRate = () => useSlot(PlaybackRateContext, 'usePlaybackRate', MEDIA_ELEMENT);
 
 /**
- * `{ duration, isReady, peaksDataArray, fadeIn, fadeOut, playoutRef }`: the
+ * `{ duration, isReady, peaksDataArray, playoutRef }`: the
  * one track of a MediaElement player. MediaElementPlaylistProvider only.
  */
 export const useMediaElementTrack = () =>

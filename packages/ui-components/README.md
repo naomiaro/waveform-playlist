@@ -41,7 +41,6 @@ function TrackMeter({ levels }: { levels: number[] }) {
       levels={levels}
       channelLabels={['L', 'R']}
       orientation="vertical"
-      showScale
     />
   );
 }

@@ -22,8 +22,6 @@ describe('ClipBoundary hover', () => {
       <Profiler id="boundary" onRender={() => commits++}>
         <ClipBoundary
           clipId="clip-1"
-          trackIndex={0}
-          clipIndex={0}
           edge="left"
           dragHandleProps={{ ref: () => {}, isDragging: false }}
         />
@@ -42,7 +40,7 @@ describe('ClipBoundary hover', () => {
   });
 
   it('still switches class while dragging', () => {
-    const props = { clipId: 'clip-1', trackIndex: 0, clipIndex: 0, edge: 'right' as const };
+    const props = { clipId: 'clip-1', edge: 'right' as const };
     const ref = () => {};
     const { container, rerender } = render(
       <ClipBoundary {...props} dragHandleProps={{ ref, isDragging: false }} />

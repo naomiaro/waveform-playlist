@@ -917,7 +917,6 @@ describe('what #769 shares between the providers stays internal', () => {
       'useAnnotationState',
       'useScrollFollow',
       'useViewDefaults',
-      'useRequiredContext',
       'followAnnotations',
       'centrePlayhead',
     ]) {

@@ -26,7 +26,7 @@ export { useDragSensors } from './useDragSensors';
 export type { DragSensorOptions } from './useDragSensors';
 
 export { useClipSplitting } from './useClipSplitting';
-export type { UseClipSplittingOptions, UseClipSplittingResult } from './useClipSplitting';
+export type { UseClipSplittingResult } from './useClipSplitting';
 
 export { useKeyboardShortcuts } from './useKeyboardShortcuts';
 export type { UseKeyboardShortcutsOptions } from './useKeyboardShortcuts';

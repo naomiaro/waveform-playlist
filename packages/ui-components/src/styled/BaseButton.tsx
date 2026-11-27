@@ -37,30 +37,3 @@ export const BaseButton = styled.button`
     cursor: not-allowed;
   }
 `;
-
-/**
- * BaseButtonSmall - A smaller variant for compact layouts
- */
-export const BaseButtonSmall = styled(BaseButton)`
-  padding: 0.25rem 0.5rem;
-  font-size: ${(props) => props.theme.fontSizeSmall};
-`;
-
-/**
- * IconButton - A square button for icons
- */
-export const IconButton = styled(BaseButton)`
-  padding: 0.5rem;
-  min-width: 2.25rem;
-  min-height: 2.25rem;
-`;
-
-/**
- * IconButtonSmall - A smaller square button for icons
- */
-export const IconButtonSmall = styled(BaseButton)`
-  padding: 0.25rem;
-  min-width: 1.75rem;
-  min-height: 1.75rem;
-  font-size: ${(props) => props.theme.fontSizeSmall};
-`;

@@ -32,10 +32,10 @@ import {
 } from './spectrogram-helpers';
 import { createAudioKeyOf, spectrogramAudio, channelData } from './audioRegistration';
 import { useStableByContent } from './useStableByContent';
-import { SpectrogramMenuItems } from './components';
+import { spectrogramMenuItems } from './components';
 import { SpectrogramSettingsModal } from './components';
 import {
-  SpectrogramIntegrationProvider,
+  SpectrogramIntegrationContext,
   type SpectrogramIntegration,
 } from '@waveform-playlist/browser';
 import {
@@ -686,7 +686,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
       onOpenSettings: () => void;
       onClose?: () => void;
     }) => {
-      return SpectrogramMenuItems({
+      return spectrogramMenuItems({
         renderMode: props.renderMode as RenderMode,
         onRenderModeChange: props.onRenderModeChange,
         onOpenSettings: props.onOpenSettings,
@@ -722,5 +722,5 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     ]
   );
 
-  return <SpectrogramIntegrationProvider value={value}>{children}</SpectrogramIntegrationProvider>;
+  return <SpectrogramIntegrationContext value={value}>{children}</SpectrogramIntegrationContext>;
 };

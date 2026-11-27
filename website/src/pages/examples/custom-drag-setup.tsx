@@ -58,7 +58,8 @@ export default function CustomDragSetupExamplePage(): React.ReactElement {
           }}>
 {`const sensors = useDragSensors({ touchOptimized });
 const { tracks } = usePlaylistTimeline();
-const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({ samplesPerPixel });
+const { samplesPerPixel } = usePlaylistZoom();
+const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers();
 
 <DragDropProvider
   sensors={sensors}

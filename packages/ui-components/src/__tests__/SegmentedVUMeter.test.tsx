@@ -42,14 +42,14 @@ describe('SegmentedVUMeter', () => {
     expect(channels.length).toBe(1);
   });
 
-  it('renders dB scale labels when showScale is true', () => {
-    renderWithTheme(<SegmentedVUMeter levels={[0.5, 0.3]} showScale />);
+  it('renders dB scale labels by default', () => {
+    renderWithTheme(<SegmentedVUMeter levels={[0.5, 0.3]} />);
     // Check that at least one numeric dB label is rendered
     expect(screen.getByText('5')).toBeTruthy();
   });
 
-  it('hides dB scale labels when showScale is false', () => {
-    renderWithTheme(<SegmentedVUMeter levels={[0.5, 0.3]} showScale={false} />);
+  it('hides dB scale labels with hideScale', () => {
+    renderWithTheme(<SegmentedVUMeter levels={[0.5, 0.3]} hideScale />);
     // Should not have scale column
     expect(screen.queryByText('-20')).toBeNull();
   });

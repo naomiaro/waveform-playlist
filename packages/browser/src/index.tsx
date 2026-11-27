@@ -1,10 +1,18 @@
 // Export new flexible/headless API
 export { WaveformPlaylistProvider } from './WaveformPlaylistContext';
-export type { TrackState, ClipPeaks, TrackClipPeaks } from './WaveformPlaylistContext';
+export type {
+  WaveformPlaylistProviderProps,
+  TrackState,
+  ClipPeaks,
+  TrackClipPeaks,
+} from './WaveformPlaylistContext';
 
 // Export MediaElement-based provider (single-track with playback rate control)
 export { MediaElementPlaylistProvider } from './MediaElementPlaylistContext';
-export type { MediaElementTrackConfig } from './MediaElementPlaylistContext';
+export type {
+  MediaElementPlaylistProviderProps,
+  MediaElementTrackConfig,
+} from './MediaElementPlaylistContext';
 
 // The context hooks (#688). Under either provider:
 export {
@@ -68,9 +76,7 @@ export {
   useClipSplitting,
   useKeyboardShortcuts,
   usePlaybackShortcuts,
-  useZoomControls,
   useTimeFormat,
-  useMasterVolume,
   useCreateArrangement,
   useArrangementTracks,
   useArrangementSources,
@@ -80,9 +86,10 @@ export {
 export type {
   UsePlaybackShortcutsOptions,
   UsePlaybackShortcutsReturn,
-  ZoomControls,
+  UseKeyboardShortcutsOptions,
+  UseClipSplittingResult,
+  DragSensorOptions,
   TimeFormatControls,
-  MasterVolumeControls,
   UseCreateArrangementOptions,
 } from './hooks';
 
@@ -164,14 +171,14 @@ export type { GetAnnotationBoxLabelFn } from './types/annotations';
 
 // Annotation integration context (for optional annotation support)
 export {
-  AnnotationIntegrationProvider,
+  AnnotationIntegrationContext,
   useAnnotationIntegration,
 } from './AnnotationIntegrationContext';
 export type { AnnotationIntegration } from './AnnotationIntegrationContext';
 
 // Spectrogram integration context (for optional spectrogram support)
 export {
-  SpectrogramIntegrationProvider,
+  SpectrogramIntegrationContext,
   useSpectrogramIntegration,
 } from './SpectrogramIntegrationContext';
 export type { SpectrogramIntegration } from './SpectrogramIntegrationContext';

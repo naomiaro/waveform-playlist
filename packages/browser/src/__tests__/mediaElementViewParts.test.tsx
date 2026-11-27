@@ -386,8 +386,9 @@ describe('fades are the clip’s', () => {
     const clip = trackValue.peaksDataArray[0][0];
     expect(clip.fadeIn).toEqual({ duration: 1, type: 'linear' });
     expect(clip.fadeOut).toEqual({ duration: 2, type: 'sCurve' });
-    // Still the provider's fields.
-    expect(trackValue.fadeIn).toEqual({ duration: 1, type: 'linear' });
+    // The clip is the one place (#828): the track value has no copy.
+    expect('fadeIn' in trackValue).toBe(false);
+    expect('fadeOut' in trackValue).toBe(false);
   });
 
   it('no fade is drawn without showFades', async () => {
@@ -466,7 +467,7 @@ describe('fades are the clip’s', () => {
     );
     const clipBefore = trackValue.peaksDataArray[0][0];
     const arrayBefore = trackValue.peaksDataArray;
-    const fadeInBefore = trackValue.fadeIn;
+    const fadeInBefore = clipBefore.fadeIn;
     const valueBefore = trackValue;
 
     await act(async () => {
@@ -475,7 +476,7 @@ describe('fades are the clip’s', () => {
     await act(async () => {});
     expect(trackValue.peaksDataArray).toBe(arrayBefore);
     // The hook's value does not change either, and hands out the first objects.
-    expect(trackValue.fadeIn).toBe(fadeInBefore);
+    expect(trackValue.peaksDataArray[0][0].fadeIn).toBe(fadeInBefore);
     expect(trackValue).toBe(valueBefore);
     expect(trackValue.peaksDataArray[0][0]).toBe(clipBefore);
     expect(created).toHaveBeenCalledTimes(1);

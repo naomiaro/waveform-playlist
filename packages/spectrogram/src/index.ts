@@ -1,6 +1,6 @@
 // React surface — computation/worker primitives live in @dawcore/spectrogram.
-export { SpectrogramMenuItems } from './components';
-export type { SpectrogramMenuItemsProps } from './components';
+export { spectrogramMenuItems } from './components';
+export type { SpectrogramMenuItemsOptions } from './components';
 export { SpectrogramSettingsModal } from './components';
 export type { SpectrogramSettingsModalProps } from './components';
 

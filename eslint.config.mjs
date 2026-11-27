@@ -101,8 +101,10 @@ export default [
     // `<X.Consumer>`. The other two match a call by its name: an aliased import
     // (`useContext as read`) is not reported. The React version is set here
     // because the plugin otherwise looks `react` up from the working directory
-    // and turns these rules off for a version below 19. The aliases `AnnotationIntegrationProvider` and
-    // `SpectrogramIntegrationProvider` are public names and stay.
+    // and turns these rules off for a version below 19. The two integration
+    // contexts are provided as `<XContext value>` since #828 (their
+    // `…Provider` aliases were removed), so a `<…Context.Provider>` of either
+    // would be reported by `no-context-provider`.
     plugins: {
       '@eslint-react': eslintReact,
     },

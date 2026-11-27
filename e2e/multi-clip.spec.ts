@@ -34,6 +34,103 @@ test.describe('Multi-Clip Example', () => {
     }).toPass({ timeout: 10000 });
   });
 
+  // #828: a zoom keeps the time under a pointer hovering over the timeline,
+  // else a selected range on screen, else the cursor on screen, else the
+  // centre. A click on a zoom button puts the pointer on the button; with
+  // nothing selected and the cursor at 0 (off screen here), the centre stays.
+  // (Zoom In is disabled after two clicks on this page: the last zoom level.)
+  test('a zoom button keeps the time at the centre of the view where it is', async ({ page }) => {
+    const zoomIn = page.getByRole('button', { name: 'Zoom In' });
+    const container = page.locator('[data-scroll-container]').first();
+    const startWidth = await container.evaluate((el) => el.scrollWidth);
+    await zoomIn.click();
+    await zoomIn.click();
+    // The last zoom level. The button is disabled before the new width
+    // commits (the zoom is a transition), so wait for the width: two steps
+    // make the timeline four times as wide.
+    await expect(zoomIn).toBeDisabled();
+    await expect(async () => {
+      expect(await container.evaluate((el) => el.scrollWidth)).toBeGreaterThan(startWidth * 3.5);
+    }).toPass({ timeout: 5000 });
+    // Scroll to the middle of the timeline.
+    await expect(async () => {
+      const scrolled = await container.evaluate((el) => {
+        el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+        return el.scrollLeft;
+      });
+      expect(scrolled).toBeGreaterThan(100);
+    }).toPass({ timeout: 5000 });
+    const centreShare = () =>
+      container.evaluate((el) => (el.scrollLeft + el.clientWidth / 2) / el.scrollWidth);
+    const before = await centreShare();
+    const widthBefore = await container.evaluate((el) => el.scrollWidth);
+    await page.getByRole('button', { name: 'Zoom Out' }).click();
+    await expect(async () => {
+      expect(await container.evaluate((el) => el.scrollWidth)).toBeLessThan(widthBefore * 0.75);
+      expect(Math.abs((await centreShare()) - before)).toBeLessThan(0.005);
+    }).toPass({ timeout: 5000 });
+  });
+
+  // #828: without a pointer over the timeline, a selected range on screen is
+  // the anchor (before the cursor and the centre). The range is near the left
+  // of the view, so keeping the centre would move it about 120 px.
+  test('a zoom button keeps a selected range where it is on screen', async ({ page }) => {
+    const zoomIn = page.getByRole('button', { name: 'Zoom In' });
+    const container = page.locator('[data-scroll-container]').first();
+    const startWidth = await container.evaluate((el) => el.scrollWidth);
+    await zoomIn.click();
+    await zoomIn.click();
+    // The last zoom level. The button is disabled before the new width
+    // commits (the zoom is a transition), so wait for the width: two steps
+    // make the timeline four times as wide.
+    await expect(zoomIn).toBeDisabled();
+    await expect(async () => {
+      expect(await container.evaluate((el) => el.scrollWidth)).toBeGreaterThan(startWidth * 3.5);
+    }).toPass({ timeout: 5000 });
+    await expect(async () => {
+      const scrolled = await container.evaluate((el) => {
+        el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+        return el.scrollLeft;
+      });
+      expect(scrolled).toBeGreaterThan(100);
+    }).toPass({ timeout: 5000 });
+    const row = page.locator('[data-track-row]').first();
+    await row.scrollIntoViewIfNeeded();
+    let frame: { x: number; y: number; width: number; height: number } | null = null;
+    let rowBox: { x: number; y: number; width: number; height: number } | null = null;
+    await expect(async () => {
+      frame = await container.boundingBox();
+      rowBox = await row.boundingBox();
+      expect(frame).toBeTruthy();
+      expect(rowBox).toBeTruthy();
+    }).toPass({ timeout: 5000 });
+    const y = rowBox!.y + rowBox!.height - 10;
+    const startX = frame!.x + 150;
+    await page.mouse.move(startX, y);
+    await page.mouse.down();
+    await page.mouse.move(startX + 120, y, { steps: 6 });
+    await page.mouse.up();
+
+    const selection = page.locator('[data-selection]').first();
+    const centreX = async () => {
+      const box = await selection.boundingBox();
+      expect(box).toBeTruthy();
+      return box!.x + box!.width / 2;
+    };
+    let before = 0;
+    await expect(async () => {
+      before = await centreX();
+      expect(Math.abs(before - (startX + 60))).toBeLessThanOrEqual(3);
+    }).toPass({ timeout: 5000 });
+
+    await page.getByRole('button', { name: 'Zoom Out' }).click();
+    await expect(async () => {
+      const box = await selection.boundingBox();
+      expect(box!.width).toBeLessThan(80);
+      expect(Math.abs((await centreX()) - before)).toBeLessThanOrEqual(2);
+    }).toPass({ timeout: 5000 });
+  });
+
   test.describe('Playhead Positioning', () => {
     test('clicking on waveform area moves playhead', async ({ page }) => {
       // Get the first clip container - this ensures we click on actual waveform content

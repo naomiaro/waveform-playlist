@@ -62,7 +62,7 @@ class RecordingWorker {
 }
 
 vi.mock('@waveform-playlist/browser', () => ({
-  SpectrogramIntegrationProvider: ({
+  SpectrogramIntegrationContext: ({
     value,
     children,
   }: {

@@ -21,7 +21,7 @@ export interface SegmentedVUMeterProps {
   orientation?: 'vertical' | 'horizontal';
   segmentCount?: number;
   dBRange?: [number, number];
-  showScale?: boolean;
+  hideScale?: boolean;
   colorStops?: ColorStop[];
   segmentWidth?: number;
   segmentHeight?: number;
@@ -244,7 +244,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
   orientation = 'vertical',
   segmentCount = 24,
   dBRange = [-50, 5],
-  showScale = true,
+  hideScale = false,
   colorStops = DEFAULT_COLOR_STOPS,
   segmentWidth = 20,
   segmentHeight = 8,
@@ -488,7 +488,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
           data-meter-orientation={orientation}
         >
           {Array.from({ length: channelCount }, (_, i) => renderChannel(i))}
-          {showScale && renderScale()}
+          {!hideScale && renderScale()}
         </MeterContainer>
       );
     }
@@ -506,7 +506,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
         data-meter-orientation={orientation}
       >
         {leftChannels.map(renderChannel)}
-        {showScale && renderScale()}
+        {!hideScale && renderScale()}
         {rightChannels.map(renderChannel)}
       </MeterContainer>
     );
@@ -522,7 +522,7 @@ const SegmentedVUMeterInner: React.FC<SegmentedVUMeterProps> = ({
       data-meter-orientation={orientation}
     >
       {renderChannel(0)}
-      {showScale && renderScale()}
+      {!hideScale && renderScale()}
     </MeterContainer>
   );
 };

@@ -19,6 +19,7 @@ let currentTime = 0;
 vi.mock('../contexts/playlistContexts', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../contexts/playlistContexts')>()),
   usePlaylistView: () => ({ sampleRate: SAMPLE_RATE }),
+  usePlaylistZoom: () => ({ samplesPerPixel: 1000, canZoomIn: false, canZoomOut: false }),
   usePlaybackRefs: () => ({ currentTimeRef: { current: currentTime } }),
   useSelectedTrackId: () => ({ selectedTrackId }),
 }));
@@ -92,7 +93,7 @@ function withArrangement(
 describe('splitClipAt by ids', () => {
   function setup() {
     const engine = fakeArrangement();
-    const { result } = renderHook(() => useClipSplitting({ samplesPerPixel: 1000 }), {
+    const { result } = renderHook(() => useClipSplitting(), {
       wrapper: withArrangement(engine),
     });
     return { engine, result };
@@ -129,7 +130,7 @@ describe('a drag whose clipIndex does not match the clip', () => {
   function setup(tracks = makeTracks()) {
     const engine = fakeArrangement(tracks);
     const preview = createValueSource<TrimPreview | null>(null);
-    const hook = renderHook(() => useClipDragHandlers({ samplesPerPixel: 1000 }), {
+    const hook = renderHook(() => useClipDragHandlers(), {
       wrapper: withArrangement(engine, preview),
     });
     const setTracks = (next: ClipTrack[]) => {
@@ -238,7 +239,7 @@ describe('a drag follows its clip and its track by id', () => {
   function setup() {
     const engine = fakeArrangement();
     const preview = createValueSource<TrimPreview | null>(null);
-    const hook = renderHook(() => useClipDragHandlers({ samplesPerPixel: 1000 }), {
+    const hook = renderHook(() => useClipDragHandlers(), {
       wrapper: withArrangement(engine, preview),
     });
     const setTracks = (next: ClipTrack[]) => {

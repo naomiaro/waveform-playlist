@@ -8,12 +8,12 @@ import {
   useArrangement,
   useDragGuardOptional,
   usePlaylistView,
+  usePlaylistZoom,
   useTrimPreviewOptional,
 } from '../contexts/playlistContexts';
 import type { TrimPreview } from '../providerInternals/useTrimPreview';
 
 interface UseClipDragHandlersOptions {
-  samplesPerPixel: number;
   /** Optional function that snaps a sample position to the nearest grid position.
    *  Used for boundary trim snapping (move snapping is handled by the SnapToGridModifier). */
   snapSamplePosition?: (samplePosition: number) => number;
@@ -151,7 +151,8 @@ function proposedTrimDelta({
  * @example
  * ```tsx
  * const { tracks } = usePlaylistTimeline();
- * const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers({ samplesPerPixel });
+ * const { samplesPerPixel } = usePlaylistZoom();
+ * const { onDragStart, onDragMove, onDragEnd } = useClipDragHandlers();
  *
  * return (
  *   <DragDropProvider
@@ -165,11 +166,9 @@ function proposedTrimDelta({
  * );
  * ```
  */
-export function useClipDragHandlers({
-  samplesPerPixel,
-  snapSamplePosition,
-}: UseClipDragHandlersOptions) {
+export function useClipDragHandlers({ snapSamplePosition }: UseClipDragHandlersOptions = {}) {
   const arrangement = useArrangement();
+  const { samplesPerPixel } = usePlaylistZoom();
   const { sampleRate } = usePlaylistView();
   // The provider's trim preview; none under another provider or outside one,
   // and then a trim is committed on release without being shown.

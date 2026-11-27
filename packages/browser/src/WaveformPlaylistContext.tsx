@@ -42,6 +42,7 @@ import {
 import { useFrameCallbacks, type FrameData } from './providerInternals/useFrameCallbacks';
 import { centrePlayhead, useScrollFollow } from './providerInternals/useScrollFollow';
 import { useMergedTheme } from './providerInternals/useMergedTheme';
+import { useZoomAnchor } from './providerInternals/zoomAnchor';
 import { useTrimPreview } from './providerInternals/useTrimPreview';
 import { useEngineLifetime } from './providerInternals/useEngineLifetime';
 import { useArrangementView } from './providerInternals/useArrangementView';
@@ -151,8 +152,22 @@ export interface WaveformPlaylistProviderProps {
    * view option: the provider computes the peaks with it.
    */
   mono?: boolean;
+  /**
+   * The zoom level the provider starts at, in samples per pixel (default
+   * 1024). The initial value only: afterwards the engine owns the level,
+   * which `useEditorControls().zoomIn()` / `zoomOut()` change. A later change
+   * of this prop is not followed.
+   */
   samplesPerPixel?: number;
   zoomLevels?: number[]; // Array of zoom levels in samples per pixel (lower = more zoomed in)
+  /**
+   * Whether automatic scroll (the view keeps the playhead centred during
+   * playback) starts on; default false. The initial value only: afterwards
+   * the provider owns the setting, which
+   * `usePlaybackControls().setAutomaticScroll` (or the
+   * `AutomaticScrollCheckbox`) changes. A later change of this prop is not
+   * followed.
+   */
   automaticScroll?: boolean;
   theme?: Partial<WaveformPlaylistTheme>;
   /**
@@ -353,8 +368,6 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   // don't restart afterward don't need suppression — see the mirror's own
   // comment for why.
   const suppressEngineStopMirrorRef = useRef(false);
-  // Viewport zoom for scroll-position math and animation loop pixels.
-  const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
   // The latest engine zoom, available to a rebuild before React commits it.
   const engineSamplesPerPixelRef = useRef(initialSamplesPerPixel);
   // True while the bounded play in progress is the highlighted selection itself
@@ -429,7 +442,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     onErrorRef,
     onBuildFailure,
   });
-  // For the animation loop and the zoom scroll math, which run outside render.
+  // For the animation loop, which runs outside render.
   const sampleRateRef = useRef(sampleRate);
   sampleRateRef.current = sampleRate;
 
@@ -452,6 +465,23 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     selectionEndRef,
     onEngineState: onSelectionEngineState,
   } = useSelectionState({ engineRef });
+  // The committed zoom level for the animation loop. A zoom change keeps a
+  // point of the view in place: the hovering pointer, else the selection,
+  // else the cursor, else the centre (#828; `zoomAnchorX`).
+  const getZoomAnchorTimes = useCallback(
+    () => ({
+      selectionStart: selectionStartRef.current ?? 0,
+      selectionEnd: selectionEndRef.current ?? 0,
+      cursorTime: visualTimeRef.current,
+    }),
+    [selectionStartRef, selectionEndRef]
+  );
+  const samplesPerPixelRef = useZoomAnchor({
+    scrollContainerRef,
+    samplesPerPixel,
+    sampleRate,
+    getTimes: getZoomAnchorTimes,
+  });
   const {
     isLoopEnabled,
     loopStart,
@@ -523,31 +553,6 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
       setLoopRegion(start, end);
     }
   }, [setLoopRegion, selectionStartRef, selectionEndRef]);
-
-  // Adjust scroll position proportionally when zoom changes
-  useEffect(() => {
-    if (!scrollContainerRef.current || duration === 0) return;
-
-    const container = scrollContainerRef.current;
-    const oldSamplesPerPixel = samplesPerPixelRef.current;
-    const newSamplesPerPixel = samplesPerPixel;
-
-    if (oldSamplesPerPixel === newSamplesPerPixel) return;
-
-    // Calculate the current center time in the viewport
-    const containerWidth = container.clientWidth;
-    const currentScrollLeft = container.scrollLeft;
-    const centerPixel = currentScrollLeft + containerWidth / 2;
-    const sr = sampleRateRef.current;
-    const centerTime = (centerPixel * oldSamplesPerPixel) / sr;
-
-    // Calculate new scroll position to keep the same center time
-    const newCenterPixel = (centerTime * sr) / newSamplesPerPixel;
-    const newScrollLeft = Math.max(0, newCenterPixel - containerWidth / 2);
-
-    container.scrollLeft = newScrollLeft;
-    samplesPerPixelRef.current = newSamplesPerPixel;
-  }, [samplesPerPixel, duration, scrollContainerRef]);
 
   // Forward late-arriving / swapped SoundFontCache to the live adapter so
   // MIDI tracks upgrade from PolySynth without an engine rebuild. Before the
@@ -799,6 +804,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     };
     startAnimationFrameLoop(updateTime);
   }, [
+    samplesPerPixelRef,
     setActiveAnnotationId,
     startAnimationFrameLoop,
     getPlaybackTime,
