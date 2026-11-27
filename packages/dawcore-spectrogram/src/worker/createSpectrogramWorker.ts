@@ -20,7 +20,11 @@ export interface SpectrogramWorkerFFTParams {
   durationSamples: number;
   mono: boolean;
   sampleRange?: { start: number; end: number };
-  /** If set, compute only this channel index (used by worker pool). */
+  /**
+   * If set, compute only the channel at this index of the arrays the worker
+   * holds for the clip. The pool gives worker k ≥ 1 channel k alone and asks
+   * for index 0 (#925).
+   */
   channelFilter?: number;
 }
 

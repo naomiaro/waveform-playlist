@@ -33,7 +33,8 @@ function ackComputeFFTs(worker: unknown) {
 
 const threeChannelParams = {
   clipId: 'clip1',
-  channelDataArrays: [new Float32Array(64), new Float32Array(64), new Float32Array(64)],
+  // Channel k holds the value k + 1, so a worker's arrays name their channels.
+  channelDataArrays: [1, 2, 3].map((v) => new Float32Array(64).fill(v)),
   config: {},
   sampleRate: 48000,
   offsetSamples: 0,
@@ -57,12 +58,15 @@ describe('worker pool — channels beyond poolSize (#556)', () => {
     // A third worker must have been created for channel 2.
     expect(factory).toHaveBeenCalledTimes(3);
 
-    // Each of the three workers received exactly its own channelFilter.
-    const filters = nativeWorkers.map((w) => {
+    // Each worker computes its own channel: worker 0 holds them all (for the
+    // mono mix) and is asked for index 0; worker k ≥ 1 holds channel k alone
+    // at index 0 (#925).
+    const computed = nativeWorkers.map((w) => {
       const fft = postedMessages(w).find((m) => m.type === 'compute-fft');
-      return fft?.channelFilter;
+      const arrays = fft?.channelDataArrays as Float32Array[];
+      return arrays[fft?.channelFilter as number][0] - 1;
     });
-    expect(filters).toEqual([0, 1, 2]);
+    expect(computed).toEqual([0, 1, 2]);
 
     for (const w of nativeWorkers) ackComputeFFTs(w);
     await expect(promise).resolves.toEqual({ cacheKey: 'k' });
