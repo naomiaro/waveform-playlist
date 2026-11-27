@@ -193,6 +193,26 @@ describe('SpectrogramProvider on the real worker pool (#821)', () => {
     expect(fftAudioBytes(live)).toBe(0);
   });
 
+  it('while the playlist is still loading, a loaded spectrogram track draws without copying its audio', async () => {
+    // isReady stays false until every track has loaded once; a track whose
+    // audio is decoded already draws meanwhile (review of #926).
+    fake.timeline = {
+      tracks: [spectrogramTrack([clip('c1', stereoBuffer())])],
+      isReady: false,
+    };
+    render(
+      <SpectrogramProvider>
+        <div />
+      </SpectrogramProvider>
+    );
+    await settle();
+    await registerStereoCanvases('c1');
+
+    expect(messagesOf(fake.workers, 'register-audio-data')).toHaveLength(2);
+    expect(messagesOf(fake.workers, 'compute-fft').length).toBeGreaterThan(0);
+    expect(fftAudioBytes(fake.workers)).toBe(0);
+  });
+
   it('two clips on one buffer register it once, and each FFT request keeps its own range', async () => {
     const buffer = stereoBuffer();
     fake.timeline = {

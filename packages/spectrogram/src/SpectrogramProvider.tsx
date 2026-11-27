@@ -63,7 +63,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
   const spectrogramColorMap = useStableByContent(colorMap);
   const { mono } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
-  const { tracks, isReady } = usePlaylistTimeline();
+  const { tracks } = usePlaylistTimeline();
   const { scrollContainerRef } = usePlaybackControls();
 
   // State
@@ -133,8 +133,9 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
   // Pre-register with the pool the audio of every clip on a track that draws a
   // spectrogram, once per buffer, and release what no such clip uses any more.
   // The pool is the one owner of what it holds (`registeredAudioClipIds`).
+  // Not gated on the playlist's isReady: a track whose audio is decoded draws
+  // while others still load, and its FFT requests would carry its audio.
   useEffect(() => {
-    if (!isReady) return;
     const wanted = spectrogramAudio(tracks, trackSpectrogramOverrides, audioKeyOf);
     // Nothing wanted and no pool yet: nothing to release, and no pool to make.
     const pool = wanted.size > 0 ? ensureWorkerPool() : spectrogramWorkerRef.current;
@@ -147,7 +148,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     for (const key of held) {
       if (!wanted.has(key)) pool.unregisterAudioData(key);
     }
-  }, [isReady, tracks, trackSpectrogramOverrides, audioKeyOf, ensureWorkerPool]);
+  }, [tracks, trackSpectrogramOverrides, audioKeyOf, ensureWorkerPool]);
 
   // Main spectrogram computation effect
   useEffect(() => {
