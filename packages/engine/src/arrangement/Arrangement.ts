@@ -81,6 +81,7 @@ import {
 import type {
   AddTrackOptions,
   Arrangement,
+  ArrangementChangeInfo,
   ClipBounds,
   MixerChangeOptions,
   RemoveClipOptions,
@@ -182,7 +183,7 @@ export class ArrangementImpl implements Arrangement {
   private _timeBase: ArrangementTimeBase | null;
   /** The ppqn the stored ticks are counted in. Null until an engine has attached. */
   private _tickPpqn: number | null;
-  private _subscribers: Set<() => void> = new Set();
+  private _subscribers: Set<(change: ArrangementChangeInfo) => void> = new Set();
   private _listeners: Set<ChangeListener> = new Set();
   private _pending: Array<{ change: ArrangementChange; at: ArrangementVersions }> = [];
   private _delivering = false;
@@ -252,9 +253,9 @@ export class ArrangementImpl implements Arrangement {
   }
 
   /** Be told after every change. See `Arrangement.subscribe`. */
-  subscribe(listener: () => void): () => void {
+  subscribe(listener: (change: ArrangementChangeInfo) => void): () => void {
     // Each call gets its own entry, so one function subscribed twice is told twice.
-    const entry = () => listener();
+    const entry = (change: ArrangementChangeInfo) => listener(change);
     this._subscribers.add(entry);
     return () => {
       this._subscribers.delete(entry);
@@ -1097,10 +1098,13 @@ export class ArrangementImpl implements Arrangement {
             }
           }
         }
-        // The engine has brought its adapter in step; now everyone else.
+        // The engine has brought its adapter in step; now everyone else,
+        // told the kind of change and nothing of the engine's payload (one
+        // object for all of them, frozen so that none can change it for the next).
+        const info: ArrangementChangeInfo = Object.freeze({ type: next.change.type });
         for (const subscriber of [...this._subscribers]) {
           try {
-            subscriber();
+            subscriber(info);
           } catch (error) {
             console.warn('[waveform-playlist] Error in an arrangement subscriber:', error);
           }

@@ -347,7 +347,13 @@ export interface EngineRefsContextValue {
    * Use this for audible-latency calculations (e.g., recording live-preview peak slicing).
    */
   getOutputLatency: () => number;
-  /** The engine. `current` is null until the first build and during a rebuild. */
+  /**
+   * The engine. `current` is null until the first build and during a rebuild.
+   * The provider owns the selection, the loop, the zoom, the selected track
+   * and the master volume and gives them to the engine: change them with the
+   * setters of `usePlaybackControls()` and `useEditorControls()`. A call on
+   * the engine for one of them is not followed by the view.
+   */
   playoutRef: React.RefObject<PlaylistEngine | null>;
 }
 

@@ -414,7 +414,7 @@ arrangement.canRedo;
 
 `getTracks()` holds each track as it entered: its `volume`, `muted`, `soloed`, `pan` and `panLaw` fields are not updated by the mixer setters. The current values are in `getMixer()`. (`engine.getState().tracks` is the same tracks with the current mix written into those fields and without the clips that are [still loading](#loading-audio).)
 
-A subscriber is called after the engine has made its adapter call for that change. Two changes reach subscribers without the adapter being in step: one made with `skipAdapter`, and the `startTick` assignment when an engine attaches, which subscribers hear before that engine sends its first tracks to its adapter. `getMixer()` is also replaced, without a change of `mixerVersion`, when a track with a new ID enters or entries are dropped, and an undo, a redo or an abort replaces it with the mix of the state it returns to. A subscriber that throws is reported with `console.warn` and does not fail the change. `getTracks()` and `getMixer()` return the same object until it changes, so a subscriber can tell what changed by comparing with what it read last time.
+A subscriber is called with `{ type }`, the kind of change it was (`ArrangementChangeType` in the [type reference](#typescript)), and reads what changed from the arrangement itself. A listener that takes no argument works as well. It is called after the engine has made its adapter call for that change. Two changes reach subscribers without the adapter being in step: one made with `skipAdapter`, and the `startTick` assignment when an engine attaches, which subscribers hear before that engine sends its first tracks to its adapter. `getMixer()` is also replaced, without a change of `mixerVersion`, when a track with a new ID enters or entries are dropped, and an undo, a redo or an abort replaces it with the mix of the state it returns to. A subscriber that throws is reported with `console.warn` and does not fail the change. `getTracks()` and `getMixer()` return the same object until it changes, so a subscriber can tell what changed by comparing with what it read last time.
 
 Make track changes from an event handler (or a listener of `arrangement.sources`), not from inside a `subscribe()` or `statechange` listener: two or more track edits made inside one listener run make an engine send its adapter every track at once (`setTracks`), which can interrupt playback (see [Events](#events)). The same rule holds under the React provider: see [Loading Audio](/docs/react/guides/loading-audio#adding-tracks-at-runtime).
 
@@ -1085,6 +1085,24 @@ interface MixerGesture {
   attach(input: HTMLInputElement): () => void;   // ends the gesture on the input's own events; returns the detach function
 }
 
+type ArrangementChangeType =
+  | 'set' // setTracks replaced the whole set
+  | 'add' // one track was added
+  | 'remove' // one track was removed
+  | 'update' // one track changed: updateTrack, or a clip added, removed, moved, trimmed or split
+  | 'reorder' // one track was moved
+  | 'restore' // an undo, a redo or an abort changed the tracks (and maybe the mix)
+  | 'restoreMix' // an undo, a redo or an abort changed the mix only
+  | 'load' // audio arrived: loading clips became loaded clips
+  | 'mixer' // one of the mixer setters changed a volume, mute, solo, pan or pan law
+  | 'recording' // a take started or stopped recording onto a track
+  | 'recompute' // every track was gone through again: clip positions after a tempo change, or clip ticks when an engine attached
+  | 'history'; // only what can be undone or redone changed
+
+interface ArrangementChangeInfo {
+  readonly type: ArrangementChangeType;
+}
+
 interface TrackMixerValues {
   volume: number;
   muted: boolean;
@@ -1105,7 +1123,7 @@ interface Arrangement {
   // read
   getTracks(): readonly ArrangementTrack[];
   getMixer(): ReadonlyMap<string, TrackMixerValues>;
-  subscribe(listener: () => void): () => void;
+  subscribe(listener: (change: ArrangementChangeInfo) => void): () => void;
   readonly tracksVersion: number;
   readonly mixerVersion: number;
 

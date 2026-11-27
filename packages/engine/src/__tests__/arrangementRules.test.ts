@@ -524,6 +524,50 @@ describe('the engine follows the arrangement by subscription', () => {
   });
 });
 
+describe('what a subscriber is told', () => {
+  it('each change comes with its type, and nothing else', () => {
+    const arrangement = new Arrangement({ tracks: [track('A', [clip('a1', 0)])] });
+    const seen: unknown[] = [];
+    arrangement.subscribe((change) => seen.push(change));
+
+    arrangement.addTrack(track('B', []));
+    arrangement.moveClip('A', 'a1', 1000);
+    arrangement.setTrackVolume('A', 0.5);
+    arrangement.removeTrack('B');
+    arrangement.undo();
+    arrangement.setTracks([]);
+
+    expect(seen).toEqual([
+      { type: 'add' },
+      { type: 'update' },
+      { type: 'mixer' },
+      { type: 'remove' },
+      { type: 'restore' },
+      { type: 'set' },
+    ]);
+  });
+
+  it('what it is told cannot be changed for the next subscriber', () => {
+    const arrangement = new Arrangement({ tracks: [] });
+    const frozen: boolean[] = [];
+    const seen: unknown[] = [];
+    // Read here and asserted below: a subscriber that throws is caught.
+    arrangement.subscribe((change) => frozen.push(Object.isFrozen(change)));
+    arrangement.subscribe((change) => seen.push(change.type));
+    arrangement.addTrack(track('A', []));
+    expect(frozen).toEqual([true]);
+    expect(seen).toEqual(['add']);
+  });
+
+  it('a listener that takes no argument still works', () => {
+    const arrangement = new Arrangement({ tracks: [] });
+    const listener = vi.fn(() => {});
+    arrangement.subscribe(listener);
+    arrangement.addTrack(track('A', []));
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('the selected track', () => {
   it('is cleared when its track is removed', () => {
     const { engine, states } = setupEngine();

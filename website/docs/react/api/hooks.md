@@ -453,7 +453,7 @@ For static positioning when playback is stopped (initial render, after pause/see
 
 ### useEngineRefs
 
-`WaveformPlaylistProvider` only. Refs and functions of the multitrack engine. Like `usePlaybackRefs()`, the value never changes, so calling this hook never re-renders the component. `playoutRef.current` is `null` until the engine is first built and during a rebuild: read it in an event handler, or in an effect that depends on `isReady` from `usePlaylistTimeline()`.
+`WaveformPlaylistProvider` only. Refs and functions of the multitrack engine. Like `usePlaybackRefs()`, the value never changes, so calling this hook never re-renders the component. `playoutRef.current` is `null` until the engine is first built and during a rebuild: read it in an event handler, or in an effect that depends on `isReady` from `usePlaylistTimeline()`. The provider owns the selection, the loop, the zoom, the selected track and the master volume and gives them to the engine: change them with the setters of `usePlaybackControls()` and `useEditorControls()`. A call on the engine for one of them (`playoutRef.current.setSelection(…)`, `.zoomIn()`) is not followed by the view.
 
 ```typescript
 function useEngineRefs(): EngineRefsContextValue;

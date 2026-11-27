@@ -4983,7 +4983,7 @@ In plain JavaScript a leftover `showScale={false}` is ignored and the scale is d
 
 **Package:** `@waveform-playlist/browser`, with the types `ZoomControls` and `MasterVolumeControls`.
 
-They are the provider's own hooks: they take an engine ref and hold a copy of the engine's state, which follows the engine only when its `onEngineState` is handed every `statechange`, as the provider does for its own call. The provider's hooks give the same values and setters.
+They were the provider's own hooks: they took an engine ref and held a copy of the engine's state, which followed the engine only when its `onEngineState` was handed every `statechange`, as the provider did for its own call. The provider's hooks give the same values and setters.
 
 **Find:** `useZoomControls`, `useMasterVolume`, `ZoomControls` and `MasterVolumeControls` in an import from `@waveform-playlist/browser`.
 
@@ -5130,3 +5130,41 @@ const items = SpectrogramMenuItems({ renderMode, onRenderModeChange, onOpenSetti
 import { spectrogramMenuItems, type SpectrogramMenuItemsOptions } from '@waveform-playlist/spectrogram';
 const items = spectrogramMenuItems({ renderMode, onRenderModeChange, onOpenSettings });
 ```
+
+## Selection, loop, zoom, selected track and master volume are the provider's
+
+**Package:** `@waveform-playlist/browser`, `WaveformPlaylistProvider`.
+
+The provider now owns these five values and gives them to its engine. Before, the engine owned them and the provider followed the engine's `statechange` event.
+
+What this fixes: a call to `setSelection`, `setLoopEnabled`, `setLoopRegion`, `clearLoopRegion`, `setSelectedTrackId`, `zoomIn` or `zoomOut` made while the provider had no engine did nothing. That is before the first engine of a mount exists, and while a new engine is being built after the `effects` function or the `zoomLevels` changed. These calls now take effect at once, and the next engine starts with the values.
+
+What changes for an app: a call made on the engine object itself is no longer followed. `playoutRef.current.setSelection(1, 2)` or `playoutRef.current.zoomIn()` (the engine from `useEngineRefs()`) changes that engine's copy only: the highlight, the zoom and the values of `useSelection()`, `useLoop()`, `usePlaylistZoom()`, `useSelectedTrackId()` and `usePlaylistMixer().masterVolume` stay as they were, and the next engine the provider builds starts with the provider's values. `setLoopRegion`, `setLoopEnabled` and `setMasterVolume` called on the engine still reach the audio until then.
+
+`canZoomIn` and `canZoomOut` are now right from the first render. Before, both were `true` until the first engine existed.
+
+**Find:** `playoutRef.current` followed by `setSelection`, `setLoopRegion`, `setLoopEnabled`, `selectTrack`, `zoomIn`, `zoomOut`, `setZoomLevel` or `setMasterVolume`.
+
+**Replace with:**
+
+```tsx
+// Before
+const { playoutRef } = useEngineRefs();
+playoutRef.current?.setSelection(1, 2);
+playoutRef.current?.setLoopRegion(1, 2);
+playoutRef.current?.setLoopEnabled(true);
+playoutRef.current?.selectTrack(trackId);
+playoutRef.current?.zoomIn();
+playoutRef.current?.setMasterVolume(0.5);
+// After
+const { setSelection } = usePlaybackControls();
+const { setLoopRegion, setLoopEnabled, setSelectedTrackId, zoomIn, setMasterVolume } = useEditorControls();
+setSelection(1, 2);
+setLoopRegion(1, 2);
+setLoopEnabled(true);
+setSelectedTrackId(trackId);
+zoomIn();
+setMasterVolume(0.5);
+```
+
+`setSelection` from `usePlaybackControls()` also moves the cursor to the start of the range and restarts playback there if it is running; the engine's own `setSelection` did neither. There is no replacement for `setZoomLevel` with an arbitrary level: zoom moves one step at a time through `zoomLevels`.

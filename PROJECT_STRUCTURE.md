@@ -168,7 +168,7 @@ const clip = createClipFromSeconds({
 - **Build:** tsup (not vite) — `pnpm typecheck && tsup`. Outputs ESM + CJS + DTS.
 - **Testing:** vitest unit tests in `src/__tests__/`. Run with `npx vitest run` from `packages/engine/`.
 - **Key Types:** `PlayoutAdapter` (pluggable audio backend, optional `addTrack()` for incremental additions), `Arrangement` (from `createArrangement()`), `EngineState` (state incl. `tracksVersion`/`mixerVersion`; `tracks` is `readonly ClipTrack[]`, shared and not a copy), `EngineEvents` (statechange, play/pause/stop)
-- **State Ownership:** The arrangement owns the tracks, the per-track mix, the undo history (of the tracks and the mix), which tracks a take is recording onto and the audio sources its clips name (one loader; a loading clip becomes a loaded clip when its source arrives). The engine owns transport, selection, loop, selectedTrackId, zoom and masterVolume. React subscribes to `statechange` events.
+- **State Ownership:** The arrangement owns the tracks, the per-track mix, the undo history (of the tracks and the mix), which tracks a take is recording onto and the audio sources its clips name (one loader; a loading clip becomes a loaded clip when its source arrives). The engine owns transport, and selection, loop, selectedTrackId, zoom and masterVolume for a host that uses it by itself and for dawcore; `WaveformPlaylistProvider` owns those five and gives them to its engine (#826), subscribing only to the engine's `stop`.
 - **Clip Mutations:** `moveClip()`, `trimClip()`, `splitClip()` change the arrangement (new array, new track and clip objects for what changed); the engine, told by the arrangement, syncs the adapter via `adapter.updateTrack()` (or `adapter.setTracks()` when the adapter has no `updateTrack`) and emits `statechange`. The browser package's provider is given the arrangement (`arrangement` prop) and derives what it publishes from it; nothing is mirrored back.
   - `moveClip()` returns constrained delta (number). Accepts optional `skipAdapter` parameter to skip adapter sync during high-frequency drags.
   - `trimClip()` accepts optional `skipAdapter` parameter.
@@ -355,22 +355,22 @@ const clip = createClipFromSeconds({
   │   ├── useDynamicEffects.ts          # Master effects chain
   │   ├── useExportWav.ts               # WAV export via Tone.Offline
   │   ├── useKeyboardShortcuts.ts       # Flexible keyboard shortcut system
-  │   ├── useLoopState.ts               # Loop state (engine delegation + onEngineState)
-  │   ├── useMasterVolume.ts            # Master volume (engine delegation + onEngineState)
+  │   ├── useLoopState.ts               # Loop state (owned by the hook, handed to the engine)
+  │   ├── useMasterVolume.ts            # Master volume (owned by the hook, handed to the engine)
   │   ├── useOutputMeter.ts             # Master bus output VU metering via worklet (returns a MeterSource)
   │   ├── usePlaybackShortcuts.ts       # Default playback shortcuts
   │   ├── useRecordingLayout.ts         # Channel count and stepped timeline end of a take in progress
   │   ├── useRecordingSession.ts        # Tells the provider a take is running (setRecordingActive in an effect)
-  │   ├── useSelectedTrack.ts           # Selected track ID (engine delegation + onEngineState)
+  │   ├── useSelectedTrack.ts           # Selected track ID (owned by the hook, handed to the engine)
   │   ├── useSelectionDrag.ts           # The selection drag of both views; commits on release during playback
-  │   ├── useSelectionState.ts          # Selection state (engine delegation + onEngineState)
+  │   ├── useSelectionState.ts          # Selection state (owned by the hook, handed to the engine)
   │   ├── useStoredAnnotations.ts       # The annotations of an AnnotationStore (useSyncExternalStore)
   │   ├── useTimeFormat.ts              # Time formatting
   │   ├── useTrackDynamicEffects.ts     # Per-track effects
   │   ├── useTrackReorderHandle.ts      # Reorder drag handle for the track whose panel the caller is in (dnd-kit sortable)
   │   ├── useTrimPreviewView.ts         # What the clip view and the root read of the trim preview: the previewed clip's drawing record, the stepped width past the end
   │   ├── useWaveformDataCache.ts       # Web worker peak generation per AudioBuffer (lookup + version counter)
-  │   └── useZoomControls.ts            # Zoom state (engine delegation + onEngineState)
+  │   └── useZoomControls.ts            # Zoom state (owned by the hook, handed to the engine)
   ├── components/                       # React components
   │   ├── WaveformRoot.tsx              # Root of the multitrack view: timeline length, row layout, row selection on press, spectrogram modal
   │   ├── waveformParts.tsx             # The parts by name (exported), the timescale part, sortWaveformParts
@@ -819,9 +819,10 @@ WaveformPlaylistProvider (Split Contexts for Performance; everything below deriv
 │   └─→ Canvas Rendering (SmartChannel)
 │
 └─→ PlaylistEngine (state + events; built by the provider on mount, on an effects or zoomLevels change)
-    ├─→ Owns: transport, selection, loop, zoom, master volume, selectedTrackId
+    ├─→ Owns: transport
+    ├─→ Is given by the provider: selection, loop, zoom, master volume, selectedTrackId (the provider's hooks own them)
     ├─→ Plays the provider's Arrangement (tracks, mix, undo history), following it by subscription
-    ├─→ Emits: statechange → provider mirrors selection, loop, zoom, volume, selected track into React state
+    ├─→ Emits: stop → provider mirrors an engine-initiated stop
     └─→ ToneAdapter (PlayoutAdapter interface)
         └─→ TonePlayout (Tone.js)
             └─→ Web Audio API
@@ -837,9 +838,9 @@ Provider (useSyncExternalStore over arrangement.subscribe / arrangement.sources)
     ├─→ useArrangementView derives tracks, peaksDataArray, duration, trackStates, canUndo/canRedo
     └─→ useReadyOnce: first engine attached + no source pending → isReady, onReady, 'waveform-playlist:ready' (once per mount)
 
-Engine method for transport/view state (e.g., engine.setSelection())
+Provider setter for selection, loop, zoom, master volume or selected track (e.g., setSelection())
     ↓
-Engine emits 'statechange' → each hook's onEngineState() mirrors it into React state
+The owning hook writes its state and ref, then calls the engine if there is one (a new engine is given the values when built)
 ```
 
 **Context Splitting Architecture:**
@@ -1165,11 +1166,11 @@ Business logic is extracted into reusable custom hooks that can be used by any c
 - `useTrackDynamicEffects` - Per-track effects management
 - `useAudioEffects` - Audio effects management
 - `useExportWav` - WAV export via Tone.Offline
-- `useSelectionState` - Selection start/end (engine delegation + onEngineState)
-- `useLoopState` - Loop enabled/start/end (engine delegation + onEngineState)
-- `useSelectedTrack` - Selected track ID (engine delegation + onEngineState)
-- `useMasterVolume` - Master volume (engine delegation + onEngineState)
-- `useZoomControls` - Zoom samplesPerPixel/canZoomIn/Out (engine delegation + onEngineState)
+- `useSelectionState` - Selection start/end (owned by the hook, handed to the engine)
+- `useLoopState` - Loop enabled/start/end (owned by the hook, handed to the engine)
+- `useSelectedTrack` - Selected track ID (owned by the hook, handed to the engine)
+- `useMasterVolume` - Master volume (owned by the hook, handed to the engine)
+- `useZoomControls` - Zoom samplesPerPixel/canZoomIn/Out (owned by the hook, handed to the engine)
 - `useTimeFormat` - Time formatting and format selection
 - `useOutputMeter` - Master bus output VU metering via AudioWorklet (returns a `MeterSource`, not state)
 - `useWaveformDataCache` - Web worker peak generation and cache
@@ -1204,7 +1205,7 @@ const [editable, setAnnotationsEditable] = useFollowedOption(annotationList?.edi
 const [linkEndpoints, setLinkEndpoints] = useFollowedOption(annotationList?.linkEndpoints);
 const [continuousPlay, setContinuousPlay] = useFollowedOption(annotationList?.isContinuousPlay);
 
-// SelectionContext (mirrored from the engine by useSelectionState)
+// SelectionContext (owned by useSelectionState)
 const [selectionStart, setSelectionStart] = useState(0);
 const [selectionEnd, setSelectionEnd] = useState(0);
 

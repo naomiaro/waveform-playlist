@@ -24,6 +24,10 @@
  * (`setTrackRecording`, `recordingTrackIds`, `'recording'`).
  *
  * v3 (#848): `addTrack(track, { index })` puts the track at a place in the order.
+ *
+ * Not a new key (#826): `subscribe` listeners are called with `{ type }`. The
+ * engine does not call `subscribe`, and a listener that takes no argument
+ * works with either copy.
  */
 
 import type { Arrangement } from './types';

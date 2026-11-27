@@ -543,7 +543,13 @@ interface EngineRefsContextValue {
    * Use this for audible-latency calculations (e.g., recording live-preview peak slicing).
    */
   getOutputLatency: () => number;
-  /** The engine. `current` is null until the first build and during a rebuild. */
+  /**
+   * The engine. `current` is null until the first build and during a rebuild.
+   * The provider owns the selection, the loop, the zoom, the selected track
+   * and the master volume and gives them to the engine: change them with the
+   * setters of `usePlaybackControls()` and `useEditorControls()`. A call on
+   * the engine for one of them is not followed by the view.
+   */
   playoutRef: React.RefObject<PlaylistEngine | null>;
 }
 ```
@@ -1780,7 +1786,8 @@ interface Arrangement {
   // read
   getTracks(): readonly ArrangementTrack[];             // Loaded clips (AudioClip) and clips still loading (LoadingClip; isLoadingClip). The same array until the tracks change. A track's mixer fields are the values it entered with
   getMixer(): ReadonlyMap<string, TrackMixerValues>;    // Current volume, mute, solo, pan by track id (the stored mute: the take's track's is not forced). The same Map until a value changes, an entry is added or dropped, or an undo, a redo or an abort brings back another state's
-  subscribe(listener: () => void): () => void;          // Once per change (tracks, mix or history), in order; returns the function that stops it
+  subscribe(listener: (change: { readonly type: ArrangementChangeType }) => void): () => void; // Once per change (tracks, mix or history), in order, with the kind of change; returns the function that stops it
+  // ArrangementChangeType = 'set' | 'add' | 'remove' | 'update' | 'reorder' | 'restore' | 'restoreMix' | 'load' | 'mixer' | 'recording' | 'recompute' | 'history'
   readonly tracksVersion: number;                       // Counts changes to the tracks
   readonly mixerVersion: number;                        // Counts the changes of the current mix: the four mixer setters, an undo/redo/abort that brings back other values, the start or end of a take's mute on a current track (not entries added or dropped)
 

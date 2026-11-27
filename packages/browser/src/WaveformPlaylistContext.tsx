@@ -13,12 +13,7 @@ import type {
   TrackEffectsFunction,
   SoundFontCache,
 } from '@waveform-playlist/playout';
-import type {
-  Arrangement,
-  EngineState,
-  PlaylistEngine,
-  PlayoutAdapter,
-} from '@waveform-playlist/engine';
+import type { Arrangement, PlaylistEngine, PlayoutAdapter } from '@waveform-playlist/engine';
 import { type Fade, type MidiNoteData } from '@waveform-playlist/core';
 import { type WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { syncSoundFontCacheToAdapter } from './soundFontSync';
@@ -34,6 +29,7 @@ import {
   useSelectedTrack,
   useAnimationFrameLoop,
 } from './hooks';
+import { DEFAULT_ZOOM_LEVELS } from './hooks/useZoomControls';
 import { followAnnotations } from './providerInternals/followAnnotations';
 import {
   useAnnotationState,
@@ -159,7 +155,7 @@ export interface WaveformPlaylistProviderProps {
   mono?: boolean;
   /**
    * The zoom level the provider starts at, in samples per pixel (default
-   * 1024). The initial value only: afterwards the engine owns the level,
+   * 1024). The initial value only: afterwards the provider owns the level,
    * which `useEditorControls().zoomIn()` / `zoomOut()` change. A later change
    * of this prop is not followed.
    */
@@ -261,7 +257,6 @@ function toVisualTime(rawTime: number): number {
 interface EngineFollowers {
   seed: (engine: PlaylistEngine) => void;
   follow: (engine: PlaylistEngine) => void;
-  mirror: (state: EngineState) => void;
 }
 
 const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
@@ -288,7 +283,7 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   // Content-stable: an inline array is new on every render. The engine's
   // lifetime compares the levels by content too.
   const stableZoomLevels = useMemo(
-    () => zoomLevels,
+    () => zoomLevels ?? DEFAULT_ZOOM_LEVELS,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [zoomLevels?.join(',')]
   );
@@ -375,8 +370,10 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   // don't restart afterward don't need suppression — see the mirror's own
   // comment for why.
   const suppressEngineStopMirrorRef = useRef(false);
-  // The latest engine zoom, available to a rebuild before React commits it.
-  const engineSamplesPerPixelRef = useRef(initialSamplesPerPixel);
+  // The zoom outside render. `useZoomControls` owns it and is its only
+  // writer; it is made here because the engine's lifetime, set up first,
+  // builds each engine with it.
+  const zoomSamplesPerPixelRef = useRef(initialSamplesPerPixel);
   // True while the bounded play in progress is the highlighted selection itself
   // (its start and end are the selection's). Set by play(). Selection playback
   // ignores continuous play; anything else, including an annotation clicked
@@ -402,8 +399,8 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     setCurrentTime(currentTimeRef.current);
   }, [stopAnimationFrameLoop]);
 
-  // The engine's own state is mirrored by the hooks below, which need the
-  // engine ref first; these three reach them through a ref set after them.
+  // What a new engine is given comes from the hooks below, which need the
+  // engine ref first; these two reach them through a ref set after them.
   const followersRef = useRef<EngineFollowers | null>(null);
   const seedEngine = useCallback(
     (engine: PlaylistEngine) => followersRef.current?.seed(engine),
@@ -413,10 +410,6 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     (engine: PlaylistEngine) => followersRef.current?.follow(engine),
     []
   );
-  const onEngineState = useCallback((state: EngineState) => {
-    engineSamplesPerPixelRef.current = state.samplesPerPixel;
-    followersRef.current?.mirror(state);
-  }, []);
 
   // The engine around the arrangement: built on mount and when `effects` or
   // the zoom levels change, disposed in every cleanup (#812). A track edit
@@ -439,12 +432,11 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     resolveTrackEffects,
     soundFontCacheRef,
     sampleRateProp,
-    zoomLevels,
-    samplesPerPixelRef: engineSamplesPerPixelRef,
+    zoomLevels: stableZoomLevels,
+    samplesPerPixelRef: zoomSamplesPerPixelRef,
     playbackEndTimeRef,
     seedEngine,
     onEngine,
-    onEngineState,
     stopAnimationFrameLoop,
     onErrorRef,
     onBuildFailure,
@@ -453,24 +445,25 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   const sampleRateRef = useRef(sampleRate);
   sampleRateRef.current = sampleRate;
 
-  // Custom hooks — engine-owned state delegated to hooks with onEngineState() pattern
+  // Zoom, master volume, selection, loop and the selected track: each hook
+  // owns its value, engine or not, and hands it to the engine there is (#826).
   const { timeFormat, setTimeFormat } = useTimeFormat();
-  const zoom = useZoomControls({ engineRef, initialSamplesPerPixel });
-  const { samplesPerPixel, onEngineState: onZoomEngineState } = zoom;
-  const volume = useMasterVolume({ engineRef, initialVolume: 1.0 });
-  const {
-    masterVolume,
-    setMasterVolume,
-    masterVolumeRef,
-    onEngineState: onVolumeEngineState,
-  } = volume;
+  const zoom = useZoomControls({
+    engineRef,
+    samplesPerPixelRef: zoomSamplesPerPixelRef,
+    zoomLevels: stableZoomLevels,
+  });
+  const { samplesPerPixel } = zoom;
+  const { masterVolume, setMasterVolume, masterVolumeRef } = useMasterVolume({
+    engineRef,
+    initialVolume: 1.0,
+  });
   const {
     selectionStart,
     selectionEnd,
     setSelection: setSelectionEngine,
     selectionStartRef,
     selectionEndRef,
-    onEngineState: onSelectionEngineState,
   } = useSelectionState({ engineRef });
   // The committed zoom level for the animation loop. A zoom change keeps a
   // point of the view in place: the hovering pointer, else the selection,
@@ -499,21 +492,16 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     isLoopEnabledRef,
     loopStartRef,
     loopEndRef,
-    onEngineState: onLoopEngineState,
   } = useLoopState({ engineRef });
   const {
     selectedTrackId,
     setSelectedTrackId: setSelectedTrackIdControl,
-    onEngineState: onSelectedTrackEngineState,
     selectedTrackIdRef,
-  } = useSelectedTrack({ engineRef });
+  } = useSelectedTrack({ engineRef, arrangement });
 
   // Everything the provider publishes about the tracks, derived from the
   // arrangement during render and never written back (#812).
-  const baseScale = useMemo(
-    () => Math.min(...(stableZoomLevels ?? [256, 512, 1024, 2048, 4096, 8192])),
-    [stableZoomLevels]
-  );
+  const baseScale = useMemo(() => Math.min(...stableZoomLevels), [stableZoomLevels]);
   const view = useArrangementView(arrangement, {
     samplesPerPixel,
     mono,
@@ -672,18 +660,11 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
     [stopAnimationFrameLoop, setCurrentTimeRefs]
   );
 
-  // What a new engine is given and how the provider follows it. The engine
-  // owns selection, loop, selected track, zoom and master volume; the hooks
-  // mirror them from `statechange`. Seeded so that a fresh engine does not
-  // put them back to defaults.
+  // What a new engine is given and how the provider follows it. The hooks
+  // own selection, loop, selected track, zoom and master volume (#826); an
+  // engine is given them when it is built (the zoom in its constructor) and
+  // on every change after that, and none is read back from it.
   useLayoutEffect(() => {
-    const mirror = (state: EngineState) => {
-      onSelectionEngineState(state);
-      onLoopEngineState(state);
-      onSelectedTrackEngineState(state);
-      onZoomEngineState(state);
-      onVolumeEngineState(state);
-    };
     followersRef.current = {
       seed: (engine) => {
         engine.setSelection(selectionStartRef.current ?? 0, selectionEndRef.current ?? 0);
@@ -693,10 +674,8 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
         if (selectedTrackIdRef.current) engine.selectTrack(selectedTrackIdRef.current);
       },
       follow: (engine) => {
-        engine.on('statechange', onEngineState);
         engine.on('stop', () => mirrorEngineStop(engine));
       },
-      mirror,
     };
   });
 

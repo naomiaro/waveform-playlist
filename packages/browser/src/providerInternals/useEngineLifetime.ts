@@ -18,7 +18,6 @@ import {
   attachDecodeContext,
   PlaylistEngine,
   type Arrangement,
-  type EngineState,
   type PlayoutAdapter,
 } from '@waveform-playlist/engine';
 import type {
@@ -50,20 +49,14 @@ export interface UseEngineLifetimeOptions {
   /** The provider's `sampleRate` prop. Read when an engine is built. */
   sampleRateProp?: number;
   /** Compared by content: an inline array with the same levels builds nothing. */
-  zoomLevels?: number[];
+  zoomLevels?: readonly number[];
   samplesPerPixelRef: React.RefObject<number>;
   /** Where a bounded play stops: carried into the resume of a play a rebuild interrupts. */
   playbackEndTimeRef: React.RefObject<number | null>;
   /** Give a new engine the provider's selection, loop, volume and selected track. */
   seedEngine: (engine: PlaylistEngine) => void;
-  /** Subscribe to a new engine (`statechange`, `stop`). */
+  /** Subscribe to a new engine (`stop`). */
   onEngine: (engine: PlaylistEngine) => void;
-  /**
-   * A new engine's first state, once, after `onEngine`: an engine built on
-   * an arrangement sends its tracks in its constructor and emits no
-   * `statechange`, so this is where `canZoomIn` / `canZoomOut` first arrive.
-   */
-  onEngineState: (state: EngineState) => void;
   stopAnimationFrameLoop: () => void;
   /** The latest committed `onError` (QG). */
   onErrorRef: React.RefObject<((error: Error) => void) | undefined>;
@@ -115,7 +108,7 @@ function deferred<T>(): Deferred<T> {
 interface BuildContext {
   arrangement: Arrangement;
   effects: EffectsFunction | undefined;
-  zoomLevels: number[] | undefined;
+  zoomLevels: readonly number[] | undefined;
   latest: React.RefObject<UseEngineLifetimeOptions>;
   engineRef: React.RefObject<PlaylistEngine | null>;
   adapterRef: React.RefObject<PlayoutAdapter | null>;
@@ -159,12 +152,11 @@ async function buildEngine(ctx: BuildContext, run: BuildRun): Promise<void> {
       // The provider attaches the decode context itself, once per mount.
       attachDecodeContext: false,
       samplesPerPixel: ctx.latest.current.samplesPerPixelRef.current,
-      zoomLevels: ctx.zoomLevels,
+      zoomLevels: ctx.zoomLevels && [...ctx.zoomLevels],
     });
     const latest = ctx.latest.current;
     latest.seedEngine(engine);
     latest.onEngine(engine);
-    latest.onEngineState(engine.getState());
     ctx.engineRef.current = engine;
     ctx.engineBuildInFlightRef.current = false;
     ctx.onAssigned(adapter);

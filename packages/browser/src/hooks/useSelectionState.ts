@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, type RefObject } from 'react';
-import type { PlaylistEngine, EngineState } from '@waveform-playlist/engine';
+import type { PlaylistEngine } from '@waveform-playlist/engine';
 
 export interface UseSelectionStateProps {
   engineRef: RefObject<PlaylistEngine | null>;
@@ -14,44 +14,34 @@ export interface SelectionControls {
 }
 
 /**
- * Hook for managing selection state via PlaylistEngine delegation.
- *
- * setSelection delegates to the engine. State is mirrored back from
- * the engine via onEngineState(), which the provider's statechange
- * handler calls on every engine event.
+ * The selection (start and end, in seconds). This hook owns it (#826): the
+ * setter writes it here, engine or not, and hands it to the engine there is.
+ * The provider gives each new engine the value from the refs. Nothing is
+ * read back from an engine.
  *
  * Note: The provider wraps this setter with playback side-effects
- * (updating currentTime, restarting playback). This hook only handles
- * the engine delegation + state mirroring.
+ * (updating currentTime, restarting playback).
  */
-export function useSelectionState({ engineRef }: UseSelectionStateProps): SelectionControls & {
-  onEngineState: (state: EngineState) => void;
-} {
+export function useSelectionState({ engineRef }: UseSelectionStateProps): SelectionControls {
   const [selectionStart, setSelectionStartState] = useState(0);
   const [selectionEnd, setSelectionEndState] = useState(0);
 
-  // Internal refs for statechange guard + engine seeding on rebuild.
+  // The value outside render: the animation loop, and what a new engine is given.
   const selectionStartRef = useRef(0);
   const selectionEndRef = useRef(0);
 
   const setSelection = useCallback(
     (start: number, end: number) => {
-      engineRef.current?.setSelection(start, end);
+      const from = Math.min(start, end);
+      const to = Math.max(start, end);
+      selectionStartRef.current = from;
+      selectionEndRef.current = to;
+      setSelectionStartState(from);
+      setSelectionEndState(to);
+      engineRef.current?.setSelection(from, to);
     },
     [engineRef]
   );
-
-  // Called by the provider's statechange handler to mirror engine state.
-  const onEngineState = useCallback((state: EngineState) => {
-    if (state.selectionStart !== selectionStartRef.current) {
-      selectionStartRef.current = state.selectionStart;
-      setSelectionStartState(state.selectionStart);
-    }
-    if (state.selectionEnd !== selectionEndRef.current) {
-      selectionEndRef.current = state.selectionEnd;
-      setSelectionEndState(state.selectionEnd);
-    }
-  }, []);
 
   return {
     selectionStart,
@@ -59,6 +49,5 @@ export function useSelectionState({ engineRef }: UseSelectionStateProps): Select
     setSelection,
     selectionStartRef,
     selectionEndRef,
-    onEngineState,
   };
 }

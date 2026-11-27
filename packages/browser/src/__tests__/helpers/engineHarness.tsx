@@ -7,7 +7,6 @@ import { createClip, createTrack } from '@waveform-playlist/core';
 import type { ArrangementTrack, AudioClip, ClipSource, LoadingClip } from '@waveform-playlist/core';
 import type {
   Arrangement,
-  EngineState,
   LoadSource,
   PlaylistEngine,
   PlayoutAdapter,
@@ -179,7 +178,6 @@ export interface LifetimeProps {
   onError?: (error: Error) => void;
   seedEngine?: (engine: PlaylistEngine) => void;
   onEngine?: (engine: PlaylistEngine) => void;
-  onEngineState?: (state: EngineState) => void;
   resolveTrackEffects?: () => undefined;
   stopAnimationFrameLoop?: () => void;
 }
@@ -214,7 +212,6 @@ export function useLifetimeForTest(props: LifetimeProps): LifetimeHarness {
     playbackEndTimeRef,
     seedEngine: props.seedEngine ?? NOTHING,
     onEngine: props.onEngine ?? NOTHING,
-    onEngineState: props.onEngineState ?? NOTHING,
     stopAnimationFrameLoop: props.stopAnimationFrameLoop ?? NOTHING,
     onErrorRef,
   });

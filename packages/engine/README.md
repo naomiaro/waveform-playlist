@@ -329,7 +329,9 @@ interface Arrangement {
   // read
   getTracks(): readonly ArrangementTrack[];
   getMixer(): ReadonlyMap<string, TrackMixerValues>;
-  subscribe(listener: () => void): () => void;
+  // Called with the kind of change: 'set' | 'add' | 'remove' | 'update' | 'reorder' | 'restore' |
+  // 'restoreMix' | 'load' | 'mixer' | 'recording' | 'recompute' | 'history'
+  subscribe(listener: (change: { readonly type: ArrangementChangeType }) => void): () => void;
   readonly tracksVersion: number;
   readonly mixerVersion: number;
 
