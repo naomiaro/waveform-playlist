@@ -1,6 +1,6 @@
 {
   "name": "@dawcore/midi",
-  "version": "0.0.6-next.8",
+  "version": "0.0.6-next.9",
   "description": "Framework-agnostic MIDI file parsing, and loading a MIDI file as waveform-playlist tracks",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",

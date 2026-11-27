@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/media-element-playout",
-  "version": "12.4.0-next.7",
+  "version": "13.0.0-next.8",
   "description": "HTMLMediaElement-based playout engine for waveform-playlist with pitch-preserving playback rate",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
