@@ -10,8 +10,8 @@
 // its owner is one of the entries scanned; `export default`, `export * as`,
 // `export let`, a destructured `export const { a }`; an id held in a constant,
 // a template string without `${}`, `.attrs({ id })`, a radio `name`. The other
-// packages (midi, engine, playout, media-element-playout, the web components)
-// are not scanned: #807.
+// packages (engine, playout, media-element-playout, the web components) are
+// not scanned: #807.
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
@@ -104,9 +104,6 @@ const CONTROLLED_AND_BOUND = [
 const NAME_OWNERS = [...REACT_PACKAGES, 'browser/tone', 'core'];
 // Not one thing with two owners: a type in core, a component in ui-components.
 const DIFFERENT_KINDS = ['Track (core, ui-components)'];
-// Two different functions under one name, older than #770 and not yet renamed
-// (#807). Listed so that the next one is noticed; remove the entry with the rename.
-const KNOWN_AND_TRACKED = ['createEffectInstance (browser/tone, core)'];
 
 describe('one owner per exported name (#770)', () => {
   it.each(REACT_PACKAGES)('%s re-exports nothing from another workspace package', (pkg) => {
@@ -139,7 +136,6 @@ describe('one owner per exported name (#770)', () => {
       [
         ...CONTROLLED_AND_BOUND.map((name) => `${name} (browser, ui-components)`),
         ...DIFFERENT_KINDS,
-        ...KNOWN_AND_TRACKED,
       ].sort()
     );
   });

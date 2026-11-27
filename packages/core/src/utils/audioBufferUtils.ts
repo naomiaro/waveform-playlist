@@ -64,10 +64,3 @@ export function appendToAudioBuffer(
   // Create new buffer
   return createAudioBuffer(audioContext, [combined], sampleRate);
 }
-
-/**
- * Calculate duration in seconds from sample count and sample rate
- */
-export function calculateDuration(sampleCount: number, sampleRate: number): number {
-  return sampleCount / sampleRate;
-}

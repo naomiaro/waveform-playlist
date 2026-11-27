@@ -209,7 +209,7 @@ describe('buildOfflineChain / connectOfflineChain', () => {
       'factory exploded'
     );
     // The native instance created before the failing clone must be disposed.
-    // createEffectInstance's dispose() calls effect.disconnect() + effect.dispose();
+    // createToneEffectInstance's dispose() calls effect.disconnect() + effect.dispose();
     // the Reverb constructor mock returns stubs we can inspect.
     const { Reverb } = await import('tone');
     const reverbStub = (Reverb as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;

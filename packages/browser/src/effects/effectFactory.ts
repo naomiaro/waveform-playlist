@@ -88,7 +88,7 @@ const generateInstanceId = (): string => {
 /**
  * Create an effect instance from a definition with initial parameter values
  */
-export function createEffectInstance(
+export function createToneEffectInstance(
   definition: EffectDefinition,
   initialParams?: Record<string, number | string | boolean>
 ): EffectInstance {

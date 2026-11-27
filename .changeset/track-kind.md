@@ -4,7 +4,6 @@
 '@waveform-playlist/playout': major
 '@waveform-playlist/browser': major
 '@waveform-playlist/recording': major
-'@waveform-playlist/midi': minor
 '@dawcore/components': patch
 ---
 
@@ -18,8 +17,6 @@ A track has a kind, audio or MIDI, and holds clips of that kind only (#756).
 - `@waveform-playlist/browser`: the render mode follows the kind. A MIDI track is a piano roll (also while empty); an audio track never is. A track of the wrong kind is refused by the arrangement and throws at the call that offered it (see the changeset of the provider's `arrangement` prop). Each track row carries `data-track-kind="audio|midi"`.
 - `@waveform-playlist/recording`: `useIntegratedRecording().startRecording()` refuses a MIDI track (returns `false`, sets `error`). Before, the take was added to the MIDI track and carved its MIDI clips. A take is added to the track it was started on, not to the track selected when it stops: the target cannot be switched mid-take. New return field `recordingTrackId` (that track's id, `null` when no take is running) for the live preview's `recordingState.trackId`.
 - `@dawcore/components`: `<daw-track kind="audio|midi">` (reflected, default `audio`); `TrackConfig.kind` and `TrackDescriptor.kind`. `render-mode="piano-roll"` no longer makes a MIDI track. A clip of the wrong kind is not added and is reported with `daw-clip-error`; recording onto a MIDI track dispatches `daw-recording-error`. `loadMidi()` and `addTrack({ midi })` set the kind.
-
-**Not breaking:** `@waveform-playlist/midi`: the tracks it makes have `kind: 'midi'`.
 
 **Why:** a track with both kinds became two playout tracks in the Tone.js adapter, and every per-track operation (mute, solo, volume, pan, effects, removal, SoundFont swap) had to address both; that pairing was the source of several bugs. The native transport never played MIDI clips, both WAV exports skip them, and the views drew such a track with one render mode for both kinds.
 

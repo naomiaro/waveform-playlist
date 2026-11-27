@@ -9,7 +9,6 @@
 '@dawcore/wam': patch
 '@waveform-playlist/engine': patch
 '@waveform-playlist/media-element-playout': patch
-'@waveform-playlist/midi': patch
 '@waveform-playlist/playout': patch
 '@waveform-playlist/recording': patch
 '@waveform-playlist/spectrogram': patch

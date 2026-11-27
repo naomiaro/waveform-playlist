@@ -328,7 +328,6 @@ const config: Config = {
                 '@waveform-playlist/ui-components': path.resolve(__dirname, '../packages/ui-components/src'),
                 '@waveform-playlist/annotations': path.resolve(__dirname, '../packages/annotations/src'),
                 '@waveform-playlist/spectrogram': path.resolve(__dirname, '../packages/spectrogram/src'),
-                '@waveform-playlist/midi': path.resolve(__dirname, '../packages/midi/src'),
                 '@waveform-playlist/recording': path.resolve(__dirname, '../packages/recording/src'),
                 // worklets, loaders, webaudio-peaks, and the @dawcore/* family use their built dist versions via node_modules
                 // (@dawcore/components uses Lit decorators which babel-loader doesn't parse without extra config)

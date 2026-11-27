@@ -4,7 +4,7 @@ import {
   createClipFromSeconds,
   createTrack,
 } from '@waveform-playlist/core';
-import { parseMidiFile, parseMidiUrl, type ParsedMidi } from '@dawcore/midi';
+import { parseMidiFile, parseMidiUrl, type ParsedMidi } from './parseMidiFile';
 
 /** What a MIDI track needs besides its notes. */
 export interface MidiTrackShape {

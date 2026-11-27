@@ -11,7 +11,7 @@ export default defineConfig({
     alias: {
       '@waveform-playlist/browser': path.join(packagesDir, 'browser/src'),
       '@waveform-playlist/core': path.join(packagesDir, 'core/src'),
-      '@waveform-playlist/midi': path.join(packagesDir, 'midi/src'),
+      '@dawcore/midi': path.join(packagesDir, 'dawcore-midi/src'),
       '@waveform-playlist/playout': path.join(packagesDir, 'playout/src'),
       '@waveform-playlist/ui-components': path.join(packagesDir, 'ui-components/src'),
       '@waveform-playlist/engine': path.join(packagesDir, 'engine/src'),

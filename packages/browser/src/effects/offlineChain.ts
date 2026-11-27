@@ -14,7 +14,7 @@ import type { ToneAudioNode } from 'tone';
 import type { WamPluginInstance } from '@dawcore/wam'; // type-only — erased at runtime
 import { ensureEffectPrepared } from '@waveform-playlist/core';
 import type { EffectDefinition } from './effectDefinitions';
-import { createEffectInstance, type EffectInstance } from './effectFactory';
+import { createToneEffectInstance, type EffectInstance } from './effectFactory';
 import { createWamEffectInstance } from './wamEffectFactory';
 import { createCustomEffectInstance } from './customEffectFactory';
 import { loadWamModule } from './loadWam';
@@ -47,7 +47,7 @@ export async function buildOfflineChain(
   try {
     for (const entry of entries) {
       if (entry.kind === 'tone') {
-        instances.push(createEffectInstance(entry.definition, entry.params));
+        instances.push(createToneEffectInstance(entry.definition, entry.params));
         continue;
       }
       if (entry.kind === 'custom') {

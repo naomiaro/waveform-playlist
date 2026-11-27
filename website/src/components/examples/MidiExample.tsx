@@ -34,7 +34,7 @@ import {
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { audioTrack } from '@waveform-playlist/core';
 import type { Arrangement } from '@waveform-playlist/engine';
-import { loadMidiTracks } from '@waveform-playlist/midi';
+import { loadMidiTracks } from '@dawcore/midi';
 import { SoundFontCache, getGlobalAudioContext } from '@waveform-playlist/playout';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
