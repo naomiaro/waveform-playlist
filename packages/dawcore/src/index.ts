@@ -49,7 +49,6 @@ export { DawTimeFormatElement } from './elements/daw-time-format';
 export { DawPlayerElement } from './elements/daw-player';
 export { SpectrogramController } from './controllers/spectrogram-controller';
 export type {
-  KeyBinding,
   PlaybackShortcutMap,
   SplittingShortcutMap,
   UndoShortcutMap,

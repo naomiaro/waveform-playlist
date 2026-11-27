@@ -96,7 +96,7 @@ Each example page should have OG/Twitter meta tags with a social image. Pattern:
 
 ## Docusaurus Native Examples
 
-**Webpack aliases** in `website/docusaurus.config.ts` — packages transpiled from source (aliased to `packages/<name>/src`): `@waveform-playlist/browser`, `core`, `playout`, `engine`, `ui-components`, `annotations`, `spectrogram`, `midi`, `recording`. A source change in one of these needs no rebuild for the website. `worklets`, `webaudio-peaks` and the `@dawcore/*` family are NOT aliased: the website uses their built `dist` through node_modules. **Rebuild those after pulling/merging source changes** (`pnpm --filter @waveform-playlist/worklets build`, `pnpm --filter @dawcore/components build`) — a stale `dist` runs old behaviour despite correct source.
+**Webpack aliases** in `website/docusaurus.config.ts` — packages transpiled from source (aliased to `packages/<name>/src`): `@waveform-playlist/browser`, `core`, `playout`, `engine`, `ui-components`, `annotations`, `spectrogram`, `recording`. A source change in one of these needs no rebuild for the website. `worklets`, `webaudio-peaks` and the `@dawcore/*` family (also `@dawcore/midi`, whose `loadMidiTracks` the MIDI example imports; until #807 that came from the source-aliased `@waveform-playlist/midi`) are NOT aliased: the website uses their built `dist` through node_modules. **Rebuild those after pulling/merging source changes** (`pnpm --filter @waveform-playlist/worklets build`, `pnpm --filter @dawcore/components build`) — a stale `dist` runs old behaviour despite correct source.
 
 **SSR/SSG pattern:** Example components use browser APIs (AudioContext, Canvas, window) that aren't available during static site generation. Use `createLazyExample` from `BrowserOnlyWrapper`:
 

@@ -58,7 +58,7 @@ describe('loadMidiTracks', () => {
     const bytes = midi.toArray();
     const copy = new Uint8Array(new ArrayBuffer(bytes.length));
     copy.set(bytes);
-    const blob = Object.assign(new Blob([copy]), { arrayBuffer: async () => copy.buffer });
+    const blob = new Blob([copy]);
     const [track, ...rest] = await loadMidiTracks(blob, {
       sampleRate: SAMPLE_RATE,
       name: 'Renamed',

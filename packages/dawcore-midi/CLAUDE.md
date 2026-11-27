@@ -29,7 +29,9 @@ This package does the data pipeline only: `.mid` file → parser → `ClipTrack[
                                           arrangement.addTrack(track)
 ```
 
-The parser was moved here from `@waveform-playlist/midi` so it can be reused by the web-components layer without pulling React into dawcore's transitive deps. See `docs/specs/2026-05-23-dawcore-load-midi-design.md`.
+The parser was moved here from `@waveform-playlist/midi` so it can be reused by the web-components layer without pulling React into dawcore's transitive deps (PR #392; its design document was removed when the work was done).
+
+**`loadMidiTracks` makes core a runtime import of this package** (until #807 the parser used core for types only). dawcore's lazy `loadMidi()` chunk (`await import('@dawcore/midi')`) keeps `loadMidiTracks` and its imports of core's `createClipFromSeconds` and `createTrack`, about 1 kB, although dawcore calls only the parser (esbuild with splitting, measured by the review of #937). When the app's core and this package's exact-pinned core differ, that chunk evaluates the second copy's clip helpers.
 
 ### `loadMidiTracks`
 
@@ -65,7 +67,7 @@ Flatten would merge `midiNotes` into one visual track but keep separate `ClipTra
 
 `cd packages/dawcore-midi && npx vitest run` (Node environment; tests in `__tests__/` at the package root, not under `src/`).
 
-Test data is synthesized via `@tonejs/midi`'s `Midi` constructor — no binary fixture files. `loadMidiTracks.test.ts` uses Node's own `Blob` (it has `arrayBuffer()`, which jsdom's did not, the reason for a workaround while the test lived in `@waveform-playlist/midi`) and `createArrangement` from `@waveform-playlist/engine`, a devDependency for that test only.
+Test data is synthesized via `@tonejs/midi`'s `Midi` constructor — no binary fixture files. `loadMidiTracks.test.ts` uses Node's own `Blob` (it has `arrayBuffer()`, which jsdom's did not, the reason for a workaround in two tests while the file lived in `@waveform-playlist/midi`) and `createArrangement` from `@waveform-playlist/engine`, a devDependency for that test only.
 
 ### @tonejs/midi gotchas
 

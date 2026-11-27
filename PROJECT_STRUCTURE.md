@@ -1109,8 +1109,6 @@ export interface MediaElementTrackContextValue {
   duration: number;
   isReady: boolean;
   peaksDataArray: TrackClipPeaks[];
-  fadeIn?: FadeConfig;
-  fadeOut?: FadeConfig;
   playoutRef: React.RefObject<MediaElementPlayout | null>;
 }
 ```

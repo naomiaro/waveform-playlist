@@ -23,7 +23,7 @@ Migrate to native Web Components under the **dawcore** brand, making the library
 
 The original plan renamed every `@waveform-playlist/*` package into the `@dawcore/*` scope and replaced the React packages outright. **Decision (shipped): the two ecosystems coexist instead.**
 
-- **`@waveform-playlist/*`** remains the React surface (`browser`, `ui-components`, `recording`, `annotations`, `spectrogram`, `midi`) plus the shared framework-agnostic foundations (`core`, `engine`, `playout`, `worklets`, `webaudio-peaks`, `loaders`, `media-element-playout`). No renames.
+- **`@waveform-playlist/*`** remains the React surface (`browser`, `ui-components`, `recording`, `annotations`, `spectrogram`) plus the shared framework-agnostic foundations (`core`, `engine`, `playout`, `worklets`, `webaudio-peaks`, `loaders`, `media-element-playout`). No renames.
 - **`@dawcore/*`** is the Web Components ecosystem, versioned independently at 0.x:
 
 | Package                | Directory                      | Description                                                                        |
@@ -31,11 +31,11 @@ The original plan renamed every `@waveform-playlist/*` package into the `@dawcor
 | `@dawcore/components`  | `packages/dawcore`             | Web Components UI layer — Lit Custom Elements with Shadow DOM                      |
 | `@dawcore/transport`   | `packages/transport`           | Native Web Audio transport/scheduler (no Tone.js); provides `NativePlayoutAdapter` |
 | `@dawcore/spectrogram` | `packages/dawcore-spectrogram` | Framework-agnostic spectrogram compute (worker pool)                               |
-| `@dawcore/midi`        | `packages/dawcore-midi`        | Framework-agnostic MIDI parsing (optional peer of components)                      |
+| `@dawcore/midi`        | `packages/dawcore-midi`        | Framework-agnostic MIDI parsing and `loadMidiTracks` (optional peer of components) |
 | `@dawcore/wam`         | `packages/dawcore-wam`         | WAM 2.0 plugin hosting (optional peer)                                             |
 | `@dawcore/faust`       | `packages/dawcore-faust`       | In-browser Faust DSP → WAM compilation (optional peer)                             |
 
-`@dawcore/components` consumes the shared foundations as peers (`@waveform-playlist/core`, `@waveform-playlist/engine`, `@waveform-playlist/worklets`) — the engine and type layer serve both surfaces. When a React package has framework-agnostic logic worth sharing, it follows the two-flavor split convention: `@dawcore/X` core + `@waveform-playlist/X` React wrapper (precedents: spectrogram, midi).
+`@dawcore/components` consumes the shared foundations as peers (`@waveform-playlist/core`, `@waveform-playlist/engine`, `@waveform-playlist/worklets`) — the engine and type layer serve both surfaces. When a React package has framework-agnostic logic worth sharing, it follows the two-flavor split convention: `@dawcore/X` core + `@waveform-playlist/X` React wrapper (precedent: spectrogram). A wrapper with no React code left is removed: `@waveform-playlist/midi` went in #807, and React apps import `loadMidiTracks` from `@dawcore/midi`.
 
 React packages without a Web Components equivalent yet: the recording arming surface (epic #453).
 
@@ -1387,6 +1387,7 @@ interface KeyboardShortcut {
   preventDefault?: boolean; // Default: true
 }
 
+// from @waveform-playlist/core (dawcore no longer exports its own copy, #807)
 interface KeyBinding {
   key: string;
   ctrlKey?: boolean;

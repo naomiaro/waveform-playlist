@@ -1,7 +1,7 @@
-// #770: a name has one owner. No source file of the five packages below
-// re-exports from another workspace package, and no two of the entry points
-// scanned (their main entries, browser's `./tone` entry and core's) export the
-// same name; the pairs that do are listed, each with its reason.
+// #770, #807: a name has one owner. No source file of any package under
+// `packages/` re-exports from another workspace package, and no two entry points
+// (every `exports` entry of every package, browser's `./tone` included) export
+// the same name; the pairs that do are listed, each with its reason.
 //
 // What the scans cannot see (none present when this was written, except the
 // radio group name `render-mode` of the spectrogram menu, #808): a name
@@ -9,9 +9,8 @@
 // (`export const X = Imported`), is caught only by the name check, so only when
 // its owner is one of the entries scanned; `export default`, `export * as`,
 // `export let`, a destructured `export const { a }`; an id held in a constant,
-// a template string without `${}`, `.attrs({ id })`, a radio `name`. The other
-// packages (engine, playout, media-element-playout, the web components) are
-// not scanned: #807.
+// a template string without `${}`, `.attrs({ id })`, a radio `name`. The id
+// check covers the React packages only.
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
@@ -19,6 +18,17 @@ import { fileURLToPath } from 'node:url';
 
 const packagesRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const REACT_PACKAGES = ['browser', 'annotations', 'ui-components', 'spectrogram', 'recording'];
+const ALL_PACKAGES = readdirSync(packagesRoot)
+  .filter((dir) => isFile(join(packagesRoot, dir, 'package.json')))
+  .sort();
+
+function isFile(path: string): boolean {
+  try {
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
+}
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -76,17 +86,32 @@ function exportedNames(file: string, seen = new Set<string>()): Set<string> {
   return names;
 }
 
-/** `pkg` is a package directory, or `browser/tone` for browser's second entry. */
-function entryOf(pkg: string): string {
-  const [dir, entry = 'index'] = pkg.split('/');
-  const src = join(packagesRoot, dir, 'src');
-  return [join(src, `${entry}.tsx`), join(src, `${entry}.ts`)].find((candidate) => {
-    try {
-      return statSync(candidate).isFile();
-    } catch {
-      return false;
+/**
+ * The source file of each `exports` entry of a package, by name: `browser` for
+ * `.`, `browser/tone` for `./tone`. `./dist/x.mjs` is built from `src/x.ts(x)`
+ * or `src/x/index.ts(x)`.
+ */
+function entriesOf(dir: string): Array<[string, string]> {
+  const manifest = JSON.parse(readFileSync(join(packagesRoot, dir, 'package.json'), 'utf8'));
+  return Object.entries(manifest.exports as Record<string, string | { import: string }>).map(
+    ([subpath, target]) => {
+      const built = typeof target === 'string' ? target : target.import;
+      const stem = join(
+        packagesRoot,
+        dir,
+        'src',
+        built.replace(/^\.\/dist\//, '').replace(/\.m?js$/, '')
+      );
+      const source = [
+        `${stem}.ts`,
+        `${stem}.tsx`,
+        join(stem, 'index.ts'),
+        join(stem, 'index.tsx'),
+      ].find(isFile);
+      if (!source) throw new Error(`no source for ${dir} ${subpath} (${built})`);
+      return [subpath === '.' ? dir : `${dir}/${subpath.slice(2)}`, source];
     }
-  }) as string;
+  );
 }
 
 // The bound control in browser wraps the controlled one of ui-components: no
@@ -99,14 +124,27 @@ const CONTROLLED_AND_BOUND = [
   'TimeFormatSelect',
 ];
 
-// What the name check covers: the React packages, browser's `./tone` entry, and
-// core, which they all build on.
-const NAME_OWNERS = [...REACT_PACKAGES, 'browser/tone', 'core'];
-// Not one thing with two owners: a type in core, a component in ui-components.
-const DIFFERENT_KINDS = ['Track (core, ui-components)'];
+// A subpath entry that offers part of its own package's main entry on a narrower
+// import: the same names, one package, so one owner. Not compared with that entry.
+const PART_OF_MAIN_ENTRY = ['dawcore-spectrogram/orchestrator'];
+
+// Two different things under one name, each in its own package (#807: renaming
+// them was not worth a break; the web-component and transport names are their
+// packages' own API):
+const DIFFERENT_THINGS = [
+  // a type in core, a component in ui-components
+  'Track (core, ui-components)',
+  // the options of React's WAV export and of `<daw-editor>`'s `exportAudio()`
+  'ExportOptions (browser/tone, dawcore)',
+  // core's meter-change record (detectMeterChanges) and transport's MeterMap entry,
+  // with a `Tick` brand and a cached `barAtTick`
+  'MeterEntry (core, transport)',
+  // the options of the React recording hook and of dawcore's recording controller
+  'RecordingOptions (dawcore, recording)',
+];
 
 describe('one owner per exported name (#770)', () => {
-  it.each(REACT_PACKAGES)('%s re-exports nothing from another workspace package', (pkg) => {
+  it.each(ALL_PACKAGES)('%s re-exports nothing from another workspace package', (pkg) => {
     const found = sourceFiles(join(packagesRoot, pkg, 'src')).flatMap((file) =>
       [...readFileSync(file, 'utf8').matchAll(RE_EXPORT)].map(
         (match) => `${relative(packagesRoot, file)}: ${match[1]}`
@@ -116,17 +154,28 @@ describe('one owner per exported name (#770)', () => {
   });
 
   it('no two entry points export the same name, apart from the controlled and bound pairs', () => {
-    const names = new Map(NAME_OWNERS.map((pkg) => [pkg, exportedNames(entryOf(pkg))]));
+    const entries = ALL_PACKAGES.flatMap(entriesOf);
+    const names = new Map(entries.map(([entry, file]) => [entry, exportedNames(file)]));
+    const NAME_OWNERS = [...names.keys()];
     // The scan must have found the entries, or an empty result means nothing.
-    for (const pkg of NAME_OWNERS) expect(names.get(pkg)!.size).toBeGreaterThan(5);
+    expect(ALL_PACKAGES.length).toBeGreaterThan(15);
+    expect(NAME_OWNERS).toContain('browser/tone');
+    expect(NAME_OWNERS).toContain('dawcore-spectrogram/orchestrator');
+    expect(names.get('dawcore')!.has('DawEditorElement')).toBe(true);
+    expect(names.get('transport')!.has('MeterEntry')).toBe(true);
+    expect(names.get('dawcore-midi')!.has('loadMidiTracks')).toBe(true);
+    expect(names.get('engine')!.has('calculateDuration')).toBe(true);
     expect(names.get('core')!.has('samplesToPixels')).toBe(true);
     expect(names.get('core')!.has('SnapTo')).toBe(true);
     expect(names.get('browser/tone')!.has('useExportWav')).toBe(true);
     expect(names.get('browser')!.has('WaveformPlaylistProvider')).toBe(true);
     expect(names.get('ui-components')!.has('BaseCheckbox')).toBe(true);
     const shared: string[] = [];
+    const isPartOf = (part: string, main: string) =>
+      PART_OF_MAIN_ENTRY.includes(part) && part.split('/')[0] === main;
     NAME_OWNERS.forEach((a, i) =>
       NAME_OWNERS.slice(i + 1).forEach((b) => {
+        if (isPartOf(a, b) || isPartOf(b, a)) return;
         for (const name of names.get(a)!) {
           if (names.get(b)!.has(name)) shared.push(`${name} (${[a, b].sort().join(', ')})`);
         }
@@ -135,7 +184,7 @@ describe('one owner per exported name (#770)', () => {
     expect(shared.sort()).toEqual(
       [
         ...CONTROLLED_AND_BOUND.map((name) => `${name} (browser, ui-components)`),
-        ...DIFFERENT_KINDS,
+        ...DIFFERENT_THINGS,
       ].sort()
     );
   });

@@ -354,4 +354,4 @@ Track names are derived from the MIDI file content:
 - **Program > 0** → Title-cased GM instrument name (e.g., "Electric Bass (Finger)")
 - **Program 0** → Track name from the MIDI file, or "Acoustic Grand Piano", or "Channel N"
 
-The `name` option of `loadMidiTracks` names the track only when the file yields exactly one (a single-track file, or `flatten`). A file with several tracks keeps the names above, not prefixed with `name`.
+The `name` option of `loadMidiTracks` names the track and its clip only when the file yields exactly one track (one track with notes — tracks without notes are left out — or `flatten`). A file with several tracks keeps the names above, not prefixed with `name`.
