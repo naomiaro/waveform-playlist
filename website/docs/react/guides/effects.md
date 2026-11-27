@@ -703,6 +703,8 @@ Every audio track has one pan law, and its clips do not change it:
 
 A track takes its law from the **first decoded audio it holds**: a mono clip makes it a mono-law track, a stereo clip a stereo-law track. It then keeps that law. Adding a clip of the other kind, removing clips, recording a take or emptying the track does not move the audio already on it. Until a track has audio its law reads `'auto'`.
 
+The law belongs to the track's id, like its volume and pan. If your app gives tracks its own ids and reuses one for other material (`arrangement.setTracks` or `updateTrack` with an id that is already there), that track keeps the law it had. Use a new id for new material, or set the law.
+
 A clip of the other kind still plays, under the track's law. The law converts nothing:
 
 - a stereo clip on a mono-law track stays stereo, plays 3 dB lower at centre than it would on a stereo-law track, and a hard pan mutes one side instead of folding it in;

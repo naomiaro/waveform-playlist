@@ -130,7 +130,7 @@ Every audio track now has a pan law of its own, `'mono'` or `'stereo'`. It is de
 - A track of mono clips only, or of stereo clips only, sounds as before.
 - A stereo clip added to a track of mono clips (a file dropped on it, a recorded take, `updateTrack`) no longer makes the mono clips 3 dB louder at centre. The stereo clip plays under the track's mono law: 3 dB lower at centre than on a stereo-law track, and a hard pan mutes one side instead of folding it in.
 - Removing the last stereo clip from such a track no longer makes the mono clips 3 dB quieter.
-- A track that was emptied keeps its law for the next audio it is given.
+- A track that was emptied keeps its law for the next audio it is given. So does a track id you reuse: `setTracks` or `updateTrack` with an id the arrangement already holds keeps that id's law, as it keeps its volume and pan. Use a new id for new material (the default: `audioTrack()` and `createTrack()` generate one), or set the law.
 - A new track whose first clips are a mono file and a stereo file, both loading, takes the law of whichever finishes first. Previously it had the stereo law once both were in.
 
 **Find:** nothing to search for in most apps. If you want a particular law on a track that mixes mono and stereo clips, say so:
