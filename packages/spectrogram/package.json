@@ -1,6 +1,6 @@
 {
   "name": "@waveform-playlist/spectrogram",
-  "version": "15.0.0-next.4",
+  "version": "15.0.0-next.5",
   "description": "React Provider + UI for spectrograms — wraps @dawcore/spectrogram",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
