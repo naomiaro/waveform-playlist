@@ -1,5 +1,8 @@
-import { useState, useCallback, useRef, startTransition, type RefObject } from 'react';
-import type { PlaylistEngine, EngineState } from '@waveform-playlist/engine';
+import { useState, useCallback, startTransition, type RefObject } from 'react';
+import type { PlaylistEngine } from '@waveform-playlist/engine';
+
+/** The levels zoom steps through when the provider is given none. */
+export const DEFAULT_ZOOM_LEVELS: readonly number[] = [256, 512, 1024, 2048, 4096, 8192];
 
 export interface ZoomControls {
   samplesPerPixel: number;
@@ -11,15 +14,25 @@ export interface ZoomControls {
 
 export interface UseZoomControlsProps {
   engineRef: RefObject<PlaylistEngine | null>;
-  initialSamplesPerPixel: number;
+  /**
+   * Where the zoom is kept outside render, holding the initial zoom. Made by
+   * the caller, because a new engine is built with it and the engine's
+   * lifetime is set up before this hook. Only this hook writes it.
+   */
+  samplesPerPixelRef: RefObject<number>;
+  /** Samples per pixel, smallest (most zoomed in) first. Stable by content. */
+  zoomLevels: readonly number[];
 }
 
 /**
- * Hook for managing zoom controls via PlaylistEngine delegation.
+ * The zoom (samples per pixel). This hook owns it (#826): `zoomIn` and
+ * `zoomOut` step through `zoomLevels` here, engine or not, and hand the new
+ * level to the engine there is. A new engine is built with the level in
+ * `samplesPerPixelRef`. Nothing is read back from an engine.
  *
- * zoomIn/zoomOut delegate to the engine. State is mirrored back from
- * the engine via onEngineState(), which the provider's statechange
- * handler calls on every engine event.
+ * `canZoomIn` and `canZoomOut` are computed from the level and the levels.
+ * A level that is not one of `zoomLevels` has no step in either direction
+ * (no engine is built for it either: the build fails and says so).
  *
  * samplesPerPixel updates use startTransition so React treats them as
  * non-urgent — during playback, animation RAF callbacks interleave
@@ -27,52 +40,36 @@ export interface UseZoomControlsProps {
  */
 export function useZoomControls({
   engineRef,
-  initialSamplesPerPixel,
-}: UseZoomControlsProps): ZoomControls & {
-  onEngineState: (state: EngineState) => void;
-} {
-  const [samplesPerPixel, setSamplesPerPixel] = useState(initialSamplesPerPixel);
-  const [canZoomIn, setCanZoomIn] = useState(true);
-  const [canZoomOut, setCanZoomOut] = useState(true);
+  samplesPerPixelRef,
+  zoomLevels,
+}: UseZoomControlsProps): ZoomControls {
+  const [samplesPerPixel, setSamplesPerPixel] = useState(() => samplesPerPixelRef.current);
 
-  // Internal refs for statechange guards — prevent redundant setState
-  // calls during high-frequency engine events (clip drags, play/pause).
-  const canZoomInRef = useRef(true);
-  const canZoomOutRef = useRef(true);
-  const samplesPerPixelRef = useRef(initialSamplesPerPixel);
-
-  const zoomIn = useCallback(() => {
-    engineRef.current?.zoomIn();
-  }, [engineRef]);
-
-  const zoomOut = useCallback(() => {
-    engineRef.current?.zoomOut();
-  }, [engineRef]);
-
-  // Called by the provider's statechange handler to mirror engine state.
-  const onEngineState = useCallback((state: EngineState) => {
-    if (state.samplesPerPixel !== samplesPerPixelRef.current) {
-      samplesPerPixelRef.current = state.samplesPerPixel;
+  const step = useCallback(
+    (by: -1 | 1) => {
+      const index = zoomLevels.indexOf(samplesPerPixelRef.current);
+      if (index === -1) return;
+      const next = zoomLevels[index + by];
+      if (next === undefined) return;
+      samplesPerPixelRef.current = next;
       startTransition(() => {
-        setSamplesPerPixel(state.samplesPerPixel);
+        setSamplesPerPixel(next);
       });
-    }
-    if (state.canZoomIn !== canZoomInRef.current) {
-      canZoomInRef.current = state.canZoomIn;
-      setCanZoomIn(state.canZoomIn);
-    }
-    if (state.canZoomOut !== canZoomOutRef.current) {
-      canZoomOutRef.current = state.canZoomOut;
-      setCanZoomOut(state.canZoomOut);
-    }
-  }, []);
+      engineRef.current?.setZoomLevel(next);
+    },
+    [engineRef, samplesPerPixelRef, zoomLevels]
+  );
+
+  const zoomIn = useCallback(() => step(-1), [step]);
+  const zoomOut = useCallback(() => step(1), [step]);
+
+  const index = zoomLevels.indexOf(samplesPerPixel);
 
   return {
     samplesPerPixel,
     zoomIn,
     zoomOut,
-    canZoomIn,
-    canZoomOut,
-    onEngineState,
+    canZoomIn: index > 0,
+    canZoomOut: index !== -1 && index < zoomLevels.length - 1,
   };
 }

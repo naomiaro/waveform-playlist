@@ -32,7 +32,7 @@ vi.mock('@waveform-playlist/engine', async (importOriginal) => {
 import { render, act, cleanup } from '@testing-library/react';
 import React, { StrictMode } from 'react';
 import { attachDecodeContext, createArrangement } from '@waveform-playlist/engine';
-import type { Arrangement, EngineState, PlaylistEngine } from '@waveform-playlist/engine';
+import type { Arrangement, PlaylistEngine } from '@waveform-playlist/engine';
 import type { EffectsFunction } from '@waveform-playlist/playout';
 import {
   adapterFactory,
@@ -103,7 +103,6 @@ describe('useEngineLifetime', () => {
           seen.engineRefDuringCallbacks.push(harness.lifetime.engineRef.current);
         }}
         onEngine={() => calls.push('onEngine')}
-        onEngineState={() => calls.push('state')}
       />
     );
     await act(flush);
@@ -124,7 +123,7 @@ describe('useEngineLifetime', () => {
     expect(lifetime.isEngineAttached).toBe(true);
     expect(lifetime.engineBuildInFlightRef.current).toBe(false);
     // Seeded, subscribed and told its first state before it is assigned.
-    expect(calls).toEqual(['seed', 'onEngine', 'state']);
+    expect(calls).toEqual(['seed', 'onEngine']);
     expect(seen.engineRefDuringCallbacks).toEqual([null]);
   });
 
@@ -138,7 +137,6 @@ describe('useEngineLifetime', () => {
       onError: () => {},
       seedEngine: () => {},
       onEngine: () => {},
-      onEngineState: () => {},
       resolveTrackEffects: () => undefined,
       zoomLevels: [512, 1024, 2048],
       effects: effectsA,
@@ -226,36 +224,29 @@ describe('useEngineLifetime', () => {
     expect(harness.lifetime.engineEpoch).toBe(1);
   });
 
-  it('a rebuild with other zoom levels reports the new engine’s first state once', async () => {
+  it('a rebuild with other zoom levels builds the new engine with them', async () => {
     const arrangement = createArrangement();
     const factory = adapterFactory();
-    const states: EngineState[] = [];
-    const onEngineState = (state: EngineState) => states.push(state);
     const view = render(
       <Probe
         arrangement={arrangement}
         createAdapter={factory.createAdapter}
         zoomLevels={[512, 1024, 2048]}
-        onEngineState={onEngineState}
       />
     );
     await act(flush);
-    expect(states).toHaveLength(1);
-    expect(states[0]).toMatchObject({ canZoomIn: true, canZoomOut: true });
+    expect(recorded.built[0].options.zoomLevels).toEqual([512, 1024, 2048]);
 
     view.rerender(
       <Probe
         arrangement={arrangement}
         createAdapter={factory.createAdapter}
         zoomLevels={[1024, 2048]}
-        onEngineState={onEngineState}
       />
     );
     await act(flush);
     expect(recorded.built).toHaveLength(2);
     expect(recorded.built[1].options.zoomLevels).toEqual([1024, 2048]);
-    expect(states).toHaveLength(2);
-    expect(states[1]).toMatchObject({ canZoomIn: false, canZoomOut: true });
   });
 
   it('nothing is fetched until the first adapter exists; a load started between two engines waits and then decodes with the new adapter’s context', async () => {

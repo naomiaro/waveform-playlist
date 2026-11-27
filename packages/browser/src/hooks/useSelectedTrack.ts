@@ -1,8 +1,10 @@
-import { useState, useCallback, useRef, type RefObject } from 'react';
-import type { PlaylistEngine, EngineState } from '@waveform-playlist/engine';
+import { useState, useCallback, useEffect, useRef, type RefObject } from 'react';
+import type { Arrangement, PlaylistEngine } from '@waveform-playlist/engine';
 
 export interface UseSelectedTrackProps {
   engineRef: RefObject<PlaylistEngine | null>;
+  /** The selected id names one of its tracks. */
+  arrangement: Arrangement;
 }
 
 export interface SelectedTrackControls {
@@ -11,40 +13,49 @@ export interface SelectedTrackControls {
 }
 
 /**
- * Hook for managing selected track state via PlaylistEngine delegation.
+ * The selected track id. This hook owns it (#826): the setter writes it
+ * here, engine or not, and hands it to the engine there is. The provider
+ * gives each new engine the value from the ref. Nothing is read back from an
+ * engine.
  *
- * setSelectedTrackId delegates to the engine's selectTrack method.
- * State is mirrored back from the engine via onEngineState(), which
- * the provider's statechange handler calls on every engine event.
+ * The id names a track of the arrangement: when that track is gone, nothing
+ * is selected (the engine has the same rule for its own copy).
  */
-export function useSelectedTrack({ engineRef }: UseSelectedTrackProps): SelectedTrackControls & {
-  onEngineState: (state: EngineState) => void;
+export function useSelectedTrack({
+  engineRef,
+  arrangement,
+}: UseSelectedTrackProps): SelectedTrackControls & {
   selectedTrackIdRef: React.RefObject<string | null>;
 } {
   const [selectedTrackId, setSelectedTrackIdState] = useState<string | null>(null);
 
-  // Internal ref for statechange guard.
+  // The value outside render: what a new engine is given.
   const selectedTrackIdRef = useRef<string | null>(null);
 
   const setSelectedTrackId = useCallback(
     (trackId: string | null) => {
+      selectedTrackIdRef.current = trackId;
+      setSelectedTrackIdState(trackId);
       engineRef.current?.selectTrack(trackId);
     },
     [engineRef]
   );
 
-  // Called by the provider's statechange handler to mirror engine state.
-  const onEngineState = useCallback((state: EngineState) => {
-    if (state.selectedTrackId !== selectedTrackIdRef.current) {
-      selectedTrackIdRef.current = state.selectedTrackId;
-      setSelectedTrackIdState(state.selectedTrackId);
-    }
-  }, []);
+  useEffect(() => {
+    const clearIfGone = () => {
+      const selected = selectedTrackIdRef.current;
+      if (selected === null) return;
+      if (arrangement.getTracks().some((track) => track.id === selected)) return;
+      setSelectedTrackId(null);
+    };
+    // A track removed between the render and this effect.
+    clearIfGone();
+    return arrangement.subscribe(clearIfGone);
+  }, [arrangement, setSelectedTrackId]);
 
   return {
     selectedTrackId,
     setSelectedTrackId,
-    onEngineState,
     selectedTrackIdRef,
   };
 }
