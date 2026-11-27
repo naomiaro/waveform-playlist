@@ -190,6 +190,16 @@ export function useIntegratedRecording(
     // The take ended without our stopRecording(): keep it (#822).
     finishTakeRef.current(buffer)
   );
+  // The start below can wait on the audio context first. It then calls the
+  // startRec of the latest render: the one it closed over may hold a stream
+  // that a cleanup has stopped meanwhile (a hide and a reveal).
+  const startRecRef = useRef(startRec);
+  startRecRef.current = startRec;
+  // What requestMicAccess asks for, read when it is called.
+  const selectedDeviceRef = useRef(selectedDevice);
+  selectedDeviceRef.current = selectedDevice;
+  const devicesRef = useRef(devices);
+  devicesRef.current = devices;
 
   // Start recording handler. Reads selectedTrackId from its ref, and the
   // tracks from the arrangement as they are now: a track the app added in the
@@ -229,7 +239,7 @@ export function useIntegratedRecording(
       recordingTrackIdRef.current = selectedTrackIdRef.current;
       setRecordingTrackId(selectedTrackIdRef.current);
 
-      const started = await startRec();
+      const started = await startRecRef.current();
       if (!started) setRecordingTrackId(null);
       return started;
     } catch (err) {
@@ -239,7 +249,7 @@ export function useIntegratedRecording(
     } finally {
       isStartingRef.current = false;
     }
-  }, [arrangement, startRec]);
+  }, [arrangement]);
 
   // Add a finished take to the track it was started on. Called once per take
   // by whichever saw it end: stopRecording below, or useRecording when the
@@ -372,7 +382,17 @@ export function useIntegratedRecording(
     }
     try {
       setHookError(null);
-      await requestAccess(undefined, audioConstraintsRef.current);
+      // The device the picker shows, while it is still there: after a hide
+      // the app asks again, and must get the microphone it had chosen. An
+      // exact id of a device that has left the list would fail the request,
+      // so that case asks for the default one (the fallback effect then
+      // corrects the selection).
+      const selected = selectedDeviceRef.current;
+      const deviceId =
+        selected !== null && devicesRef.current.some((d) => d.deviceId === selected)
+          ? selected
+          : undefined;
+      await requestAccess(deviceId, audioConstraintsRef.current);
       await resumeGlobalAudioContext();
       audioResumedRef.current = true;
     } catch (err) {

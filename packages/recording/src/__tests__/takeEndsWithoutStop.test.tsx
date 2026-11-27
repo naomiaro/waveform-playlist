@@ -23,8 +23,9 @@ vi.mock('@waveform-playlist/core', async (importOriginal) => {
 });
 
 const { useIntegratedRecording } = await import('../hooks/useIntegratedRecording');
-const { useRecording } = await import('../hooks/useRecording');
+const { useRecording, useRecordingWithTakeEnded } = await import('../hooks/useRecording');
 const { createMockStream, createMockNode, workletsModule } = await import('./helpers/recordingEnv');
+const { playoutModule } = await import('./helpers/recordingEnv');
 
 const audioTrack = (id: string): ArrangementTrack =>
   ({ id, name: id, kind: 'audio', clips: [] }) as unknown as ArrangementTrack;
@@ -355,5 +356,134 @@ describe('useRecording: a start that is waiting when the component is hidden', (
     expect(started).toBe(false);
     expect(result.current.isRecording).toBe(false);
     expect(env.context.createMediaStreamSource).not.toHaveBeenCalled();
+  });
+});
+
+describe('useIntegratedRecording: asking for the microphone again', () => {
+  const requestedDevice = () => env.getUserMedia.mock.lastCall![0].audio.deviceId;
+
+  it('asks for the selected device after a hide, not the default one', async () => {
+    const arrangement = arrangementOf('track-1');
+    const { result, hide, show } = renderHookInActivity(() =>
+      useIntegratedRecording(arrangement, 'track-1')
+    );
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+    await act(async () => {
+      changeDevices(['dev-a', 'dev-b']);
+      await settle();
+    });
+    await act(async () => {
+      await result.current.changeDevice('dev-b');
+    });
+    expect(result.current.selectedDevice).toBe('dev-b');
+
+    await act(async () => {
+      hide();
+    });
+    await act(async () => {
+      show();
+    });
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+
+    expect(requestedDevice()).toEqual({ exact: 'dev-b' });
+    expect(result.current.selectedDevice).toBe('dev-b');
+  });
+
+  it('asks for the default device when the selected one has left the list', async () => {
+    const arrangement = arrangementOf('track-1');
+    const { result, hide, show } = renderHookInActivity(() =>
+      useIntegratedRecording(arrangement, 'track-1')
+    );
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+    expect(result.current.selectedDevice).toBe('dev-a');
+    await act(async () => {
+      hide();
+    });
+    await act(async () => {
+      show();
+    });
+    await act(async () => {
+      changeDevices(['dev-b']);
+      await settle();
+    });
+    env.getUserMedia.mockClear();
+    let firstRequest: unknown = 'not asked';
+    env.getUserMedia.mockImplementationOnce(async (constraints: MediaStreamConstraints) => {
+      firstRequest = (constraints.audio as MediaTrackConstraints).deviceId;
+      return createMockStream('mic');
+    });
+
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+
+    // An exact id of a device that is gone would make getUserMedia fail.
+    expect(firstRequest).toBeUndefined();
+  });
+
+  it('does not start a take when the start was waiting on the audio context across a hide', async () => {
+    const arrangement = arrangementOf('track-1');
+    const { result, hide, show } = renderHookInActivity(() =>
+      useIntegratedRecording(arrangement, 'track-1')
+    );
+    // The stream is granted, and the resume after it fails: the next start
+    // resumes the context itself, and waits there.
+    playoutModule.resumeGlobalAudioContext.mockRejectedValueOnce(new Error('not allowed'));
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+    expect(result.current.stream).not.toBeNull();
+    let resumed!: () => void;
+    playoutModule.resumeGlobalAudioContext.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (resumed = resolve))
+    );
+    let starting!: Promise<boolean>;
+    act(() => {
+      starting = result.current.startRecording();
+    });
+
+    await act(async () => {
+      hide();
+    });
+    await act(async () => {
+      show();
+    });
+    let started: boolean | undefined;
+    await act(async () => {
+      resumed();
+      started = await starting;
+    });
+
+    // The hide stopped the stream that start was given.
+    expect(started).toBe(false);
+    expect(result.current.isRecording).toBe(false);
+    expect(result.current.recordingTrackId).toBeNull();
+  });
+});
+
+describe('useRecording: a take-ended listener that throws', () => {
+  it('does not make the unmount throw', async () => {
+    const stream = createMockStream('mic');
+    const { result, unmount } = renderHook(() =>
+      useRecordingWithTakeEnded(stream, {}, () => {
+        throw new Error('listener failed');
+      })
+    );
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    act(() => pushSamples(256));
+
+    expect(() => unmount()).not.toThrow();
+    expect(console.warn).toHaveBeenCalledWith(
+      '[waveform-playlist] Failed to hand over the interrupted take:',
+      'Error: listener failed'
+    );
   });
 });
