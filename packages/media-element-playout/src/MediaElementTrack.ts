@@ -1,8 +1,6 @@
 import type { WaveformDataObject, FadeConfig } from '@waveform-playlist/core';
 import { applyFadeIn, applyFadeOut, generateCurve } from '@waveform-playlist/core';
 
-export type { FadeConfig } from '@waveform-playlist/core';
-
 /**
  * Extended HTMLAudioElement with vendor-prefixed preservesPitch properties.
  * `preservesPitch` is standard; the `moz` and `webkit` prefixes are for older browsers.

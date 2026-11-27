@@ -1,18 +1,12 @@
 import { LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { handleKeyboardEvent } from '@waveform-playlist/core';
-import type { KeyboardShortcut } from '@waveform-playlist/core';
+import type { KeyBinding, KeyboardShortcut } from '@waveform-playlist/core';
 import type { DawEditorElement } from './daw-editor';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-/** Key binding for remapping — derived from KeyboardShortcut to stay in sync. */
-export type KeyBinding = Pick<
-  KeyboardShortcut,
-  'key' | 'ctrlKey' | 'shiftKey' | 'metaKey' | 'altKey'
->;
 
 export interface PlaybackShortcutMap {
   playPause?: KeyBinding;

@@ -18,7 +18,7 @@ import {
   useArrangementTracks,
 } from '@waveform-playlist/browser';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
-import { loadMidiTracks } from '@waveform-playlist/midi';
+import { loadMidiTracks } from '@dawcore/midi';
 import { SoundFontCache, getGlobalAudioContext } from '@waveform-playlist/playout';
 
 const darkThemeOverrides: Partial<WaveformPlaylistTheme> = {

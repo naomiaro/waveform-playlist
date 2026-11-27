@@ -14,7 +14,7 @@ This page contains all TypeScript interfaces extracted from source code. Designe
 
 **Upgrading from an earlier major:** see the [upgrade guide](./react/upgrading.md) — one Find / Replace-with entry per breaking change.
 
-**One owner per name (#770):** among the React packages a name is exported by one package, and `browser`, `annotations`, `ui-components`, `spectrogram` and `recording` re-export nothing from another package. Import data types and helpers (`ClipTrack`, `AudioClip`, `Fade`, `AnnotationData`, `createTrack`, `KeyboardShortcut`, `handleKeyboardEvent`, the sample/pixel/second conversions, `SpectrogramCanvasRegistration`) from `@waveform-playlist/core`; `TimeFormat`, `TrackMenuItem` and `BeatsAndBarsSnapTo` from `@waveform-playlist/ui-components`; `EffectsFunction` and `TrackEffectsFunction` from `@waveform-playlist/playout`; the annotation checkboxes and `DownloadAnnotationsButton` from `@waveform-playlist/annotations`. Among the main entries of those five packages, `@waveform-playlist/browser/tone` and `@waveform-playlist/core`, the names two entry points share on purpose are `AutomaticScrollCheckbox`, `MasterVolumeControl`, `PlaybackRateSelect`, `SelectionTimeInputs` and `TimeFormatSelect`: the one in `ui-components` is driven by props, the one in `browser` reads the provider and wraps it. (`Track` is two different things under one name: a type in `@waveform-playlist/core` and a component in `@waveform-playlist/ui-components`.) One more pair is left: `createEffectInstance` is one function in `@waveform-playlist/browser/tone` and a different one in `@waveform-playlist/core`.
+**One owner per name (#770, #807):** a name is exported by one package, and no package re-exports from another. `KeyBinding` is core's (`@dawcore/components` no longer exports a copy); `ExportOptions`, `MeterEntry` and `RecordingOptions` are each two different types in two packages. Import data types and helpers (`ClipTrack`, `AudioClip`, `Fade`, `AnnotationData`, `createTrack`, `KeyboardShortcut`, `handleKeyboardEvent`, the sample/pixel/second conversions, `SpectrogramCanvasRegistration`) from `@waveform-playlist/core`; `TimeFormat`, `TrackMenuItem` and `BeatsAndBarsSnapTo` from `@waveform-playlist/ui-components`; `EffectsFunction` and `TrackEffectsFunction` from `@waveform-playlist/playout`; the annotation checkboxes and `DownloadAnnotationsButton` from `@waveform-playlist/annotations`. The names two entry points share on purpose are `AutomaticScrollCheckbox`, `MasterVolumeControl`, `PlaybackRateSelect`, `SelectionTimeInputs` and `TimeFormatSelect`: the one in `ui-components` is driven by props, the one in `browser` reads the provider and wraps it. (`Track` is two different things under one name: a type in `@waveform-playlist/core` and a component in `@waveform-playlist/ui-components`.) `createEffectInstance` is the effect registry's, in `@waveform-playlist/core`; the Tone.js factory of `@waveform-playlist/browser/tone` is `createToneEffectInstance`.
 
 ---
 
@@ -71,9 +71,12 @@ interface WaveformPlaylistProviderProps {
    *  does. Recording sessions suppress the auto-stop automatically. A provider option, not a
    *  view option: the animation loop and `seekTo` follow it. */
   indefinitePlayback?: boolean;           // Default: false
-  /** Desired AudioContext sample rate for pre-computed peaks matching. Read at build
-   *  time. Also the rate placeholders are drawn at before the first adapter exists:
-   *  without it no placeholder is drawn until an adapter has been built. */
+  /** Requested AudioContext sample rate, default Tone.js adapter only: passed to
+   *  playout's `configureGlobalContext`, which keeps an existing context's rate
+   *  and which Tone.js 15.1.22 ignores (warning when the rates differ). The
+   *  provider uses the rate of the context it gets. Read at build time. Also the
+   *  rate placeholders are drawn at before the first adapter exists: without it
+   *  no placeholder is drawn until an adapter has been built. */
   sampleRate?: number;
   /** Supply a custom playout adapter — skips dynamic import of @waveform-playlist/playout + tone.
    *  Called once per engine build; read at build time. Audio is decoded with the current
@@ -107,6 +110,7 @@ interface WaveformPlaylistProviderProps {
 The props type is exported: `import type { MediaElementPlaylistProviderProps } from '@waveform-playlist/browser'` (since #828).
 
 ```typescript
+// FadeConfig is from @waveform-playlist/core
 interface FadeConfig {
   duration: number;                      // Duration of the fade in seconds
   type?: FadeType;                       // 'linear' | 'logarithmic' | 'exponential' | 'sCurve'
@@ -862,7 +866,7 @@ const arrangement = useCreateArrangement(() => [
 <WaveformPlaylistProvider arrangement={arrangement}><Waveform /></WaveformPlaylistProvider>
 ```
 
-Placeholders: a clip still loading that has a `duration` or `waveformData` is drawn as a placeholder record in `peaksDataArray` (`isPlaceholder: true`; from its peaks, else a box of the clip's extent in the colour the waveform's bars are drawn in (`waveFillColor`, `selectedWaveFillColor` on the selected track, `grey` when the theme gives no usable colour), `<ClipPlaceholderBody />` from ui-components, `data-clip-placeholder-body="true"`, with or without clip headers and on spectrogram tracks too; the played-portion tint and fade curves draw over it), dimmed, without handles; a clip that names only its `src` is drawn once loaded. No placeholder is drawn before the provider knows its real sample rate (the `sampleRate` prop, else the first adapter's context). A placeholder's geometry is at the provider's sample rate, also when its peaks file has another.
+Placeholders: a clip still loading that has a `duration` or `waveformData` is drawn as a placeholder record in `peaksDataArray` (`isPlaceholder: true`; from its peaks, else a box of the clip's extent in the colour the waveform's bars are drawn in (`waveFillColor`, `selectedWaveFillColor` on the selected track, `grey` when the theme gives no usable colour), `<ClipPlaceholderBody />` from ui-components, `data-clip-placeholder-body="true"`, with or without clip headers and on spectrogram tracks too; the played-portion tint and fade curves draw over it), dimmed, without handles; a clip that names only its `src` is drawn once loaded. No placeholder is drawn before the provider has a sample rate (from mount the `sampleRate` prop's, which is a request; the first adapter's context rate replaces it). A placeholder's geometry is at the provider's sample rate, also when its peaks file has another.
 
 Rule for apps: change tracks from a handler, an effect or a `sources` listener, not from inside `arrangement.subscribe()` or an engine `statechange` listener: two or more track edits made inside one listener run make the engine send the adapter every track (`setTracks`), which can interrupt playback.
 
@@ -1548,9 +1552,9 @@ Each split is one `arrangement.splitClip()` on the provider's arrangement (`useA
 
 ---
 
-## MIDI (`@waveform-playlist/midi` + `@dawcore/midi`)
+## MIDI (`@dawcore/midi`)
 
-Load and parse MIDI files into `ClipTrack[]` with `midiNotes` for piano roll visualization and SoundFont/PolySynth playback. As of v13, the parser is framework-agnostic and lives in `@dawcore/midi`; `@waveform-playlist/midi` re-exports it and adds the plain function `loadMidiTracks` on top. The package has no React hook and no `react` peer dependency (`useMidiTracks` was removed: see the upgrade guide, "`useMidiTracks` is removed: load with `loadMidiTracks`").
+Load and parse MIDI files into `ClipTrack[]` with `midiNotes` for piano roll visualization and SoundFont/PolySynth playback. `@dawcore/midi` is framework-agnostic: it has the parser and the plain function `loadMidiTracks`, no React hook and no peer dependency. It replaces `@waveform-playlist/midi`, which is no longer published (upgrade guide: "`@waveform-playlist/midi` is replaced by `@dawcore/midi`"; `useMidiTracks` was removed: "`useMidiTracks` is removed: load with `loadMidiTracks`").
 
 ### loadMidiTracks
 
@@ -1576,7 +1580,7 @@ Each track has `kind: 'midi'`, and every call makes new track and clip ids. To p
 
 ### parseMidiFile / parseMidiUrl
 
-Defined in `@dawcore/midi` and re-exported from `@waveform-playlist/midi` for React consumers (no source change needed).
+From `@dawcore/midi`.
 
 ```typescript
 function parseMidiFile(data: ArrayBuffer, options?: ParseMidiOptions): ParsedMidi;
@@ -3139,7 +3143,7 @@ effectDefinitions: EffectDefinition[];
 effectCategories: { id: EffectCategory; name: string }[];
 getEffectDefinition(id: string): EffectDefinition | undefined;
 getEffectsByCategory(category: EffectCategory): EffectDefinition[];
-createEffectInstance(
+createToneEffectInstance(
   definition: EffectDefinition,
   initialParams?: Record<string, number | string | boolean>
 ): EffectInstance;
@@ -3149,8 +3153,8 @@ createEffectChain(effects: EffectInstance[]): {
   dispose: () => void;
 };
 getAvailableEffects(): EffectDefinition[]; // built-ins, then (native-context mode only) the custom types the app registered; another host's `builtIn` catalogue (dawcore's native-*) is left out
-// The registry functions (registerEffect, a different createEffectInstance, …)
-// are from `@waveform-playlist/core` — see "Effect registry" above.
+// The registry functions (registerEffect, createEffectInstance, …) are from
+// `@waveform-playlist/core` — see "Effect registry" above.
 
 // Pan stage (from `@waveform-playlist/core`) — every renderer pans tracks with
 // this, never a StereoPannerNode or Tone Panner: the law comes from the track's

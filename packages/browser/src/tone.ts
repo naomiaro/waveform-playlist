@@ -35,7 +35,7 @@ export {
   effectCategories,
   getEffectDefinition,
   getEffectsByCategory,
-  createEffectInstance,
+  createToneEffectInstance,
   createEffectChain,
 } from './effects';
 export type {

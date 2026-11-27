@@ -70,7 +70,7 @@ parseSpectrogramCanvasId(id);
 | `utils/musicalTicks` | `computeMusicalTicks`, `snapToTicks`, `snapTickToGrid`, `SnapTo`, `MusicalTick` |
 | `utils/meterDetection` | `MeterEntry`, `detectMeterChanges` |
 | `utils/peaksGenerator` | `generatePeaks`, `appendPeaks` |
-| `utils/audioBufferUtils` | `concatenateAudioData`, `createAudioBuffer`, `appendToAudioBuffer`, `calculateDuration` |
+| `utils/audioBufferUtils` | `concatenateAudioData`, `createAudioBuffer`, `appendToAudioBuffer` |
 | `utils/latency` | `resolveRecordingOffsetSamples` — override-vs-auto recording latency compensation (shared by React + dawcore) |
 | `utils/carveClipRange` | `carveClipRange` — punch-in replace: carve a sample range out of a clip list (trim/remove/split) |
 | `keyboard` | `KeyboardShortcut`, `handleKeyboardEvent` |

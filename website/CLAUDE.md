@@ -74,7 +74,7 @@ Each example page should have OG/Twitter meta tags with a social image. Pattern:
 - Do NOT add `@docusaurus/module-type-aliases` to `tsconfig.json` `compilerOptions.types` — its `Layout` type only has `children` (no `title`/`description`), overriding our more complete local declarations
 - When adding new Docusaurus virtual module imports, add the type declaration to `docusaurus.d.ts`
 - 3 pre-existing `DefaultTheme` errors from browser package source (styled-components augmentation not picked up via webpack aliases) — these are expected
-- `pnpm --filter website typecheck` is NOT in CI (root `typecheck`/`build` cover only `./packages/*`) and has pre-existing module-resolution errors (`@waveform-playlist/midi`/`spectrogram`, Tone `BitCrusher`) — it relies on bundler aliases, not tsconfig paths. Don't chase these.
+- `pnpm --filter website typecheck` is NOT in CI (root `typecheck`/`build` cover only `./packages/*`) and has pre-existing module-resolution errors (`@waveform-playlist/spectrogram`, Tone `BitCrusher`; the `@waveform-playlist/midi` one went with the package in #807, run 2026-11-27) — it relies on bundler aliases, not tsconfig paths. Don't chase these.
 
 ## Static Media Assets
 
@@ -96,7 +96,7 @@ Each example page should have OG/Twitter meta tags with a social image. Pattern:
 
 ## Docusaurus Native Examples
 
-**Webpack aliases** in `website/docusaurus.config.ts` — packages transpiled from source (aliased to `packages/<name>/src`): `@waveform-playlist/browser`, `core`, `playout`, `engine`, `ui-components`, `annotations`, `spectrogram`, `midi`, `recording`. A source change in one of these needs no rebuild for the website. `worklets`, `webaudio-peaks` and the `@dawcore/*` family are NOT aliased: the website uses their built `dist` through node_modules. **Rebuild those after pulling/merging source changes** (`pnpm --filter @waveform-playlist/worklets build`, `pnpm --filter @dawcore/components build`) — a stale `dist` runs old behaviour despite correct source.
+**Webpack aliases** in `website/docusaurus.config.ts` — packages transpiled from source (aliased to `packages/<name>/src`): `@waveform-playlist/browser`, `core`, `playout`, `engine`, `ui-components`, `annotations`, `spectrogram`, `recording`. A source change in one of these needs no rebuild for the website. `worklets`, `webaudio-peaks` and the `@dawcore/*` family (also `@dawcore/midi`, whose `loadMidiTracks` the MIDI example imports; until #807 that came from the source-aliased `@waveform-playlist/midi`) are NOT aliased: the website uses their built `dist` through node_modules. **Rebuild those after pulling/merging source changes** (`pnpm --filter @waveform-playlist/worklets build`, `pnpm --filter @dawcore/components build`) — a stale `dist` runs old behaviour despite correct source.
 
 **SSR/SSG pattern:** Example components use browser APIs (AudioContext, Canvas, window) that aren't available during static site generation. Use `createLazyExample` from `BrowserOnlyWrapper`:
 

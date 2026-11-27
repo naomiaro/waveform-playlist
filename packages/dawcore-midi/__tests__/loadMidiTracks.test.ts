@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Midi } from '@tonejs/midi';
 import { createArrangement } from '@waveform-playlist/engine';
-import { loadMidiTracks } from '../loadMidiTracks';
+import { loadMidiTracks } from '../src/loadMidiTracks';
 
 const SAMPLE_RATE = 48000;
 
@@ -24,11 +24,8 @@ function twoTrackBytes(): Uint8Array<ArrayBuffer> {
   return copy;
 }
 
-/** jsdom's Blob has no `arrayBuffer()` (browsers do): give the instance one. */
 function midiBlob(): Blob {
-  const bytes = twoTrackBytes();
-  const blob = new Blob([bytes], { type: 'audio/midi' });
-  return Object.assign(blob, { arrayBuffer: async () => bytes.buffer });
+  return new Blob([twoTrackBytes()], { type: 'audio/midi' });
 }
 
 afterEach(() => {
@@ -61,7 +58,7 @@ describe('loadMidiTracks', () => {
     const bytes = midi.toArray();
     const copy = new Uint8Array(new ArrayBuffer(bytes.length));
     copy.set(bytes);
-    const blob = Object.assign(new Blob([copy]), { arrayBuffer: async () => copy.buffer });
+    const blob = new Blob([copy]);
     const [track, ...rest] = await loadMidiTracks(blob, {
       sampleRate: SAMPLE_RATE,
       name: 'Renamed',

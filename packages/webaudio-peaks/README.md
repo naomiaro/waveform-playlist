@@ -76,7 +76,7 @@ type Peaks = Int8Array | Int16Array;
 type Bits = 8 | 16;
 ```
 
-`Peaks`, `Bits`, and `PeakData` are re-exported from `@waveform-playlist/core` for convenience — you don't need to install `core` separately just to reference these types.
+`Peaks`, `Bits` and `PeakData` are types of `@waveform-playlist/core` and are not exported by this package: to name them in your code, add `@waveform-playlist/core` to your dependencies and `import type { PeakData } from '@waveform-playlist/core'`.
 
 ### Lower-level helpers
 

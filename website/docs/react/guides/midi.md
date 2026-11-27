@@ -7,20 +7,20 @@ description: "Load MIDI files for piano roll visualization with SoundFont or syn
 
 Waveform Playlist supports MIDI file loading and playback in two flavors:
 
-- **React** — the `@waveform-playlist/midi` package provides `loadMidiTracks`, which loads a `.mid` file as tracks for the arrangement of `WaveformPlaylistProvider`.
+- **React** — the `@dawcore/midi` package provides `loadMidiTracks`, which loads a `.mid` file as tracks for the arrangement of `WaveformPlaylistProvider`.
 - **Web Components** — `<daw-editor>` from `@dawcore/components` exposes an `editor.loadMidi(source, options)` method, backed by the optional `@dawcore/midi` peer dep.
 
-Both paths use the same framework-agnostic parser (`@dawcore/midi`) under the hood — the React package re-exports it. MIDI tracks render as piano roll visualizations and play back using SoundFont samples or Tone.js PolySynth synthesis.
+Both paths use the framework-agnostic `@dawcore/midi`: a React app calls its `loadMidiTracks`, and `editor.loadMidi()` imports it on first use. MIDI tracks render as piano roll visualizations and play back using SoundFont samples or Tone.js PolySynth synthesis.
 
 ## React
 
 ### Installation
 
 ```bash
-npm install @waveform-playlist/midi @tonejs/midi
+npm install @dawcore/midi
 ```
 
-`@tonejs/midi` and `@dawcore/midi` are regular dependencies and will be installed automatically. The package is separate from the core library so users who only need audio don't pay the bundle cost (~8-12 KB gzipped).
+`@tonejs/midi` is a regular dependency of `@dawcore/midi` and is installed with it. MIDI is a package of its own so users who only need audio don't pay the bundle cost (~8-12 KB gzipped).
 
 ### Basic Usage
 
@@ -28,7 +28,8 @@ Load the `.mid` file with `loadMidiTracks`, add its tracks to the arrangement, a
 
 ```tsx
 import { useEffect, useState } from 'react';
-import { loadMidiTracks } from '@waveform-playlist/midi';
+import { loadMidiTracks } from '@dawcore/midi';
+import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import {
   WaveformPlaylistProvider,
   Waveform,
@@ -44,7 +45,10 @@ function MidiPlayer() {
 
   useEffect(() => {
     const controller = new AbortController();
-    loadMidiTracks('/music/song.mid', { sampleRate: 48000, signal: controller.signal })
+    loadMidiTracks('/music/song.mid', {
+      sampleRate: getGlobalAudioContext().sampleRate,
+      signal: controller.signal,
+    })
       .then((tracks) => {
         // An effect run again (StrictMode, Fast Refresh) must not add them twice
         if (arrangement.getTracks().length === 0) {
@@ -63,7 +67,7 @@ function MidiPlayer() {
   if (status !== 'loaded') return <div>Error: {status}</div>;
 
   return (
-    <WaveformPlaylistProvider arrangement={arrangement} sampleRate={48000}>
+    <WaveformPlaylistProvider arrangement={arrangement}>
       <PlayButton /> <StopButton />
       <Waveform />
     </WaveformPlaylistProvider>
@@ -73,7 +77,7 @@ function MidiPlayer() {
 
 The provider is rendered after the tracks are in because the playlist's [ready](/docs/react/guides/loading-audio#ready) happens once per mount and waits only for audio sources: a provider mounted over the empty arrangement would be ready at once. A dropped `.mid` file later is `loadMidiTracks(file, …)` followed by `arrangement.addTrack(track)` for each track, an undo step like any added track.
 
-`sampleRate` is the rate the clips are positioned at: pass the rate of the provider's `AudioContext` (48000 here, set with the provider's `sampleRate` prop).
+`sampleRate` is the rate the clips are positioned at: pass the rate of the `AudioContext` the playlist plays on. With the default Tone.js adapter that is `getGlobalAudioContext().sampleRate` from `@waveform-playlist/playout`, as here; with `createAdapter`, the rate of your adapter's context. A fixed number is wrong on hardware that runs at another rate: the provider's [`sampleRate` prop](/docs/react/api/providers/waveform-playlist-provider#samplerate) only requests a rate, and the context can run at another one.
 
 A single `.mid` file typically produces multiple `ClipTrack` objects — one per MIDI track of the file (e.g., Piano, Bass, Drums).
 
@@ -82,7 +86,7 @@ A single `.mid` file typically produces multiple `ClipTrack` objects — one per
 `loadMidiTracks` is a plain function: it takes a URL, a `File` or a `Blob` and resolves to `ClipTrack[]` (`kind: 'midi'`, new ids on every call), with no React state. `sampleRate` is required.
 
 ```tsx
-import { loadMidiTracks } from '@waveform-playlist/midi';
+import { loadMidiTracks } from '@dawcore/midi';
 
 const controller = new AbortController();
 const tracks = await loadMidiTracks(file, {
@@ -114,26 +118,29 @@ If you already have note data (e.g., from a custom parser or algorithm), build t
 
 ```tsx
 import { createClipFromSeconds, createTrack } from '@waveform-playlist/core';
+import { getGlobalAudioContext } from '@waveform-playlist/playout';
+import { useCreateArrangement } from '@waveform-playlist/browser';
 
-const melody = createTrack({
-  name: 'Melody',
-  kind: 'midi',
-  clips: [
-    createClipFromSeconds({
-      startTime: 0,
-      duration: 4,
-      sampleRate: 48000,
-      sourceDuration: 4,
-      name: 'Melody',
-      midiNotes: [
-        { midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 },
-        { midi: 64, name: 'E4', time: 0.5, duration: 0.5, velocity: 0.7 },
-      ],
-    }),
-  ],
-});
-
-const arrangement = useCreateArrangement(() => [melody]);
+// Built in the initializer, not on every render
+const arrangement = useCreateArrangement(() => [
+  createTrack({
+    name: 'Melody',
+    kind: 'midi',
+    clips: [
+      createClipFromSeconds({
+        startTime: 0,
+        duration: 4,
+        sampleRate: getGlobalAudioContext().sampleRate,
+        sourceDuration: 4,
+        name: 'Melody',
+        midiNotes: [
+          { midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 },
+          { midi: 64, name: 'E4', time: 0.5, duration: 0.5, velocity: 0.7 },
+        ],
+      }),
+    ],
+  }),
+]);
 ```
 
 ### Flatten Mode
@@ -141,7 +148,10 @@ const arrangement = useCreateArrangement(() => [melody]);
 By default, each MIDI track of the file becomes a separate track. Use `flatten: true` to merge them into one:
 
 ```tsx
-const tracks = await loadMidiTracks('/music/song.mid', { sampleRate: 48000, flatten: true });
+const tracks = await loadMidiTracks('/music/song.mid', {
+  sampleRate: getGlobalAudioContext().sampleRate,
+  flatten: true,
+});
 ```
 
 ### SoundFont Playback
@@ -202,7 +212,8 @@ MIDI and audio tracks can be played together: they are tracks of one arrangement
 
 ```tsx
 import { useEffect, useState } from 'react';
-import { loadMidiTracks } from '@waveform-playlist/midi';
+import { loadMidiTracks } from '@dawcore/midi';
+import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { useCreateArrangement } from '@waveform-playlist/browser';
 import { audioTrack } from '@waveform-playlist/core';
 
@@ -215,7 +226,10 @@ function useMixedArrangement() {
 
   useEffect(() => {
     const controller = new AbortController();
-    loadMidiTracks('/music/song.mid', { sampleRate: 48000, signal: controller.signal })
+    loadMidiTracks('/music/song.mid', {
+      sampleRate: getGlobalAudioContext().sampleRate,
+      signal: controller.signal,
+    })
       .then((tracks) => tracks.forEach((track) => arrangement.addTrack(track)))
       .catch((err: unknown) => {
         // An abort (unmount, StrictMode's first run) is not an error
@@ -320,12 +334,10 @@ If `@dawcore/midi` isn't installed, `loadMidi` rejects with a friendly install h
 
 ## Pure Parsing (No React, No DOM)
 
-The `parseMidiFile` function works without React or web components — useful for Node.js scripts, build-time tooling, or non-React apps. It lives in `@dawcore/midi` (re-exported from `@waveform-playlist/midi`).
+The `parseMidiFile` function works without React or web components — useful for Node.js scripts, build-time tooling, or non-React apps. It is exported by `@dawcore/midi`, with `loadMidiTracks`.
 
 ```typescript
 import { parseMidiFile } from '@dawcore/midi';
-// or, equivalently from the React package re-export:
-// import { parseMidiFile } from '@waveform-playlist/midi';
 
 const response = await fetch('/music/song.mid');
 const buffer = await response.arrayBuffer();
@@ -356,4 +368,4 @@ Track names are derived from the MIDI file content:
 - **Program > 0** → Title-cased GM instrument name (e.g., "Electric Bass (Finger)")
 - **Program 0** → Track name from the MIDI file, or "Acoustic Grand Piano", or "Channel N"
 
-When loading user-dropped files with a config `name`, individual track names from the MIDI file are used directly (not prefixed with the config name).
+The `name` option of `loadMidiTracks` names the track and its clip only when the file yields exactly one track (one track with notes — tracks without notes are left out — or `flatten`). A file with several tracks keeps the names above, not prefixed with `name`.

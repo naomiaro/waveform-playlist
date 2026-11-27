@@ -1,7 +1,7 @@
 /**
  * MIDI Playback Example
  *
- * Demonstrates loading a .mid file via @waveform-playlist/midi.
+ * Demonstrates loading a .mid file via @dawcore/midi.
  * Users can drop additional .mid files or click to browse.
  */
 
@@ -34,7 +34,7 @@ import {
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import { audioTrack } from '@waveform-playlist/core';
 import type { Arrangement } from '@waveform-playlist/engine';
-import { loadMidiTracks } from '@waveform-playlist/midi';
+import { loadMidiTracks } from '@dawcore/midi';
 import { SoundFontCache, getGlobalAudioContext } from '@waveform-playlist/playout';
 import { useDocusaurusTheme } from '../../hooks/useDocusaurusTheme';
 import { FileDropZone } from '../FileDropZone';
@@ -427,7 +427,6 @@ export function MidiExample() {
       {trackCount > 0 ? (
         <WaveformPlaylistProvider
           arrangement={arrangement}
-          sampleRate={48000}
           samplesPerPixel={2048}
           mono
           theme={{ ...theme, ...gradientTheme }}

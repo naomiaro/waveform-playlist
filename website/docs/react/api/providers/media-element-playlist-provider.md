@@ -85,6 +85,7 @@ interface MediaElementTrackConfig {
   fadeOut?: FadeConfig;
 }
 
+// FadeConfig is from @waveform-playlist/core
 interface FadeConfig {
   /** Duration of the fade in seconds */
   duration: number;

@@ -8,14 +8,14 @@ import React, {
   type ReactNode,
 } from 'react';
 import { ThemeProvider } from 'styled-components';
-import type { MediaElementPlayout, FadeConfig } from '@waveform-playlist/media-element-playout';
+import type { MediaElementPlayout } from '@waveform-playlist/media-element-playout';
 import { resolveMediaElementPlayout } from './playout/resolveMediaElementPlayout';
 import { type WaveformDataObject } from '@waveform-playlist/core';
 import type { WaveformPlaylistTheme } from '@waveform-playlist/ui-components';
 import type { AnnotationData, AnnotationStore } from '@waveform-playlist/core';
 import { extractPeaksFromWaveformData } from './waveformDataLoader';
 import type WaveformData from 'waveform-data';
-import type { PeakData } from '@waveform-playlist/core';
+import type { FadeConfig, PeakData } from '@waveform-playlist/core';
 import type { ClipPeaks, TrackClipPeaks } from './WaveformPlaylistContext';
 import { useAnimationFrameLoop } from './hooks/useAnimationFrameLoop';
 import { followAnnotations } from './providerInternals/followAnnotations';

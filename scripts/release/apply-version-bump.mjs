@@ -18,8 +18,9 @@
 //     version pre mode started at (`@dawcore/*`: the patch step only)
 //   - each package.json keeps this checkout's text; one `"version"` value is
 //     replaced, and the result is read back and compared
-//   - pre.json's list of consumed changesets is the list here plus the
-//     changeset files here
+//   - pre.json's list of consumed changesets is the changeset files here, as
+//     `changeset version` writes it: an id whose file was deleted leaves the
+//     list (#937)
 //
 // It then asks git what changed, and fails unless that is exactly what it
 // wrote. Prints one line per package, `name@version`, for the commit message.
@@ -142,11 +143,16 @@ for (const [name, version] of entries) {
 if (problems.length > 0) fail(problems);
 
 // The changesets a version run consumes: all of them, so all that are here.
+// `changeset version` writes exactly these: it also drops an id of
+// pre.json whose file was deleted (tried on #937), so the union with
+// pre.changesets would keep a deleted id, and a later changeset of that
+// name would count as consumed already.
+// The same files @changesets/read reads: no dotfile, no README.md in any case.
 const changesetIds = readdirSync(join(repoRoot, '.changeset'))
-  .filter((file) => file.endsWith('.md') && file !== 'README.md')
+  .filter((file) => !file.startsWith('.') && file.endsWith('.md') && !/^README\.md$/i.test(file))
   .map((file) => file.slice(0, -'.md'.length));
 // Kept in name order, as changesets writes it.
-const consumed = [...new Set([...pre.changesets, ...changesetIds])].sort();
+const consumed = [...new Set(changesetIds)].sort();
 writes.push({
   file: PRE_JSON,
   text: `${JSON.stringify({ ...pre, changesets: consumed }, null, 2)}\n`,

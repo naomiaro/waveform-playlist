@@ -221,9 +221,11 @@ export interface WaveformPlaylistProviderProps {
    *  don't need this. A provider option, not a view option: the animation
    *  loop and `seekTo` follow it. */
   indefinitePlayback?: boolean;
-  /** Desired AudioContext sample rate. Creates a cross-browser AudioContext at
-   *  this rate via standardized-audio-context. Pre-computed peaks (.dat files)
-   *  render instantly when they match. On mismatch, falls back to worker. */
+  /** Requested AudioContext sample rate, default Tone.js adapter only: passed to
+   *  playout's `configureGlobalContext`, which keeps an existing context's rate
+   *  and which Tone.js 15.1.22 ignores (warning when the rates differ). The provider uses the
+   *  rate of the context it gets. Pre-computed peaks (.dat files) render
+   *  instantly when they match. On mismatch, falls back to worker. */
   sampleRate?: number;
   /** Factory for a custom PlayoutAdapter. When omitted, the Tone.js engine
    *  (@waveform-playlist/playout) is dynamically imported — so a custom adapter

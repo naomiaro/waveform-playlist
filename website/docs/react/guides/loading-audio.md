@@ -181,7 +181,7 @@ A clip whose audio is still loading is not in `usePlaylistTimeline().tracks` and
 
 A placeholder is dimmed (theme key `placeholderClipOpacity`, 0.5 by default), has no drag handle and no trim handles, and its container carries `data-clip-placeholder="true"`. The box of a placeholder without peaks is `<ClipPlaceholderBody />` from `@waveform-playlist/ui-components`, the clip's first child: the played-portion tint (`waveProgressColor`) and the fade curves of `<WaveformFades />` are drawn over it. Its record is in `usePlaylistTimeline().peaksDataArray` with `isPlaceholder: true`; there is no clip for it in `tracks`, so look a record up by `clipId`, not by its position in the row.
 
-No placeholder is drawn until the provider knows its real sample rate: from mount when you pass the provider's `sampleRate` prop, otherwise once its first adapter exists. If the adapter can never be built (a missing optional peer, a `createAdapter` that throws) and no `sampleRate` prop is given, no placeholder is ever drawn. Pass `sampleRate` if placeholders must appear whatever happens to the engine. A placeholder's position and length are at the provider's sample rate, also when its peaks file was made at another rate.
+No placeholder is drawn until the provider has a sample rate: from mount at the provider's `sampleRate` prop when you pass it (a request: when the first adapter's context runs at another rate, placeholders are drawn again at that rate), otherwise once its first adapter exists. If the adapter can never be built (a missing optional peer, a `createAdapter` that throws) and no `sampleRate` prop is given, no placeholder is ever drawn. Pass `sampleRate` if placeholders must appear whatever happens to the engine. A placeholder's position and length are at the provider's sample rate, also when its peaks file was made at another rate.
 
 `duration` in `usePlaylistTimeline()` counts loaded audio only. The view is drawn wide enough for a placeholder that ends later. A click on such a placeholder past the end of the loaded audio puts the cursor there; Play from there starts and stops at once, because the position is past the end of the loaded audio, and the cursor stays where it was. `seekTo` clamps to the loaded audio.
 
@@ -252,8 +252,10 @@ Pre-computed peaks embed the source audio's sample rate (e.g., 48000 Hz). The br
 // React
 <WaveformPlaylistProvider sampleRate={48000} arrangement={arrangement} />
 
-// Web Components
-<daw-editor sample-rate="48000">
+// Web Components: the editor's rate is its adapter's AudioContext rate
+import { NativePlayoutAdapter } from '@dawcore/transport';
+
+editor.adapter = new NativePlayoutAdapter(new AudioContext({ sampleRate: 48000 }));
 ```
 
 When the hardware rate matches, pre-computed peaks render instantly. On mismatch, peaks fall back to worker generation from decoded audio (slower but correct).

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { concatenateAudioData, calculateDuration } from '../utils/audioBufferUtils';
+import { concatenateAudioData } from '../utils/audioBufferUtils';
 
 describe('concatenateAudioData', () => {
   it('concatenates multiple Float32Array chunks', () => {
@@ -62,28 +62,5 @@ describe('concatenateAudioData', () => {
     // Float32 has limited precision, so compare within Float32 tolerance
     expect(result[0]).toBeCloseTo(0.123456789, 5);
     expect(result[1]).toBeCloseTo(-0.987654321, 5);
-  });
-});
-
-describe('calculateDuration', () => {
-  it('calculates duration from sample count and sample rate', () => {
-    expect(calculateDuration(44100, 44100)).toBe(1);
-    expect(calculateDuration(88200, 44100)).toBe(2);
-    expect(calculateDuration(22050, 44100)).toBe(0.5);
-  });
-
-  it('handles 48kHz sample rate', () => {
-    expect(calculateDuration(48000, 48000)).toBe(1);
-    expect(calculateDuration(96000, 48000)).toBe(2);
-  });
-
-  it('handles zero samples', () => {
-    expect(calculateDuration(0, 44100)).toBe(0);
-  });
-
-  it('returns fractional durations', () => {
-    // 1000 samples at 44100 Hz
-    const duration = calculateDuration(1000, 44100);
-    expect(duration).toBeCloseTo(0.02267573696, 8);
   });
 });

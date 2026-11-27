@@ -49,18 +49,18 @@ vi.mock('tone', () => {
   };
 });
 
-import { createEffectInstance } from '../effects/effectFactory';
+import { createToneEffectInstance } from '../effects/effectFactory';
 import { effectDefinitions } from '../effects/effectDefinitions';
 
 beforeEach(() => {
   order.length = 0;
 });
 
-describe('createEffectInstance audio context', () => {
+describe('createToneEffectInstance audio context', () => {
   it('establishes the shared global context BEFORE constructing the Tone effect', () => {
     const reverb = effectDefinitions.find((d) => d.id === 'reverb')!;
 
-    createEffectInstance(reverb);
+    createToneEffectInstance(reverb);
 
     expect(order).toEqual(['getGlobalContext', 'construct:Reverb']);
   });
@@ -68,7 +68,7 @@ describe('createEffectInstance audio context', () => {
   it('does so for every built-in effect type', () => {
     for (const definition of effectDefinitions) {
       order.length = 0;
-      createEffectInstance(definition);
+      createToneEffectInstance(definition);
       expect(order[0], definition.id).toBe('getGlobalContext');
       expect(order[1], definition.id).toMatch(/^construct:/);
     }

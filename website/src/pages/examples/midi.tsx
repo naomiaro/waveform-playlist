@@ -80,7 +80,7 @@ export default function MidiExamplePage(): React.ReactElement {
           <ul>
             <li>
               Loading <code>.mid</code> files with <code>loadMidiTracks()</code> from{' '}
-              <code>@waveform-playlist/midi</code>
+              <code>@dawcore/midi</code>
             </li>
             <li>
               Multi-track expansion — one MIDI file produces multiple timeline tracks (one per MIDI
@@ -91,7 +91,7 @@ export default function MidiExamplePage(): React.ReactElement {
             <li>Per-track close buttons and Clear All</li>
           </ul>
           <p>
-            The <code>@waveform-playlist/midi</code> package handles parsing only — it outputs{' '}
+            The <code>@dawcore/midi</code> package parses the file and builds the tracks; it plays nothing. It outputs{' '}
             <code>ClipTrack[]</code> with <code>midiNotes</code> on each clip. The playout layer
             automatically routes these to <code>SoundFontToneTrack</code> (realistic instrument
             samples) or <code>MidiToneTrack</code> (Tone.js PolySynth fallback) for synthesis.

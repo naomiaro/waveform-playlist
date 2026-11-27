@@ -20,7 +20,7 @@ import {
 } from '@waveform-playlist/core';
 import type { WamPluginInstance } from '@dawcore/wam'; // type-only — erased at runtime
 import { getEffectDefinition, type EffectDefinition } from './effectDefinitions';
-import { createEffectInstance, type EffectInstance } from './effectFactory';
+import { createToneEffectInstance, type EffectInstance } from './effectFactory';
 import { loadWamModule } from './loadWam';
 import { createWamEffectInstance, type WamEffectInstance } from './wamEffectFactory';
 import { createCustomEffectInstance, toEffectDefinition } from './customEffectFactory';
@@ -262,7 +262,7 @@ export class EffectsRack {
       builtIn.parameters.forEach((parameter) => {
         params[parameter.name] = parameter.default;
       });
-      const instance = createEffectInstance(builtIn, params);
+      const instance = createToneEffectInstance(builtIn, params);
       return this.append(instance, {
         effectId,
         kind: 'tone',

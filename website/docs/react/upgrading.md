@@ -13,7 +13,7 @@ Each package is versioned independently, so "the next major" is a different numb
 
 ## React 19 is required
 
-**Packages:** `@waveform-playlist/browser`, `ui-components`, `annotations`, `spectrogram`, `recording`. (`@waveform-playlist/midi` no longer has a `react` peer dependency: its hook was removed, see [`useMidiTracks` is removed: load with `loadMidiTracks`](#usemiditracks-is-removed-load-with-loadmiditracks).)
+**Packages:** `@waveform-playlist/browser`, `ui-components`, `annotations`, `spectrogram`, `recording`. (`@waveform-playlist/midi` is no longer published, and its replacement `@dawcore/midi` has no `react` peer dependency: see [`@waveform-playlist/midi` is replaced by `@dawcore/midi`](#waveform-playlistmidi-is-replaced-by-dawcoremidi).)
 
 The `react` (and, where declared, `react-dom`) peer dependency is now `^19.0.0` in every React package. Previously `browser` accepted `^18.2.0 || ^19.0.0`, `ui-components` accepted `>=17.0.0`, and the others accepted `^18.0.0` only, so the set could not be installed together on React 19 without peer warnings.
 
@@ -2321,7 +2321,7 @@ Not changed: `theme`, `samplesPerPixel` and `automaticScroll` on both providers;
 
 **Packages:** `@waveform-playlist/annotations` (major), `@waveform-playlist/browser` (major), `@waveform-playlist/ui-components` (major), `@waveform-playlist/spectrogram` (major), `@waveform-playlist/core` (major: `getShortcutLabel` is removed; one type added). Both providers.
 
-Among the React packages a name is now exported by one package. `browser`, `annotations`, `ui-components`, `spectrogram` and `recording` re-export nothing from another package: import a name from the package that owns it. Five names remain in two entry points, on purpose: `AutomaticScrollCheckbox`, `MasterVolumeControl`, `PlaybackRateSelect`, `SelectionTimeInputs` and `TimeFormatSelect`. The one in `@waveform-playlist/ui-components` is driven by props; the one in `@waveform-playlist/browser` reads the provider and renders it. (`Track` is two different things under one name: a type in `@waveform-playlist/core` and a component in `@waveform-playlist/ui-components`.) This holds for the main entries of those five packages, for `@waveform-playlist/browser/tone` and for `@waveform-playlist/core`, which a test compares. One pair is left and tracked: `createEffectInstance` is one function in `@waveform-playlist/browser/tone` and another in `@waveform-playlist/core`. The other packages (`midi`, `engine`, `playout`, `media-element-playout`, the web components) are not covered.
+Among the React packages a name is now exported by one package. `browser`, `annotations`, `ui-components`, `spectrogram` and `recording` re-export nothing from another package: import a name from the package that owns it. Five names remain in two entry points, on purpose: `AutomaticScrollCheckbox`, `MasterVolumeControl`, `PlaybackRateSelect`, `SelectionTimeInputs` and `TimeFormatSelect`. The one in `@waveform-playlist/ui-components` is driven by props; the one in `@waveform-playlist/browser` reads the provider and renders it. (`Track` is two different things under one name: a type in `@waveform-playlist/core` and a component in `@waveform-playlist/ui-components`.) A test compares the entries of every package under `packages/` (the React packages, `@waveform-playlist/browser/tone`, core, engine, playout, media-element-playout, webaudio-peaks, worklets and the `@dawcore/*` packages). `createEffectInstance`, which was one function in `@waveform-playlist/browser/tone` and another in `@waveform-playlist/core`, is renamed in `@waveform-playlist/browser/tone`: [its own entry](#createeffectinstance-of-waveform-playlistbrowsertone-is-renamed-createtoneeffectinstance). Three more names are two different things in two packages: `ExportOptions` (the options of `useExportWav` in `@waveform-playlist/browser/tone` and of `exportAudio()` in `@dawcore/components`), `MeterEntry` (`@waveform-playlist/core` and `@dawcore/transport`, whose entry has a `Tick` and a `barAtTick`) and `RecordingOptions` (`@waveform-playlist/recording` and `@dawcore/components`).
 
 The four annotation controls are owned by `@waveform-playlist/annotations` and are bound to the playlist provider there:
 
@@ -2647,6 +2647,70 @@ Not changed by this entry: `AnnotationProvider`, `AnnotationBox` and `Annotation
 1. Search every import from `@waveform-playlist/browser` for the names in the "Moved" table, and the whole project for `getShortcutLabel`: none may remain.
 2. Search for `checked=` and `onChange=` on the three annotation checkboxes and for `annotations=` on `DownloadAnnotationsButton`: none may remain.
 3. With a strict package manager, every `@waveform-playlist/*` package you now import from is in your `package.json`.
+
+## `createEffectInstance` of `@waveform-playlist/browser/tone` is renamed `createToneEffectInstance`
+
+**Package:** `@waveform-playlist/browser` (`@waveform-playlist/browser/tone`).
+
+`@waveform-playlist/core` exports a different function under the old name: the effect registry's `createEffectInstance(type, audioContext, params)` (see [the effect registry moves to core](#web-components-the-effect-registry-moves-from-dawcorecomponents-to-waveform-playlistcore)). The one of `@waveform-playlist/browser/tone`, which builds a built-in Tone.js effect from its definition, is renamed. Its arguments, `(definition, initialParams?)`, and its result, an `EffectInstance`, are unchanged. Core's function keeps its name.
+
+**Find:** `createEffectInstance` in an import from `@waveform-playlist/browser/tone`.
+
+**Replace with:**
+
+```tsx
+// Before
+import { createEffectInstance, getEffectDefinition } from '@waveform-playlist/browser/tone';
+
+const instance = createEffectInstance(getEffectDefinition('reverb')!, { decay: 2 });
+
+// After
+import { createToneEffectInstance, getEffectDefinition } from '@waveform-playlist/browser/tone';
+
+const instance = createToneEffectInstance(getEffectDefinition('reverb')!, { decay: 2 });
+```
+
+A leftover import of the old name does not throw and has no shim: see [what a leftover import does](#one-owner-per-exported-name-the-annotation-controls-move-to-the-annotations-package-re-exports-and-unused-exports-are-removed).
+
+## `calculateDuration` is removed from `@waveform-playlist/core`: use `samplesToSeconds`
+
+**Package:** `@waveform-playlist/core`.
+
+Core's `calculateDuration(sampleCount, sampleRate)` returned `sampleCount / sampleRate`, which is what `samplesToSeconds(samples, sampleRate)` of core returns. `@waveform-playlist/engine` exports a different `calculateDuration(tracks)`, the end of the last clip in seconds; that one stays. With a strict package manager, `@waveform-playlist/core` must be in your own `package.json` to import `samplesToSeconds` from it.
+
+**Find:** `calculateDuration` in an import from `@waveform-playlist/core`.
+
+**Replace with:**
+
+```ts
+// Before
+import { calculateDuration } from '@waveform-playlist/core';
+
+const seconds = calculateDuration(buffer.length, buffer.sampleRate);
+
+// After
+import { samplesToSeconds } from '@waveform-playlist/core';
+
+const seconds = samplesToSeconds(buffer.length, buffer.sampleRate);
+```
+
+## `FadeConfig` is imported from `@waveform-playlist/core`
+
+**Package:** `@waveform-playlist/media-element-playout` (types only: nothing changes at runtime).
+
+`@waveform-playlist/media-element-playout` re-exported core's `FadeConfig` type and no longer does. `MediaElementTrackOptions.fadeIn` and `fadeOut`, `setFadeIn` and `setFadeOut` take the same type as before. With a strict package manager (pnpm), an app that has `@waveform-playlist/core` only as a dependency of another package adds it to its own `package.json` before importing from it.
+
+**Find:** `FadeConfig` in an import from `@waveform-playlist/media-element-playout`.
+
+**Replace with:**
+
+```ts
+// Before
+import type { FadeConfig } from '@waveform-playlist/media-element-playout';
+
+// After
+import type { FadeConfig } from '@waveform-playlist/core';
+```
 
 ## Keyboard shortcuts yield to the focused control
 
@@ -3206,7 +3270,7 @@ Also removed:
 
 ## A track has a kind: audio or MIDI, never both
 
-**Packages:** `@waveform-playlist/core`, `@waveform-playlist/engine`, `@waveform-playlist/playout`, `@waveform-playlist/browser`, `@waveform-playlist/recording`, `@waveform-playlist/midi`.
+**Packages:** `@waveform-playlist/core`, `@waveform-playlist/engine`, `@waveform-playlist/playout`, `@waveform-playlist/browser`, `@waveform-playlist/recording`. (`loadMidiTracks` of `@dawcore/midi` makes MIDI tracks.)
 
 `ClipTrack` has a new required field, `kind: 'audio' | 'midi'`. Every clip on an audio track is an audio clip, and every clip on a MIDI track has `midiNotes`. Before, a track could hold both, and the kind was guessed from the clips.
 
@@ -3431,7 +3495,7 @@ Passing `undefined` as `effectsFunction` (to export without the master chain) st
 
 **Package:** `@waveform-playlist/browser` (`@waveform-playlist/browser/tone`).
 
-An `EffectInstance` (returned by `createEffectInstance` and `createWamEffectInstance`) had one node, `effect`. It now has `input` (where the chain connects in) and `output` (where it continues from), because a registered custom effect can have two different nodes. For a Tone.js effect and a WAM plugin they are the same node.
+An `EffectInstance` (returned by `createEffectInstance`, now [`createToneEffectInstance`](#createeffectinstance-of-waveform-playlistbrowsertone-is-renamed-createtoneeffectinstance), and `createWamEffectInstance`) had one node, `effect`. It now has `input` (where the chain connects in) and `output` (where it continues from), because a registered custom effect can have two different nodes. For a Tone.js effect and a WAM plugin they are the same node.
 
 **Find:** `.effect` read from an `EffectInstance` or `WamEffectInstance`.
 
@@ -3446,7 +3510,7 @@ instance.effect.connect(destination);
 // After
 import { connect } from 'tone';
 
-const instance = createEffectInstance(definition);
+const instance = createToneEffectInstance(definition);
 connect(source, instance.input);
 connect(instance.output, destination);
 ```
@@ -3704,7 +3768,28 @@ registerEffect('my-effect', definition);
 
 The definition shape is unchanged apart from one addition: `EffectParamDef` has an optional `label`. New in core: `unregisterEffect(type)`. One rule of `NativeEffectInstance` is now stated and relied on by both hosts: the host owns every connection out of `output` and disconnects all of them when it rewires the chain, so do not connect `output` to anything inside the effect (take a feedback tap from a node before it).
 
-Do not confuse core's `createEffectInstance(type, audioContext, params)` with the `createEffectInstance(definition, initialParams)` exported from `@waveform-playlist/browser/tone`; the second one builds a built-in Tone.js effect.
+Core's `createEffectInstance(type, audioContext, params)` builds a registered effect. The function of `@waveform-playlist/browser/tone` that builds a built-in Tone.js effect, `createEffectInstance(definition, initialParams)` until now, is [renamed `createToneEffectInstance`](#createeffectinstance-of-waveform-playlistbrowsertone-is-renamed-createtoneeffectinstance).
+
+## Web components: `KeyBinding` is imported from `@waveform-playlist/core`
+
+**Package:** `@dawcore/components` (types only: nothing changes at runtime).
+
+`@dawcore/components` declared its own `KeyBinding`, the same type as `@waveform-playlist/core`'s (`Pick<KeyboardShortcut, 'key' | 'ctrlKey' | 'shiftKey' | 'metaKey' | 'altKey'>`), and no longer exports it. `PlaybackShortcutMap`, `SplittingShortcutMap` and `UndoShortcutMap` still come from `@dawcore/components` and take the same bindings.
+
+**Find:** `KeyBinding` in an import from `@dawcore/components`.
+
+**Replace with:**
+
+```ts
+// Before
+import type { KeyBinding, PlaybackShortcutMap } from '@dawcore/components';
+
+// After
+import type { KeyBinding } from '@waveform-playlist/core';
+import type { PlaybackShortcutMap } from '@dawcore/components';
+```
+
+`@waveform-playlist/core` is a peer dependency of `@dawcore/components`, installed with the other peers in [Getting Started](/docs/web-components/getting-started#installation). With a strict package manager it must be in your own `package.json` to be imported.
 
 ## Web components: `<daw-track kind="midi">` declares a MIDI track
 
@@ -3911,7 +3996,7 @@ files.forEach((file) => arrangement.addTrack(audioTrack({ src: file })));
 
 Several clips on one track are `LoadingClip` objects (`{ id, src, start, duration, offset }`, seconds) in the track's `clips`; see [Several Clips per Track](/docs/react/guides/loading-audio#several-clips-per-track).
 
-**MIDI:** `useMidiTracks` from `@waveform-playlist/midi` is removed. Load with `loadMidiTracks(src, { sampleRate })`, add each track to the arrangement, call `arrangement.clearHistory()` once, and render the provider after that: see [`useMidiTracks` is removed: load with `loadMidiTracks`](#usemiditracks-is-removed-load-with-loadmiditracks).
+**MIDI:** `useMidiTracks` from `@waveform-playlist/midi` is removed. Load with `loadMidiTracks(src, { sampleRate })` from `@dawcore/midi`, add each track to the arrangement, call `arrangement.clearHistory()` once, and render the provider after that: see [`useMidiTracks` is removed: load with `loadMidiTracks`](#usemiditracks-is-removed-load-with-loadmiditracks).
 
 ## `usePlaylistTimeline()`: `onTracksChange` is removed; `tracks` is read-only and holds loaded clips
 
@@ -4362,11 +4447,36 @@ const silent = arrangement.getMixer().get(id)?.muted || arrangement.recordingTra
 
 Code that saved a track's mute before a take and set it back after can go.
 
+## `@waveform-playlist/midi` is replaced by `@dawcore/midi`
+
+**Packages:** `@waveform-playlist/midi`, which is no longer published, and `@dawcore/midi`.
+
+`loadMidiTracks` and `LoadMidiTracksOptions` move to `@dawcore/midi`, the package that already defined the MIDI parser. `@waveform-playlist/midi` held only those two and a re-export of the parser (`parseMidiFile`, `parseMidiUrl`, `ParsedMidi`, `ParsedMidiTrack`, `ParseMidiOptions`). Its last versions stay on npm: `13.0.4` (`latest`, with the `useMidiTracks` hook of the next entry) and `14.0.0-next.8` (`next`, with `loadMidiTracks`). The names and what they do are unchanged. `@dawcore/midi` has the same dependencies (`@tonejs/midi`, `@waveform-playlist/core`) and no peer dependency.
+
+**Find:** `@waveform-playlist/midi` in `package.json` and in imports.
+
+**Replace with:**
+
+```sh
+npm uninstall @waveform-playlist/midi
+npm install @dawcore/midi
+```
+
+```ts
+// Before
+import { loadMidiTracks, parseMidiFile } from '@waveform-playlist/midi';
+
+// After
+import { loadMidiTracks, parseMidiFile } from '@dawcore/midi';
+```
+
+From `13.x`, where the package had `useMidiTracks`, also apply the next entry.
+
 ## `useMidiTracks` is removed: load with `loadMidiTracks`
 
-**Package:** `@waveform-playlist/midi`.
+**Package:** `@waveform-playlist/midi` (replaced by `@dawcore/midi`: see the entry above).
 
-`useMidiTracks(configs, { sampleRate })` returned `{ tracks, loading, error, loadedCount, totalCount }` for the provider's `tracks` prop, which no longer exists. The hook is removed, with its types `MidiTrackConfig`, `UseMidiTracksOptions` and `UseMidiTracksReturn`. The package now exports `loadMidiTracks`, `LoadMidiTracksOptions` and the parser re-exported from `@dawcore/midi` (`parseMidiFile`, `parseMidiUrl`, `ParsedMidi`, `ParsedMidiTrack`, `ParseMidiOptions`), and it no longer has a `react` peer dependency.
+`useMidiTracks(configs, { sampleRate })` returned `{ tracks, loading, error, loadedCount, totalCount }` for the provider's `tracks` prop, which no longer exists. The hook is removed, with its types `MidiTrackConfig`, `UseMidiTracksOptions` and `UseMidiTracksReturn`. Its replacement is `loadMidiTracks` of `@dawcore/midi` (with `LoadMidiTracksOptions`), which has no `react` peer dependency.
 
 `loadMidiTracks(src, options)` is a function: `src` is one URL, `File` or `Blob`, and it resolves to `ClipTrack[]` with `kind: 'midi'`. The app keeps its own loading and error state and adds the tracks to the arrangement.
 
@@ -4389,6 +4499,8 @@ What the hook did that the function does not:
 
 ```tsx
 // Before
+import { useMidiTracks } from '@waveform-playlist/midi';
+
 const { tracks, loading, error } = useMidiTracks([{ src: '/music/song.mid' }], {
   sampleRate: 48000,
 });
@@ -4397,6 +4509,8 @@ if (error) return <p>Error: {error}</p>;
 return <WaveformPlaylistProvider tracks={tracks}>…</WaveformPlaylistProvider>;
 
 // After
+import { loadMidiTracks } from '@dawcore/midi';
+
 const arrangement = useCreateArrangement();
 const [loaded, setLoaded] = useState(false);
 const [error, setError] = useState<string | null>(null);
@@ -4420,14 +4534,10 @@ useEffect(() => {
 
 if (error) return <p>Error: {error}</p>;
 if (!loaded) return <p>Loading MIDI…</p>;
-return (
-  <WaveformPlaylistProvider arrangement={arrangement} sampleRate={48000}>
-    …
-  </WaveformPlaylistProvider>
-);
+return <WaveformPlaylistProvider arrangement={arrangement}>…</WaveformPlaylistProvider>;
 ```
 
-Render the provider after the tracks are in: the playlist's ready happens once per mount and waits only for audio sources ([MIDI guide](/docs/react/guides/midi#basic-usage)).
+Render the provider after the tracks are in: the playlist's ready happens once per mount and waits only for audio sources ([MIDI guide](/docs/react/guides/midi#basic-usage)). `sampleRate` means what it meant for the hook; the MIDI guide recommends passing the rate of the context the playlist plays on (`getGlobalAudioContext().sampleRate` with the default adapter) rather than a fixed number.
 
 Notes you already have, with no file:
 

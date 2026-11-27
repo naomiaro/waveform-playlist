@@ -6,9 +6,9 @@
     "dev": "vite"
   },
   "dependencies": {
+    "@dawcore/midi": "workspace:*",
     "@waveform-playlist/browser": "workspace:*",
     "@waveform-playlist/core": "workspace:*",
-    "@waveform-playlist/midi": "workspace:*",
     "@waveform-playlist/playout": "workspace:*",
     "@waveform-playlist/ui-components": "workspace:*",
     "react": "^19.0.0",
