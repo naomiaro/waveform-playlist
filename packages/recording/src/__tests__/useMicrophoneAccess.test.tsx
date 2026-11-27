@@ -244,4 +244,25 @@ describe('useMicrophoneAccess', () => {
     warn.mockRestore();
     error.mockRestore();
   });
+
+  it('reports a device list that cannot be read at mount, as a prefixed warning and an error', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    (
+      navigator.mediaDevices as unknown as { enumerateDevices: ReturnType<typeof vi.fn> }
+    ).enumerateDevices.mockRejectedValueOnce(new Error('NotReadableError'));
+    const { result } = renderHook(() => useMicrophoneAccess());
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(result.current.error?.message).toBe('NotReadableError');
+    expect(error).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(
+      '[waveform-playlist] Failed to enumerate devices:',
+      'Error: NotReadableError'
+    );
+    warn.mockRestore();
+    error.mockRestore();
+  });
 });

@@ -188,7 +188,7 @@ The core AudioWorklet-based recording hook.
 **Returns (`UseRecordingReturn`):**
 - `isRecording: boolean`, `isPaused: boolean`
 - `progress: RecordingProgressSource` — a source of `{ duration: number; peaks: (Int8Array | Int16Array)[] }` (seconds elapsed; one peaks entry per channel, growing live). Published once per animation frame while recording; the hook does not re-render for it. After a stop, `duration` is the recorded buffer's length
-- `audioBuffer: AudioBuffer | null` — set after `stopRecording()` resolves
+- `audioBuffer: AudioBuffer | null` — set after `stopRecording()` resolves, and when a take ends by itself (microphone unplugged, component hidden mid-take)
 - `startRecording: () => Promise<boolean>` — resolves `true` when the capture pipeline actually started (`false`: no stream, already recording, worklet failure); check it before starting synchronized playback
 - `stopRecording: () => Promise<AudioBuffer | null>` — awaits the worklet's final flush before resolving, so the last samples are never dropped
 - `pauseRecording: () => void`, `resumeRecording: () => void` — pause/resume the worklet itself, not just the UI

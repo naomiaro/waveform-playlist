@@ -24,7 +24,7 @@ vi.mock('@waveform-playlist/core', async (importOriginal) => {
 
 const { useIntegratedRecording } = await import('../hooks/useIntegratedRecording');
 const { useRecording } = await import('../hooks/useRecording');
-const { createMockStream, createMockNode } = await import('./helpers/recordingEnv');
+const { createMockStream, createMockNode, workletsModule } = await import('./helpers/recordingEnv');
 
 const audioTrack = (id: string): ArrangementTrack =>
   ({ id, name: id, kind: 'audio', clips: [] }) as unknown as ArrangementTrack;
@@ -318,5 +318,42 @@ describe('useIntegratedRecording: a stop while the next take is starting', () =>
     });
 
     expect(clipsOf(arrangement, 'track-1')).toHaveLength(1);
+  });
+});
+
+describe('useRecording: a start that is waiting when the component is hidden', () => {
+  it('does not start after the component is shown again', async () => {
+    // The start waits on the worklet module load.
+    let loaded!: () => void;
+    workletsModule.addRecordingWorkletModule.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (loaded = resolve))
+    );
+    const stream = createMockStream('mic');
+    const { result, hide, show } = renderHookInActivity(() => useRecording(stream));
+    let starting!: Promise<boolean>;
+    act(() => {
+      starting = result.current.startRecording();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // The hide stops the microphone the start was given (the owner's cleanup):
+    // a take started now would record a stopped stream.
+    await act(async () => {
+      hide();
+    });
+    await act(async () => {
+      show();
+    });
+    let started: boolean | undefined;
+    await act(async () => {
+      loaded();
+      started = await starting;
+    });
+
+    expect(started).toBe(false);
+    expect(result.current.isRecording).toBe(false);
+    expect(env.context.createMediaStreamSource).not.toHaveBeenCalled();
   });
 });

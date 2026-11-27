@@ -21,7 +21,10 @@ export interface RecordingSessionOptions {
  * changes or the component unmounts; the provider also clears it in its own
  * cleanup (its unmount or an `<Activity>` hide) while a track is still
  * recording. An `<Activity>` hide of the component ends the session the same
- * way, and the reveal mutes the track again.
+ * way. When the component also calls `useIntegratedRecording`, that hide ends
+ * the take too (it is added to its track), so `isRecording` is false at the
+ * reveal; with `isRecording` from elsewhere still true, the reveal mutes the
+ * track again.
  *
  * Call it in the component that calls `useIntegratedRecording`, under
  * `WaveformPlaylistProvider`. `<WaveformRecordingPreview>` only draws the

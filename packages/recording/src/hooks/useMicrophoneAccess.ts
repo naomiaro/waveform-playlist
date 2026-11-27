@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { enumerateMicrophones, watchMicrophoneDevices } from '@waveform-playlist/core';
+import { enumerateMicrophones } from '@waveform-playlist/core';
 import { UseMicrophoneAccessReturn, MicrophoneDevice } from '../types';
 
 export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
@@ -132,14 +132,17 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
     // instance, so a flag left true by the probe-unmount's cleanup would
     // stop every future getUserMedia grant as "stale".
     isUnmountedRef.current = false;
-    // List the devices now (labels won't be available without permission) and
-    // again when one is plugged in or removed. Core's watcher does nothing
-    // where navigator.mediaDevices is undefined (an insecure origin), and
-    // survives a failed enumeration.
-    const unwatch = watchMicrophoneDevices(({ devices: audioInputs }) => setDevices(audioInputs));
+    // Try to enumerate devices (labels won't be available without permission)
+    enumerateDevices();
+
+    // Re-enumerate when devices are plugged in or removed. Undefined on an
+    // insecure origin (http that is not localhost): nothing to listen to
+    // there, and the enumeration above gave no devices.
+    const mediaDevices = typeof navigator !== 'undefined' ? navigator.mediaDevices : undefined;
+    mediaDevices?.addEventListener('devicechange', enumerateDevices);
 
     return () => {
-      unwatch();
+      mediaDevices?.removeEventListener('devicechange', enumerateDevices);
       // Invalidate any in-flight request (a grant arriving after unmount is
       // stopped by the isUnmounted check) and stop the current stream.
       isUnmountedRef.current = true;
@@ -153,7 +156,7 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
         setHasPermission(false);
       }
     };
-  }, []);
+  }, [enumerateDevices]);
 
   return {
     stream,

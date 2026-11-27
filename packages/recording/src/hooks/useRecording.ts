@@ -94,6 +94,11 @@ export function useRecordingWithTakeEnded(
   // Set by the unmount cleanup so a startRecording continuation that was
   // parked on an await doesn't build an ownerless capture graph.
   const isUnmountedRef = useRef<boolean>(false);
+  // Counts the effect's setups. A startRecording that was parked on an await
+  // across a cleanup and a new setup (Fast Refresh, an <Activity> hidden and
+  // shown) finds isUnmountedRef reset; the count tells it the cleanup ran, and
+  // with it the cleanup of whoever owns the stream, which stops it.
+  const mountEpochRef = useRef(0);
   // Elapsed seconds, and the preview peaks accumulated so far. Written by the
   // duration loop and the worklet handler; published together, at most once
   // per animation frame, by publishProgress.
@@ -154,6 +159,7 @@ export function useRecordingWithTakeEnded(
       return false;
     }
     isStartingRef.current = true;
+    const mountEpoch = mountEpochRef.current;
 
     try {
       setError(null);
@@ -173,7 +179,9 @@ export function useRecordingWithTakeEnded(
       // nodes exist. A continuation past this point would start an ownerless
       // session: the rAF loop reschedules forever and chunks accumulate with
       // nothing left to stop them.
-      if (isUnmountedRef.current) return false;
+      // The same after a cleanup followed by a new setup: the take would read
+      // a stream its owner stopped in that cleanup (#822).
+      if (isUnmountedRef.current || mountEpoch !== mountEpochRef.current) return false;
 
       // Create MediaStreamSource from Tone's context
       // Each hook creates its own source to avoid cross-context issues in Firefox
@@ -493,6 +501,7 @@ export function useRecordingWithTakeEnded(
     // instance, so a flag left true by the probe-unmount's cleanup would
     // make startRecording abort forever.
     isUnmountedRef.current = false;
+    mountEpochRef.current += 1;
     return () => {
       // Abort any startRecording continuation parked on an await — it must
       // not build the capture graph after unmount.
@@ -540,7 +549,8 @@ export function useRecordingWithTakeEnded(
       audioTrackRef.current = null;
       onTrackEndedRef.current = null;
       // What was received so far is the take. The worklet's last partial
-      // flush is not in it: a cleanup cannot wait for the stop handshake.
+      // flush and any message it had posted that was not delivered yet are
+      // not in it: a cleanup cannot wait for the stop handshake and its drain.
       let buffer: AudioBuffer | null = null;
       try {
         buffer = buildTakeBufferRef.current();
@@ -550,7 +560,12 @@ export function useRecordingWithTakeEnded(
       setIsRecording(false);
       setIsPaused(false);
       if (buffer) setAudioBuffer(buffer);
-      onTakeEndedRef.current?.(buffer);
+      try {
+        onTakeEndedRef.current?.(buffer);
+      } catch (err) {
+        // A throw must not leave an effect cleanup.
+        console.warn('[waveform-playlist] Failed to hand over the interrupted take:', String(err));
+      }
     };
   }, []);
 
