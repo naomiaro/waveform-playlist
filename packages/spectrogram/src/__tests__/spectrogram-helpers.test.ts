@@ -142,17 +142,13 @@ describe('computeChunkSampleRange', () => {
 });
 
 describe('resolveRenderMode', () => {
-  it('prefers the override render mode', () => {
-    expect(resolveRenderMode({ renderMode: 'spectrogram' }, 'waveform')).toBe('spectrogram');
-  });
-
-  it('falls back to the track render mode when there is no override', () => {
-    expect(resolveRenderMode(undefined, 'both')).toBe('both');
-    expect(resolveRenderMode(undefined, 'spectrogram')).toBe('spectrogram');
+  it('is the track render mode', () => {
+    expect(resolveRenderMode('both')).toBe('both');
+    expect(resolveRenderMode('spectrogram')).toBe('spectrogram');
   });
 
   it('defaults to waveform when nothing is set', () => {
-    expect(resolveRenderMode(undefined, undefined)).toBe('waveform');
+    expect(resolveRenderMode(undefined)).toBe('waveform');
   });
 });
 

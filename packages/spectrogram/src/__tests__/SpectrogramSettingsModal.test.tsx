@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll, afterEach, type Mock } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { ThemeProvider } from 'styled-components';
 import type { SpectrogramConfig, ColorMapValue } from '@waveform-playlist/core';
 import { SpectrogramSettingsModal } from '../components/SpectrogramSettingsModal';
 
@@ -42,6 +43,7 @@ function renderModal(
     colorMap?: ColorMapValue;
     onApply?: Mock<(config: SpectrogramConfig, colorMap: ColorMapValue) => void>;
     onClose?: Mock<() => void>;
+    sampleRate?: number;
   } = {}
 ) {
   const onApply = overrides.onApply ?? vi.fn();
@@ -53,6 +55,7 @@ function renderModal(
       config={overrides.config ?? baseConfig}
       colorMap={overrides.colorMap ?? 'magma'}
       onApply={onApply}
+      sampleRate={overrides.sampleRate}
     />
   );
   // DOM order: [fftSize, hopSize, zeroPadding, windowFn, freqScale, colorMap]
@@ -222,5 +225,151 @@ describe('SpectrogramSettingsModal', () => {
       expect(screen.getByLabelText(name)).toBeDefined();
     }
     expect(screen.getByRole('dialog', { name: 'Spectrogram Settings' })).toBeDefined();
+  });
+});
+
+// #814: Apply sends only what the user changed; every other field of the
+// config, and the colour map, go back as they came in. An Apply that changed
+// nothing calls no onApply (it would be an undo step that does nothing).
+describe('SpectrogramSettingsModal: Apply changes only what was edited (#814)', () => {
+  const apply = () => fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
+  const maxFrequency = () => screen.getByLabelText('Max Frequency (Hz)') as HTMLInputElement;
+
+  it('Apply with no edit only closes: onApply is not called', () => {
+    const { onApply, onClose } = renderModal({ config: { fftSize: 1024 }, colorMap: 'inferno' });
+    apply();
+    expect(onApply).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('a field set back to the value it had is no edit', () => {
+    const { onApply, selects } = renderModal({ config: { windowFunction: 'hamming' } });
+    fireEvent.change(selects()[3], { target: { value: 'blackman' } });
+    fireEvent.change(selects()[3], { target: { value: 'hamming' } });
+    fireEvent.change(selects()[5], { target: { value: 'magma' } }); // the colour map it had
+    apply();
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it('an edit keeps the fields the form does not show', () => {
+    const config: SpectrogramConfig = {
+      fftSize: 1024,
+      alpha: 0.6,
+      labels: true,
+      labelsColor: '#abcdef',
+      labelsBackground: 'rgba(0, 0, 0, 0.3)',
+    };
+    const { onApply, numbers } = renderModal({ config, colorMap: 'inferno' });
+    fireEvent.change(numbers()[2], { target: { value: '60' } }); // range
+    apply();
+    expect(onApply).toHaveBeenCalledWith({ ...config, rangeDb: 60 }, 'inferno');
+  });
+
+  it('an edit is added to the config, and nothing else is written', () => {
+    const config: SpectrogramConfig = { alpha: 0.6, labelsColor: '#abcdef' };
+    const { onApply, numbers } = renderModal({ config });
+    fireEvent.change(numbers()[3], { target: { value: '35' } }); // gain
+    apply();
+    expect(onApply.mock.lastCall?.[0]).toEqual({ alpha: 0.6, labelsColor: '#abcdef', gainDb: 35 });
+  });
+
+  it('with no maxFrequency, the field shows half the sample rate and Apply leaves it unset', () => {
+    const { onApply, numbers } = renderModal({ config: {}, sampleRate: 48000 });
+    expect(maxFrequency().value).toBe('24000');
+    expect(maxFrequency().max).toBe('24000');
+    fireEvent.change(numbers()[3], { target: { value: '35' } }); // gain
+    apply();
+    expect(onApply.mock.lastCall?.[0]).toEqual({ gainDb: 35 });
+  });
+
+  it('with no maxFrequency and no sample rate, the field is empty', () => {
+    renderModal({ config: {} });
+    expect(maxFrequency().value).toBe('');
+  });
+
+  it('a typed maxFrequency is written; an emptied one goes back to the default', () => {
+    const { onApply } = renderModal({ config: { maxFrequency: 18000 }, sampleRate: 48000 });
+    fireEvent.change(maxFrequency(), { target: { value: '12000' } });
+    apply();
+    expect(onApply.mock.lastCall?.[0]).toEqual({ maxFrequency: 12000 });
+
+    cleanup();
+    const second = renderModal({ config: { maxFrequency: 18000 }, sampleRate: 48000 });
+    fireEvent.change(maxFrequency(), { target: { value: '' } });
+    expect(maxFrequency().value).toBe('');
+    apply();
+    expect(second.onApply.mock.lastCall?.[0]).toEqual({ maxFrequency: undefined });
+  });
+
+  it('a custom colour map shows as custom and is kept by Apply', () => {
+    const custom: ColorMapValue = [
+      [0, 0, 0],
+      [255, 255, 255],
+    ];
+    const { onApply, selects, numbers } = renderModal({ colorMap: custom });
+    const colorMap = selects()[5];
+    expect(colorMap.selectedOptions[0].textContent).toBe('custom');
+    fireEvent.change(numbers()[3], { target: { value: '35' } }); // gain
+    apply();
+    expect(onApply.mock.lastCall?.[1]).toBe(custom);
+  });
+
+  it('picking a named colour map replaces a custom one', () => {
+    const { onApply, selects } = renderModal({ colorMap: [[0, 0, 0]] });
+    fireEvent.change(selects()[5], { target: { value: 'roseus' } });
+    apply();
+    expect(onApply.mock.lastCall?.[1]).toBe('roseus');
+  });
+
+  it('picking custom again after a named map keeps the given colour map', () => {
+    const custom: ColorMapValue = [
+      [0, 0, 0],
+      [255, 255, 255],
+    ];
+    const { onApply, selects, numbers } = renderModal({ colorMap: custom });
+    fireEvent.change(selects()[5], { target: { value: 'magma' } });
+    fireEvent.change(selects()[5], { target: { value: 'custom' } });
+    expect(selects()[5].value).toBe('custom');
+    fireEvent.change(numbers()[3], { target: { value: '35' } }); // gain
+    apply();
+    expect(onApply.mock.lastCall?.[1]).toBe(custom);
+  });
+
+  it('picking custom again and changing nothing else is no change', () => {
+    const { onApply, selects } = renderModal({ colorMap: [[0, 0, 0]] });
+    fireEvent.change(selects()[5], { target: { value: 'magma' } });
+    fireEvent.change(selects()[5], { target: { value: 'custom' } });
+    apply();
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it('offers no custom option for a named colour map', () => {
+    const { selects } = renderModal({ colorMap: 'magma' });
+    const texts = Array.from(selects()[5].options, (o) => o.textContent);
+    expect(texts).not.toContain('custom');
+  });
+
+  it('the Apply button takes its colours from the theme', () => {
+    render(
+      <ThemeProvider
+        theme={{
+          buttonBackground: 'rgb(1, 2, 3)',
+          buttonText: 'rgb(4, 5, 6)',
+          buttonBorder: 'rgb(7, 8, 9)',
+        }}
+      >
+        <SpectrogramSettingsModal
+          open
+          onClose={vi.fn()}
+          config={{}}
+          colorMap="viridis"
+          onApply={vi.fn()}
+        />
+      </ThemeProvider>
+    );
+    const style = getComputedStyle(screen.getByRole('button', { name: 'Apply' }));
+    expect(style.backgroundColor).toBe('rgb(1, 2, 3)');
+    expect(style.color).toBe('rgb(4, 5, 6)');
+    expect(style.borderColor).toBe('rgb(7, 8, 9)');
   });
 });

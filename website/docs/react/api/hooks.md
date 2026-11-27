@@ -1083,7 +1083,12 @@ interface TrackContextValue {
   moveUp: () => void;
   /** Moves the track one position down. Nothing happens for the last track. */
   moveDown: () => void;
-  /** Nothing happens without a `<SpectrogramProvider>`. */
+  /**
+   * Sets the track's `renderMode` in the arrangement: an undo step. The mode
+   * the track is already drawn with (an unset one is `'waveform'`) changes
+   * nothing, and so does any mode for a MIDI track. Nothing happens without a
+   * `<SpectrogramProvider>`.
+   */
   setRenderMode: (mode: RenderMode) => void;
   /** Opens the spectrogram settings of this track. Nothing happens without a `<SpectrogramProvider>`. */
   openSpectrogramSettings: () => void;

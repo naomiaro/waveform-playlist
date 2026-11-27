@@ -2472,7 +2472,12 @@ interface TrackContextValue {
   moveUp: () => void;
   /** Moves the track one position down. Nothing happens for the last track. */
   moveDown: () => void;
-  /** Nothing happens without a `<SpectrogramProvider>`. */
+  /**
+   * Sets the track's `renderMode` in the arrangement: an undo step. The mode
+   * the track is already drawn with (an unset one is `'waveform'`) changes
+   * nothing, and so does any mode for a MIDI track. Nothing happens without a
+   * `<SpectrogramProvider>`.
+   */
   setRenderMode: (mode: RenderMode) => void;
   /** Opens the spectrogram settings of this track. Nothing happens without a `<SpectrogramProvider>`. */
   openSpectrogramSettings: () => void;
@@ -3063,12 +3068,6 @@ interface SpectrogramData {
   rangeDb: number;
 }
 
-interface TrackSpectrogramOverrides {
-  renderMode?: RenderMode;  // set by setTrackRenderMode (the track menu); absent = the track's own renderMode
-  config?: SpectrogramConfig;
-  colorMap?: ColorMapValue;
-}
-
 // From @dawcore/spectrogram
 interface SpectrogramWorkerApi {
   computeFFT(params: SpectrogramWorkerFFTParams, generation?: number): Promise<{ cacheKey: string }>;
@@ -3091,6 +3090,18 @@ export { computeSpectrogram, computeSpectrogramMono, getColorMap, getFrequencySc
 export { createSpectrogramWorker, createSpectrogramWorkerPool, SpectrogramAbortError } from '@dawcore/spectrogram';
 export { SpectrogramOrchestrator } from '@dawcore/spectrogram/orchestrator';
 export { SpectrogramProvider, SpectrogramMenuItems, SpectrogramSettingsModal } from '@waveform-playlist/spectrogram';
+
+interface SpectrogramSettingsModalProps {
+  open: boolean;
+  onClose: () => void;
+  config: SpectrogramConfig;
+  colorMap: ColorMapValue;
+  /** On Apply: `config` with the fields the user changed on top, and the colour map
+   *  (the one given unless a named one was picked). Not called when nothing changed. */
+  onApply: (config: SpectrogramConfig, colorMap: ColorMapValue) => void;
+  /** With no `maxFrequency` in `config`, the field shows half of it (the default top). */
+  sampleRate?: number;
+}
 
 // Integration context (from @waveform-playlist/browser)
 export { useSpectrogramIntegration, SpectrogramIntegrationProvider } from '@waveform-playlist/browser';

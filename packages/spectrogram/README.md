@@ -45,7 +45,7 @@ function MyEditor() {
 }
 ```
 
-`<SpectrogramProvider>` exposes one config + one color map at a time; per-track overrides come from that track's own `spectrogramConfig` / `spectrogramColorMap` fields, or via `<SpectrogramSettingsModal>` at runtime.
+`<SpectrogramProvider>` exposes one config + one color map at a time; per-track settings come from that track's own `renderMode`, `spectrogramConfig` and `spectrogramColorMap` fields. At runtime the track menu changes the render mode and the settings dialog it opens changes the config and colour map, in the arrangement (each change an undo step). `<SpectrogramSettingsModal>` used on its own changes nothing: it hands the result to its `onApply`.
 
 ## Examples & Documentation
 

@@ -1,10 +1,11 @@
 import React, { useRef, useEffect, useId, useLayoutEffect, useState } from 'react';
 import styled from 'styled-components';
-import type {
-  SpectrogramConfig,
-  ColorMapValue,
-  ColorMapName,
-  FFTSize,
+import {
+  SPECTROGRAM_DEFAULTS,
+  type SpectrogramConfig,
+  type ColorMapValue,
+  type ColorMapName,
+  type FFTSize,
 } from '@waveform-playlist/core';
 
 export interface SpectrogramSettingsModalProps {
@@ -12,7 +13,17 @@ export interface SpectrogramSettingsModalProps {
   onClose: () => void;
   config: SpectrogramConfig;
   colorMap: ColorMapValue;
+  /**
+   * Called on Apply with the config it was given plus the fields the user
+   * changed, and the colour map (the one given unless the user picked one).
+   * Not called when nothing was changed: Apply then only closes.
+   */
   onApply: (config: SpectrogramConfig, colorMap: ColorMapValue) => void;
+  /**
+   * The sample rate of the audio. With a config that has no `maxFrequency`,
+   * the field shows half of it, the top the spectrogram is drawn to.
+   */
+  sampleRate?: number;
 }
 
 const StyledDialog = styled.dialog`
@@ -97,11 +108,15 @@ const ModalButton = styled.button<{ $primary?: boolean }>`
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.85rem;
-  background: ${(p) => (p.$primary ? 'var(--ifm-color-primary, #4a9)' : 'transparent')};
-  color: ${(p) => (p.$primary ? '#fff' : 'inherit')};
+  background: ${(p) => (p.$primary ? (p.theme.buttonBackground ?? '#0091ff') : 'transparent')};
+  color: ${(p) => (p.$primary ? (p.theme.buttonText ?? '#fff') : 'inherit')};
+  ${(p) => (p.$primary && p.theme.buttonBorder ? `border-color: ${p.theme.buttonBorder};` : '')}
 
   &:hover {
-    opacity: 0.85;
+    ${(p) =>
+      p.$primary && p.theme.buttonHoverBackground
+        ? `background: ${p.theme.buttonHoverBackground};`
+        : 'opacity: 0.85;'}
   }
 `;
 
@@ -116,6 +131,8 @@ const WINDOW_FUNCTIONS = [
 ] as const;
 const FREQ_SCALES = ['linear', 'logarithmic', 'mel', 'bark', 'erb'] as const;
 const COLOR_MAPS: ColorMapName[] = ['viridis', 'magma', 'inferno', 'grayscale', 'igray', 'roseus'];
+/** The select's value for a colour map given as an array of colours. */
+const CUSTOM_COLOR_MAP = 'custom';
 
 type SettingsFormProps = Omit<SpectrogramSettingsModalProps, 'open'>;
 
@@ -123,41 +140,54 @@ type SettingsFormProps = Omit<SpectrogramSettingsModalProps, 'open'>;
  * The form is a draft of the settings. It is mounted only while the dialog is
  * open, so its state starts from the props each time the dialog opens and is
  * never overwritten by a parent re-render while the user is editing.
+ *
+ * The draft holds only the fields the user changed (#814). A field shows its
+ * edit, else the config's value, else the default; Apply sends the config it
+ * was given with the edits on top, so a field the form does not show
+ * (`alpha`, `labelsColor`, `labelsBackground`) and a field left at its default
+ * (`maxFrequency`: half the sample rate) are not written.
  */
-const SettingsForm: React.FC<SettingsFormProps> = ({ onClose, config, colorMap, onApply }) => {
+const SettingsForm: React.FC<SettingsFormProps> = ({
+  onClose,
+  config,
+  colorMap,
+  onApply,
+  sampleRate,
+}) => {
   const id = useId();
-  const [fftSize, setFftSize] = useState(config.fftSize ?? 2048);
-  const [windowFn, setWindowFn] = useState(config.windowFunction ?? 'hann');
-  const [freqScale, setFreqScale] = useState(config.frequencyScale ?? 'mel');
-  const [localColorMap, setLocalColorMap] = useState<ColorMapName>(
-    typeof colorMap === 'string' ? colorMap : 'viridis'
-  );
-  const [minFreq, setMinFreq] = useState(config.minFrequency ?? 0);
-  const [maxFreq, setMaxFreq] = useState(config.maxFrequency ?? 20000);
-  const [gainDb, setGainDb] = useState(config.gainDb ?? 20);
-  const [rangeDb, setRangeDb] = useState(config.rangeDb ?? 80);
-  const [zeroPadding, setZeroPadding] = useState(config.zeroPaddingFactor ?? 2);
-  const [hopSize, setHopSize] = useState(
-    config.hopSize ?? Math.floor((config.fftSize ?? 2048) / 4)
-  );
-  const [showLabels, setShowLabels] = useState(config.labels ?? false);
+  const [edits, setEdits] = useState<SpectrogramConfig>({});
+  const [editedColorMap, setEditedColorMap] = useState<ColorMapName | undefined>(undefined);
+
+  const shown = <K extends keyof SpectrogramConfig>(key: K): SpectrogramConfig[K] =>
+    key in edits ? edits[key] : config[key];
+  const edit = (changes: SpectrogramConfig) => setEdits((prev) => ({ ...prev, ...changes }));
+
+  const fftSize = shown('fftSize') ?? SPECTROGRAM_DEFAULTS.fftSize;
+  const hopSize = shown('hopSize') ?? Math.floor(fftSize / 4);
+  const zeroPadding = shown('zeroPaddingFactor') ?? SPECTROGRAM_DEFAULTS.zeroPaddingFactor;
+  const windowFn = shown('windowFunction') ?? SPECTROGRAM_DEFAULTS.windowFunction;
+  const freqScale = shown('frequencyScale') ?? SPECTROGRAM_DEFAULTS.frequencyScale;
+  const minFreq = shown('minFrequency') ?? SPECTROGRAM_DEFAULTS.minFrequency;
+  const nyquist = sampleRate !== undefined ? sampleRate / 2 : undefined;
+  // An emptied field stays empty while the user types (Apply then leaves the
+  // default); only an untouched one shows the default's number.
+  const maxFreq = 'maxFrequency' in edits ? edits.maxFrequency : (config.maxFrequency ?? nyquist);
+  const gainDb = shown('gainDb') ?? SPECTROGRAM_DEFAULTS.gainDb;
+  const rangeDb = shown('rangeDb') ?? SPECTROGRAM_DEFAULTS.rangeDb;
+  const showLabels = shown('labels') ?? SPECTROGRAM_DEFAULTS.labels;
+  const isCustomColorMap = typeof colorMap !== 'string';
+  const colorMapValue = editedColorMap ?? (isCustomColorMap ? CUSTOM_COLOR_MAP : colorMap);
 
   const handleApply = () => {
-    onApply(
-      {
-        fftSize,
-        windowFunction: windowFn as SpectrogramConfig['windowFunction'],
-        frequencyScale: freqScale as SpectrogramConfig['frequencyScale'],
-        minFrequency: minFreq,
-        maxFrequency: maxFreq,
-        gainDb,
-        rangeDb,
-        zeroPaddingFactor: zeroPadding,
-        hopSize,
-        labels: showLabels,
-      },
-      localColorMap
+    // A field set back to the value it had is no change. With none, Apply
+    // only closes: an onApply would be an undo step that changes nothing.
+    const configChanged = (Object.keys(edits) as Array<keyof SpectrogramConfig>).some(
+      (key) => edits[key] !== config[key]
     );
+    const colorMapChanged = editedColorMap !== undefined && editedColorMap !== colorMap;
+    if (configChanged || colorMapChanged) {
+      onApply({ ...config, ...edits }, editedColorMap ?? colorMap);
+    }
     onClose();
   };
 
@@ -171,8 +201,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ onClose, config, colorMap, 
             value={fftSize}
             onChange={(e) => {
               const v = Number(e.target.value) as FFTSize;
-              setFftSize(v);
-              setHopSize(Math.floor(v / 4));
+              edit({ fftSize: v, hopSize: Math.floor(v / 4) });
             }}
           >
             {FFT_SIZES.map((s) => (
@@ -188,7 +217,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ onClose, config, colorMap, 
           <Select
             id={`${id}-hop-size`}
             value={hopSize}
-            onChange={(e) => setHopSize(Number(e.target.value))}
+            onChange={(e) => edit({ hopSize: Number(e.target.value) })}
           >
             {[
               { label: `${fftSize} (no overlap)`, value: fftSize },
@@ -208,7 +237,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ onClose, config, colorMap, 
           <Select
             id={`${id}-zero-padding`}
             value={zeroPadding}
-            onChange={(e) => setZeroPadding(Number(e.target.value))}
+            onChange={(e) => edit({ zeroPaddingFactor: Number(e.target.value) })}
           >
             {[1, 2, 4, 8, 16].map((v) => (
               <option key={v} value={v}>
@@ -223,7 +252,9 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ onClose, config, colorMap, 
           <Select
             id={`${id}-window-function`}
             value={windowFn}
-            onChange={(e) => setWindowFn(e.target.value as typeof windowFn)}
+            onChange={(e) =>
+              edit({ windowFunction: e.target.value as SpectrogramConfig['windowFunction'] })
+            }
           >
             {WINDOW_FUNCTIONS.map((w) => (
               <option key={w} value={w}>
@@ -238,7 +269,9 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ onClose, config, colorMap, 
           <Select
             id={`${id}-frequency-scale`}
             value={freqScale}
-            onChange={(e) => setFreqScale(e.target.value as typeof freqScale)}
+            onChange={(e) =>
+              edit({ frequencyScale: e.target.value as SpectrogramConfig['frequencyScale'] })
+            }
           >
             {FREQ_SCALES.map((s) => (
               <option key={s} value={s}>
@@ -252,9 +285,15 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ onClose, config, colorMap, 
           <Label htmlFor={`${id}-color-map`}>Color Map</Label>
           <Select
             id={`${id}-color-map`}
-            value={localColorMap}
-            onChange={(e) => setLocalColorMap(e.target.value as ColorMapName)}
+            value={colorMapValue}
+            onChange={(e) =>
+              // "custom" is the colour map given (an array): no edit.
+              setEditedColorMap(
+                e.target.value === CUSTOM_COLOR_MAP ? undefined : (e.target.value as ColorMapName)
+              )
+            }
           >
+            {isCustomColorMap && <option value={CUSTOM_COLOR_MAP}>{CUSTOM_COLOR_MAP}</option>}
             {COLOR_MAPS.map((c) => (
               <option key={c} value={c}>
                 {c}
@@ -272,7 +311,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ onClose, config, colorMap, 
             max={5000}
             step={50}
             value={minFreq}
-            onChange={(e) => setMinFreq(Number(e.target.value))}
+            onChange={(e) => edit({ minFrequency: Number(e.target.value) })}
           />
         </Field>
 
@@ -282,10 +321,13 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ onClose, config, colorMap, 
             id={`${id}-max-frequency`}
             type="number"
             min={1000}
-            max={22050}
+            max={nyquist}
             step={50}
-            value={maxFreq}
-            onChange={(e) => setMaxFreq(Number(e.target.value))}
+            value={maxFreq ?? ''}
+            onChange={(e) =>
+              // Emptied: back to the default, half the sample rate.
+              edit({ maxFrequency: e.target.value === '' ? undefined : Number(e.target.value) })
+            }
           />
         </Field>
 
@@ -298,7 +340,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ onClose, config, colorMap, 
             max={120}
             step={1}
             value={rangeDb}
-            onChange={(e) => setRangeDb(Number(e.target.value))}
+            onChange={(e) => edit({ rangeDb: Number(e.target.value) })}
           />
         </Field>
 
@@ -311,7 +353,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ onClose, config, colorMap, 
             max={60}
             step={1}
             value={gainDb}
-            onChange={(e) => setGainDb(Number(e.target.value))}
+            onChange={(e) => edit({ gainDb: Number(e.target.value) })}
           />
         </Field>
 
@@ -320,7 +362,7 @@ const SettingsForm: React.FC<SettingsFormProps> = ({ onClose, config, colorMap, 
             <input
               type="checkbox"
               checked={showLabels}
-              onChange={(e) => setShowLabels(e.target.checked)}
+              onChange={(e) => edit({ labels: e.target.checked })}
             />
             Show Frequency Labels
           </CheckboxLabel>
@@ -345,6 +387,7 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
   config,
   colorMap,
   onApply,
+  sampleRate,
 }) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -386,7 +429,13 @@ export const SpectrogramSettingsModal: React.FC<SpectrogramSettingsModalProps> =
     <StyledDialog ref={dialogRef} aria-labelledby={titleId}>
       <Title id={titleId}>Spectrogram Settings</Title>
       {open && (
-        <SettingsForm onClose={onClose} config={config} colorMap={colorMap} onApply={onApply} />
+        <SettingsForm
+          onClose={onClose}
+          config={config}
+          colorMap={colorMap}
+          onApply={onApply}
+          sampleRate={sampleRate}
+        />
       )}
     </StyledDialog>
   );

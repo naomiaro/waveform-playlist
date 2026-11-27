@@ -11,6 +11,7 @@ import { render, act, cleanup } from '@testing-library/react';
 import type { ClipTrack, AudioClip, SpectrogramCanvasRegistration } from '@waveform-playlist/core';
 
 const fake = vi.hoisted(() => ({
+  arrangement: { updateTrack() {} },
   timeline: { tracks: [] as unknown[], isReady: true },
   integration: null as null | {
     registerSpectrogramCanvas: (reg: SpectrogramCanvasRegistration) => void;
@@ -74,6 +75,8 @@ vi.mock('@waveform-playlist/browser', () => ({
   usePlaylistView: () => fake.view,
   usePlaylistZoom: () => fake.zoom,
   usePlaylistTimeline: () => fake.timeline,
+  // One object, as the real hook returns.
+  useArrangement: () => fake.arrangement,
 }));
 
 import { SpectrogramProvider } from '../SpectrogramProvider';

@@ -46,7 +46,9 @@ function MyEditor() {
 }
 ```
 
-The provider exposes one config + one color map at a time. Per-track overrides come from the track's own `spectrogramConfig` / `spectrogramColorMap` fields.
+The provider exposes one config + one color map at a time. Per-track settings come from the track's own `spectrogramConfig` / `spectrogramColorMap` fields.
+
+The track menu, `useTrack().setRenderMode` and the settings dialog change the track's own `renderMode`, `spectrogramConfig` and `spectrogramColorMap` in the arrangement. Each change is an undo step, and `arrangement.getTracks()` holds it, so an app that saves its tracks saves the user's choices.
 
 ### Render Modes
 
@@ -86,7 +88,7 @@ See [The Panel of a Track](/docs/react/guides/track-management#the-panel-of-a-tr
 The package also exports the two pieces the provider builds that UI from, for a menu or dialog of your own:
 
 - `SpectrogramMenuItems(props)` is a function, not a component: it takes `{ renderMode, onRenderModeChange, onOpenSettings, onClose? }` and returns an array of `TrackMenuItem` (the render-mode radios and the settings entry) for the `items` of `TrackMenu`. Both `TrackMenu` and the `TrackMenuItem` type are exports of `@waveform-playlist/ui-components`; the spectrogram package does not export the type. It has no colour-map items; the colour map is chosen in the settings dialog.
-- `<SpectrogramSettingsModal open onClose config colorMap onApply />` is the settings dialog (FFT size, frequency scale, gain, range and the rest). It reads no context: you pass the current `config` and `colorMap` and get the new ones in `onApply`.
+- `<SpectrogramSettingsModal open onClose config colorMap onApply sampleRate />` is the settings dialog (FFT size, frequency scale, gain, range and the rest). It reads no context: you pass the current `config` and `colorMap`, and `onApply` gets the `config` you passed with the fields the user changed on top (the others, `alpha` and the label colours included, are kept as they were) and the colour map (yours, unless the user picked a named one). When nothing was changed, Apply only closes the dialog and `onApply` is not called. The optional `sampleRate` is what the Max Frequency field shows half of when `config` has no `maxFrequency`: the top the spectrogram is drawn to by default.
 
 ## Web Components
 

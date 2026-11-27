@@ -3272,7 +3272,7 @@ After a split the two tracks are separate: each has its own fader, mute and solo
 
 **Packages:** `@waveform-playlist/core`, `@waveform-playlist/ui-components`, `@waveform-playlist/browser`.
 
-`RenderMode` is now `'waveform' | 'spectrogram' | 'both'`. A piano roll is not a mode you choose: it is how a MIDI track is drawn. Render modes apply to audio tracks only, and a `renderMode` or spectrogram override on a MIDI track does nothing. With the spectrogram integration mounted, the default track panel of a MIDI track no longer shows the track menu (the render-mode choices and the spectrogram settings).
+`RenderMode` is now `'waveform' | 'spectrogram' | 'both'`. A piano roll is not a mode you choose: it is how a MIDI track is drawn. Render modes apply to audio tracks only, and a `renderMode` on a MIDI track does nothing. With the spectrogram integration mounted, the default track panel of a MIDI track no longer shows the track menu (the render-mode choices and the spectrogram settings).
 
 **Find:** the string `'piano-roll'` in TypeScript or JSX: `renderMode: 'piano-roll'` on a track, `renderMode="piano-roll"` on `<SmartChannel>`, comparisons such as `mode === 'piano-roll'`, and `switch` statements over `RenderMode`. TypeScript reports each one.
 
@@ -4727,24 +4727,36 @@ try {
 }
 ```
 
-## `TrackSpectrogramOverrides.renderMode` is optional
+## Spectrogram choices are stored on the track
 
-**Packages:** `@waveform-playlist/core` (the type), `@waveform-playlist/browser` (`useSpectrogramIntegration()`, whose `trackSpectrogramOverrides` has this type), `@waveform-playlist/spectrogram` (`SpectrogramProvider`).
+**Packages:** `@waveform-playlist/core` (`TrackSpectrogramOverrides` removed), `@waveform-playlist/browser` (`trackSpectrogramOverrides` of `useSpectrogramIntegration()` removed), `@waveform-playlist/spectrogram` (`SpectrogramProvider`).
 
-A track's spectrogram override (`trackSpectrogramOverrides` of `useSpectrogramIntegration()`) holds only what the user chose: `renderMode` when a mode was picked in the track menu, `config` and `colorMap` when the spectrogram settings were applied. Applying the settings no longer writes `renderMode: 'waveform'`, which used to switch a track whose own `renderMode` was `spectrogram` or `both` to a waveform.
+The track menu, `useTrack().setRenderMode` and the spectrogram settings dialog change the track in the arrangement: its `renderMode`, `spectrogramConfig` and `spectrogramColorMap`. `SpectrogramProvider` keeps no per-track overrides of its own. What a consumer sees:
 
-**Find:** `trackSpectrogramOverrides.get(` (and any other `TrackSpectrogramOverrides` value) followed by `.renderMode` where a `RenderMode` is expected.
+- Each choice is an undo step, and clears the redo history like any edit. Choosing the mode a track is already drawn with (an unset mode is a waveform) changes nothing, and so does a mode for a MIDI track and an Apply in the settings dialog that changed nothing.
+- A change the app makes to the track with `arrangement.updateTrack` after a choice in the menu is drawn. Before, the menu's override won for good.
+- `arrangement.getTracks()` holds the choices. `arrangement.setTracks(…)` replaces them with the tracks it is given (before, a choice survived it by track id), and a track added with the id of a removed one starts from its own fields.
 
-**Replace with:** a fallback to the track's own mode (the library's readers do the same for audio tracks; a MIDI track has no render mode):
+Reading the removed `trackSpectrogramOverrides` gives `undefined`, so `.get(…)` on it throws.
+
+**Find:** `trackSpectrogramOverrides` and `TrackSpectrogramOverrides`.
+
+**Replace with:** the track's own fields, from `usePlaylistTimeline().tracks` (or `arrangement.getTracks()`):
 
 ```ts
 // Before
-const mode: RenderMode = override.renderMode;
+const { trackSpectrogramOverrides } = useSpectrogramIntegration();
+const override = trackSpectrogramOverrides.get(track.id);
+const mode = override?.renderMode ?? track.renderMode ?? 'waveform';
+const config = override?.config ?? track.spectrogramConfig;
+const colorMap = override?.colorMap ?? track.spectrogramColorMap;
 // After
-const mode: RenderMode = override?.renderMode ?? track.renderMode ?? 'waveform';
+const mode = track.renderMode ?? 'waveform';
+const config = track.spectrogramConfig;
+const colorMap = track.spectrogramColorMap;
 ```
 
-Code that already falls back this way needs no change.
+An app that keeps its own copy of the tracks and hands them to `arrangement.setTracks` should take the tracks from `arrangement.getTracks()` first, or the user's choices are replaced.
 
 ## Smaller changes of the provider
 

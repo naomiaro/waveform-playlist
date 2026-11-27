@@ -76,6 +76,11 @@ cleanups, passive effects; then async continuations and store notifications.
 - **Moving a seam is not removing it.** List every other object that still
   stores the value. If one of them writes back to the owner, there are still
   two owners.
+- **When the arrangement becomes the owner, list what each write now does there.** Every `updateTrack` is an undo step that clears redo, and the adapter gets every track change that is not of a view field (`TRACK_VIEW_FIELDS`). On #930 that gave:
+  - an unchanged Apply that was an empty step;
+  - `setRenderMode('waveform')` on a track with no mode, also an empty step;
+  - a render-mode choice that silenced playback on the native transport.
+  A write that changes nothing the user can see returns the track it was given (no step), compared on what is drawn (`renderMode ?? 'waveform'`), not on the stored field.
 - Ask the reviewer one question before any other: "which state here is still
   stored in two places, and which place writes back?"
 - State a consumer can see changes hands: list what each consumer tree does

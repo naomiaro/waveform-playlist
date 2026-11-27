@@ -10,6 +10,6 @@
 - **Released when the last track goes.** Removing every track now releases the audio. Until now it stayed in the workers.
 - **Given again to a new pool.** After React runs the provider's cleanup and then its effects again without unmounting it (a hidden `<Activity>` shown again; `<StrictMode>` in development), the new pool is given the audio again. Until now the provider still counted the audio as registered, so every FFT request copied the clip's whole audio into each worker again: 12.5 MB per request for the stereo track of `/examples/mir-spectrogram` after an `<Activity>` hide and reveal (seen with a throwaway probe of that page).
 
-Applying the Spectrogram Settings no longer switches a track to a waveform. A track whose own `renderMode` is `spectrogram` or `both`, and whose mode was not changed in the track menu, used to be drawn as a waveform after Apply: the settings wrote an override with `renderMode: 'waveform'`. They now write only the config and the colour map.
+Applying the Spectrogram Settings no longer switches a track to a waveform. A track whose own `renderMode` is `spectrogram` or `both`, and whose mode was not changed in the track menu, used to be drawn as a waveform after Apply: the settings wrote an override with `renderMode: 'waveform'`. They now change only the track's config and colour map.
 
 A `config` or `colorMap` written inline (`config={{ fftSize: 2048 }}`, as in the guide) is compared by content: an equal value no longer gives a new context value on every render of the app.

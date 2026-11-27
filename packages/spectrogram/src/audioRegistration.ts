@@ -1,4 +1,4 @@
-import type { ClipTrack, TrackSpectrogramOverrides } from '@waveform-playlist/core';
+import type { ClipTrack } from '@waveform-playlist/core';
 import { resolveRenderMode } from './spectrogram-helpers';
 
 /**
@@ -30,12 +30,11 @@ export function createAudioKeyOf(): AudioKeyOf {
  */
 export function spectrogramAudio(
   tracks: readonly ClipTrack[],
-  overrides: ReadonlyMap<string, TrackSpectrogramOverrides>,
   audioKeyOf: AudioKeyOf
 ): Map<string, AudioBuffer> {
   const wanted = new Map<string, AudioBuffer>();
   for (const track of tracks) {
-    if (resolveRenderMode(overrides.get(track.id), track.renderMode) === 'waveform') continue;
+    if (resolveRenderMode(track.renderMode) === 'waveform') continue;
     for (const clip of track.clips) {
       if (clip.audioBuffer) wanted.set(audioKeyOf(clip.audioBuffer), clip.audioBuffer);
     }

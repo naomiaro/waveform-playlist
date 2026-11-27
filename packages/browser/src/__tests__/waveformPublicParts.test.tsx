@@ -672,7 +672,6 @@ describe('what the tracks part hands every clip', () => {
   it("the spectrogram integration's canvas registration reaches the channels", async () => {
     const registerSpectrogramCanvas = vi.fn();
     const spectrogram = {
-      trackSpectrogramOverrides: new Map(),
       setTrackRenderMode: () => {},
       setTrackSpectrogramConfig: () => {},
       registerSpectrogramCanvas,

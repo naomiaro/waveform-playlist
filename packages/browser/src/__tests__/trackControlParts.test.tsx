@@ -903,7 +903,6 @@ describe('<TrackMenuButton />', () => {
   const settings: Array<{ open: boolean }> = [];
   const setTrackRenderMode = vi.fn();
   const spectrogram = {
-    trackSpectrogramOverrides: new Map(),
     setTrackRenderMode,
     setTrackSpectrogramConfig: vi.fn(),
     registerSpectrogramCanvas: vi.fn(),
@@ -982,12 +981,12 @@ describe('<TrackMenuButton />', () => {
     expect(seen.get('a')!.hasSpectrogram).toBe(true);
   });
 
-  it('renderMode is the mode the integration has for the track', async () => {
-    const withOverride = {
-      ...spectrogram,
-      trackSpectrogramOverrides: new Map([['b', { renderMode: 'both' }]]),
-    } as unknown as SpectrogramIntegration;
-    mount({ tracks: [A, B], controls: MENU, spectrogram: withOverride });
+  it('renderMode is the track’s own mode (#814)', async () => {
+    mount({
+      tracks: [A, { ...B, renderMode: 'both' }],
+      controls: MENU,
+      spectrogram: spectrogram as SpectrogramIntegration,
+    });
     await ready();
     expect(seen.get('a')!.renderMode).toBe('waveform');
     expect(seen.get('b')!.renderMode).toBe('both');
