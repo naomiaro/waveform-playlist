@@ -13,6 +13,7 @@ export * from './annotations/shortcuts';
 export * from './annotations/store';
 export * from './annotations/bounds';
 export * from './panStage';
+export * from './panLaw';
 export * from './valueSource';
 export * from './sourceLoader';
 export * from './audioTrack';

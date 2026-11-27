@@ -11,6 +11,7 @@
 
 import { Fade } from './index';
 import type { RenderMode, SpectrogramConfig, ColorMapValue } from './spectrogram';
+import type { PanLaw } from '../panLaw';
 
 /**
  * WaveformData object from waveform-data.js library.
@@ -234,6 +235,13 @@ export interface ClipTrack {
 
   /** Stereo pan (-1.0 = left, 0 = center, 1.0 = right) */
   pan: number;
+
+  /**
+   * The pan law this track enters with (default `'auto'`: decided by its
+   * first decoded audio). While the track is in an arrangement, the
+   * arrangement's mixer holds the value (#684).
+   */
+  panLaw?: PanLaw;
 
   /** Optional track color for visual distinction */
   color?: string;

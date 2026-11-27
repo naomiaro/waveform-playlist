@@ -1,4 +1,5 @@
 import type { Fade } from './types';
+import type { PanLaw } from './panLaw';
 import type { RenderMode, SpectrogramConfig, ColorMapValue } from './types/spectrogram';
 import { createClipFromSeconds, createTrack } from './types/clip';
 import type {
@@ -37,6 +38,8 @@ export interface AudioTrackOptions {
   soloed?: boolean;
   volume?: number;
   pan?: number;
+  /** The pan law the track enters with. Default: 'auto', decided by its first decoded audio. */
+  panLaw?: PanLaw;
   renderMode?: RenderMode;
   spectrogramConfig?: SpectrogramConfig;
   spectrogramColorMap?: ColorMapValue;
@@ -187,6 +190,7 @@ export function audioTrack(options: AudioTrackOptions): ArrangementTrack {
     id: options.id || base.id,
     clips: [clip],
     renderMode: options.renderMode,
+    ...(options.panLaw !== undefined && { panLaw: options.panLaw }),
   };
   return track;
 }
