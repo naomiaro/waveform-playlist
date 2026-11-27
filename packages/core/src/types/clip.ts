@@ -167,6 +167,28 @@ export interface LoadingClip {
   waveformData?: WaveformDataObject;
 }
 
+/**
+ * The fields of a track that say how it is drawn, not how it plays. An
+ * adapter is never given them (`PlayoutTrack`), and the engine makes no
+ * adapter call for a change of these fields alone: on the native transport an
+ * `updateTrack` restarts the track's sources, so a render-mode choice during
+ * playback silenced it (review of #930). The one list; the engine reads it.
+ */
+export const TRACK_VIEW_FIELDS = [
+  'name',
+  'color',
+  'height',
+  'renderMode',
+  'spectrogramConfig',
+  'spectrogramColorMap',
+] as const satisfies readonly (keyof ClipTrack)[];
+
+/** A field of `TRACK_VIEW_FIELDS`. */
+export type TrackViewField = (typeof TRACK_VIEW_FIELDS)[number];
+
+/** A track as a playout adapter is given it: a `ClipTrack` without the view fields. */
+export type PlayoutTrack = Omit<ClipTrack, TrackViewField>;
+
 /** A track whose clips are loaded (`AudioClip`) or not loaded yet (`LoadingClip`). */
 export type ArrangementTrack = Omit<ClipTrack, 'clips'> & {
   clips: (AudioClip | LoadingClip)[];

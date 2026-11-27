@@ -647,7 +647,7 @@ The `PlayoutAdapter` interface connects the engine to any audio backend. The eng
 
 ```typescript
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { PlayoutTrack } from '@waveform-playlist/core';
 
 class MyAudioAdapter implements PlayoutAdapter {
   readonly audioContext = new AudioContext();
@@ -657,9 +657,10 @@ class MyAudioAdapter implements PlayoutAdapter {
     // Resume the audio context, load worklets, etc.
   }
 
-  setTracks(tracks: readonly ClipTrack[]): void {
+  setTracks(tracks: readonly PlayoutTrack[]): void {
     // Rebuild audio graph from tracks.
-    // The tracks are the engine's own objects: read them, never write to them.
+    // Read the tracks, never write to them. They carry no view fields (name,
+    // color, renderMode…): a change of those alone is never sent here.
   }
 
   play(startTime: number, endTime?: number): void {
@@ -1162,10 +1163,10 @@ interface PlayoutAdapter {
   readonly audioContext: AudioContext;
   readonly ppqn: number;
   init(): Promise<void>;
-  setTracks(tracks: readonly ClipTrack[]): void;
-  addTrack?(track: ClipTrack): void;
+  setTracks(tracks: readonly PlayoutTrack[]): void; // PlayoutTrack: a ClipTrack without core's TRACK_VIEW_FIELDS
+  addTrack?(track: PlayoutTrack): void;
   removeTrack?(trackId: string): void;
-  updateTrack?(trackId: string, track: ClipTrack): void;
+  updateTrack?(trackId: string, track: PlayoutTrack): void;
   play(startTime: number, endTime?: number): void;
   pause(): void;
   stop(): void;

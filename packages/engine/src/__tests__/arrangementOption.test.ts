@@ -474,7 +474,9 @@ describe('an engine given an arrangement', () => {
     const sent = adapter.rawCalls[0].args[0] as ClipTrack[];
     expect(sent.map((t) => t.id)).toEqual(['A', 'B']);
     expect(sent[0].volume).toBe(0.3);
-    expect(engine.getState().tracks).toBe(sent);
+    // Rule (review of #930, view fields): the adapter's tracks are the stored
+    // ones without their view fields, sharing their clips. (Before: the same array.)
+    sent.forEach((t, i) => expect(t.clips).toBe(engine.getState().tracks[i].clips));
     expect(engine.getState().tracksVersion).toBe(arrangement.tracksVersion);
   });
 

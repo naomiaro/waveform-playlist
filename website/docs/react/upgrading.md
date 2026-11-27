@@ -3756,6 +3756,27 @@ Also:
 - `editor.startRecording()` onto a MIDI track records nothing and dispatches `daw-recording-error`.
 - `editor.tracks` entries have a `kind` field, and `TrackConfig` (the argument of `addTrack`) an optional one. The exported `TrackDescriptor` and `TrackWithId` types therefore have a new required field: code that builds one of them by hand must add `kind`.
 
+## Playout adapters are not given a track's view fields
+
+**Packages:** `@waveform-playlist/engine` (`PlayoutAdapter`), `@waveform-playlist/core` (`TRACK_VIEW_FIELDS`, `PlayoutTrack`), `@waveform-playlist/playout`, `@dawcore/transport`.
+
+The fields that say how a track is drawn are listed in core's `TRACK_VIEW_FIELDS`: `name`, `color`, `height`, `renderMode`, `spectrogramConfig`, `spectrogramColorMap`. The engine gives an adapter its tracks without them (core's `PlayoutTrack`), and a change of those fields alone makes no adapter call: a rename or a render-mode choice during playback no longer restarts the track's audio on the native transport. It is still an undo step and a `statechange`, and `getState().tracks` keeps the fields. The adapter's tracks are copies that share the engine's clips, so they are not the same objects as `getState().tracks`.
+
+**Find:** in a `PlayoutAdapter` of your own, a read of `track.name`, `track.color`, `track.height`, `track.renderMode`, `track.spectrogramConfig` or `track.spectrogramColorMap` on a track the engine gave it; and a comparison of a given track with `engine.getState().tracks` by identity.
+
+**Replace with:** the track's id, or the fields from `engine.getState().tracks` (or `arrangement.getTracks()`) when the adapter really needs one; compare by id.
+
+```ts
+// Before
+setTracks(tracks: readonly ClipTrack[]): void {
+  for (const track of tracks) console.log(`building ${track.name}`);
+}
+// After
+setTracks(tracks: readonly PlayoutTrack[]): void {
+  for (const track of tracks) console.log(`building ${track.id}`);
+}
+```
+
 ## `WaveformPlaylistProvider` takes an `arrangement`: `tracks`, `onTracksChange` and `deferEngineRebuild` are removed
 
 **Packages:** `@waveform-playlist/browser`.

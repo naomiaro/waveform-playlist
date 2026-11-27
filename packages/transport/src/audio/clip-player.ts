@@ -1,4 +1,4 @@
-import type { ClipTrack, AudioClip } from '@waveform-playlist/core';
+import type { PlayoutTrack, AudioClip } from '@waveform-playlist/core';
 import type { Tick, Sample, SchedulerEvent, SchedulerListener } from '../types';
 import type { SampleTimeline } from '../timeline/sample-timeline';
 import type { TempoMap } from '../timeline/tempo-map';
@@ -24,7 +24,7 @@ export interface ClipEvent extends SchedulerEvent {
 }
 
 interface TrackClipState {
-  track: ClipTrack;
+  track: PlayoutTrack;
   clips: AudioClip[];
 }
 
@@ -57,7 +57,7 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
     this._tempoMap = tempoMap;
   }
 
-  setTracks(tracks: ClipTrack[], trackNodes: Map<string, TrackNode>): void {
+  setTracks(tracks: readonly PlayoutTrack[], trackNodes: Map<string, TrackNode>): void {
     this._tracks.clear();
     this._trackNodes = trackNodes;
     for (const track of tracks) {
@@ -78,7 +78,7 @@ export class ClipPlayer implements SchedulerListener<ClipEvent> {
     this._loopEndSamples = endSample;
   }
 
-  updateTrack(trackId: string, track: ClipTrack): void {
+  updateTrack(trackId: string, track: PlayoutTrack): void {
     this._tracks.set(trackId, { track, clips: track.clips });
     this._silenceTrack(trackId);
   }

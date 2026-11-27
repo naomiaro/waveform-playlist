@@ -1,4 +1,4 @@
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { ClipTrack, PlayoutTrack } from '@waveform-playlist/core';
 import type { Arrangement } from './arrangement';
 
 /**
@@ -13,13 +13,13 @@ export interface PlayoutAdapter {
   setPpqn?(ppqn: number): void;
   init(): Promise<void>;
   /** The tracks are the engine's own objects: read them, never write to them. */
-  setTracks(tracks: readonly ClipTrack[]): void;
+  setTracks(tracks: readonly PlayoutTrack[]): void;
   /** Incrementally add a single track without rebuilding the entire playout. */
-  addTrack?(track: ClipTrack): void;
+  addTrack?(track: PlayoutTrack): void;
   /** Incrementally remove a single track without rebuilding the entire playout. */
   removeTrack?(trackId: string): void;
   /** Update a single track's clips (removes old, adds new). */
-  updateTrack?(trackId: string, track: ClipTrack): void;
+  updateTrack?(trackId: string, track: PlayoutTrack): void;
   play(startTime: number, endTime?: number): void;
   pause(): void;
   stop(): void;

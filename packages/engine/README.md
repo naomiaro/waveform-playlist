@@ -419,10 +419,13 @@ interface PlayoutAdapter {
   setPpqn?(ppqn: number): void;
 
   init(): Promise<void>;
-  setTracks(tracks: readonly ClipTrack[]): void; // the engine's own objects: read them, never write to them. Loaded clips only
-  addTrack?(track: ClipTrack): void;
+  // PlayoutTrack (core): a ClipTrack without the view fields of TRACK_VIEW_FIELDS (name,
+  // color, height, renderMode, spectrogramConfig, spectrogramColorMap); a change of those
+  // alone makes no adapter call. Read the tracks, never write to them. Loaded clips only
+  setTracks(tracks: readonly PlayoutTrack[]): void;
+  addTrack?(track: PlayoutTrack): void;
   removeTrack?(trackId: string): void;
-  updateTrack?(trackId: string, track: ClipTrack): void;
+  updateTrack?(trackId: string, track: PlayoutTrack): void;
 
   play(startTime: number, endTime?: number): void;
   pause(): void;
