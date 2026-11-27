@@ -53,6 +53,29 @@ describe('createSpectrogramWorkerPool', () => {
   });
 
   describe('registerAudioData / unregisterAudioData', () => {
+    it('registeredAudioClipIds lists the clips registered and not unregistered (#821)', () => {
+      const pool = createSpectrogramWorkerPool(createMockNativeWorker, 2);
+      expect(pool.registeredAudioClipIds()).toEqual([]);
+      pool.registerAudioData('a', [new Float32Array(4)], 44100);
+      pool.registerAudioData('b', [new Float32Array(4), new Float32Array(4)], 44100);
+      pool.unregisterAudioData('a');
+      expect(pool.registeredAudioClipIds()).toEqual(['b']);
+    });
+
+    it('registeredAudioClipIds returns a copy the caller cannot change the pool through (#821)', () => {
+      const pool = createSpectrogramWorkerPool(createMockNativeWorker, 1);
+      pool.registerAudioData('a', [new Float32Array(4)], 44100);
+      pool.registeredAudioClipIds().pop();
+      expect(pool.registeredAudioClipIds()).toEqual(['a']);
+    });
+
+    it('registeredAudioClipIds is empty after terminate (#821)', () => {
+      const pool = createSpectrogramWorkerPool(createMockNativeWorker, 1);
+      pool.registerAudioData('a', [new Float32Array(4)], 44100);
+      pool.terminate();
+      expect(pool.registeredAudioClipIds()).toEqual([]);
+    });
+
     it('broadcasts registerAudioData to every worker that can compute one of the clip channels', () => {
       const nativeWorkers: ReturnType<typeof createMockNativeWorker>[] = [];
       const pool = createSpectrogramWorkerPool(() => {

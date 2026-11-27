@@ -82,6 +82,15 @@ export interface SpectrogramWorkerApi {
   unregisterCanvas(canvasId: string): void;
   registerAudioData(clipId: string, channelDataArrays: Float32Array[], sampleRate: number): void;
   unregisterAudioData(clipId: string): void;
+  /**
+   * The ids whose audio is registered now: registered and not unregistered
+   * since. An id is whatever the caller registered the audio under (a clip id,
+   * or a key per AudioBuffer, as the React provider uses). Empty once
+   * terminated; a register after that is ignored. A new array on every call.
+   * A caller that pre-registers audio asks this instead of keeping its own
+   * list, which would outlive a terminated worker (#821).
+   */
+  registeredAudioClipIds(): string[];
   terminate(): void;
 }
 
@@ -231,6 +240,7 @@ export function createSpectrogramWorker(worker: Worker): SpectrogramWorkerApi {
     },
 
     registerAudioData(clipId: string, channelDataArrays: Float32Array[], sampleRate: number): void {
+      if (terminated) return;
       const transferableArrays = channelDataArrays.map((arr) => arr.slice());
       const transferables = transferableArrays.map((arr) => arr.buffer);
       worker.postMessage(
@@ -241,12 +251,18 @@ export function createSpectrogramWorker(worker: Worker): SpectrogramWorkerApi {
     },
 
     unregisterAudioData(clipId: string): void {
+      if (terminated) return;
       worker.postMessage({ type: 'unregister-audio-data', clipId });
       registeredClipIds.delete(clipId);
     },
 
+    registeredAudioClipIds(): string[] {
+      return [...registeredClipIds];
+    },
+
     terminate() {
       terminated = true;
+      registeredClipIds.clear();
       worker.terminate();
       for (const [, entry] of pending) {
         entry.reject(new Error('Worker terminated'));

@@ -4704,6 +4704,25 @@ try {
 }
 ```
 
+## `TrackSpectrogramOverrides.renderMode` is optional
+
+**Packages:** `@waveform-playlist/core` (the type), `@waveform-playlist/browser` (`useSpectrogramIntegration()`, whose `trackSpectrogramOverrides` has this type), `@waveform-playlist/spectrogram` (`SpectrogramProvider`).
+
+A track's spectrogram override (`trackSpectrogramOverrides` of `useSpectrogramIntegration()`) holds only what the user chose: `renderMode` when a mode was picked in the track menu, `config` and `colorMap` when the spectrogram settings were applied. Applying the settings no longer writes `renderMode: 'waveform'`, which used to switch a track whose own `renderMode` was `spectrogram` or `both` to a waveform.
+
+**Find:** `trackSpectrogramOverrides.get(` (and any other `TrackSpectrogramOverrides` value) followed by `.renderMode` where a `RenderMode` is expected.
+
+**Replace with:** a fallback to the track's own mode (the library's readers do the same for audio tracks; a MIDI track has no render mode):
+
+```ts
+// Before
+const mode: RenderMode = override.renderMode;
+// After
+const mode: RenderMode = override?.renderMode ?? track.renderMode ?? 'waveform';
+```
+
+Code that already falls back this way needs no change.
+
 ## Smaller changes of the provider
 
 **Packages:** `@waveform-playlist/browser`.

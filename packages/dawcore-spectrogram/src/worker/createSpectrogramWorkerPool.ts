@@ -277,6 +277,10 @@ export function createSpectrogramWorkerPool(
       }
     },
 
+    registeredAudioClipIds(): string[] {
+      return [...registeredAudio.keys()];
+    },
+
     terminate(): void {
       terminated = true;
       registeredAudio.clear();

@@ -16,7 +16,7 @@ const fake = vi.hoisted(() => ({
     registerSpectrogramCanvas: (reg: SpectrogramCanvasRegistration) => void;
     unregisterSpectrogramCanvas: (canvasId: string) => void;
   },
-  computeFFT: [] as Array<{ clipId: string; offsetSamples: number; durationSamples: number }>,
+  computeFFT: [] as Array<{ offsetSamples: number; durationSamples: number }>,
   renderChunks: [] as Array<{ canvasIds: string[] }>,
   registerCanvas: [] as string[],
   scrollContainerRef: { current: null },
@@ -28,27 +28,34 @@ vi.mock('@dawcore/spectrogram', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@dawcore/spectrogram')>();
   return {
     ...actual,
-    createSpectrogramWorkerPool: () => ({
-      registerAudioData() {},
-      unregisterAudioData() {},
-      abortGeneration() {},
-      registerCanvas(canvasId: string) {
-        fake.registerCanvas.push(canvasId);
-      },
-      unregisterCanvas() {},
-      async computeFFT(params: { clipId: string; offsetSamples: number; durationSamples: number }) {
-        fake.computeFFT.push({
-          clipId: params.clipId,
-          offsetSamples: params.offsetSamples,
-          durationSamples: params.durationSamples,
-        });
-        return { cacheKey: `key-${fake.computeFFT.length}` };
-      },
-      async renderChunks(params: { canvasIds: string[] }) {
-        fake.renderChunks.push({ canvasIds: params.canvasIds });
-      },
-      terminate() {},
-    }),
+    createSpectrogramWorkerPool: () => {
+      const audio = new Set<string>();
+      return {
+        registerAudioData(key: string) {
+          audio.add(key);
+        },
+        unregisterAudioData(key: string) {
+          audio.delete(key);
+        },
+        registeredAudioClipIds: () => [...audio],
+        abortGeneration() {},
+        registerCanvas(canvasId: string) {
+          fake.registerCanvas.push(canvasId);
+        },
+        unregisterCanvas() {},
+        async computeFFT(params: { offsetSamples: number; durationSamples: number }) {
+          fake.computeFFT.push({
+            offsetSamples: params.offsetSamples,
+            durationSamples: params.durationSamples,
+          });
+          return { cacheKey: `key-${fake.computeFFT.length}` };
+        },
+        async renderChunks(params: { canvasIds: string[] }) {
+          fake.renderChunks.push({ canvasIds: params.canvasIds });
+        },
+        terminate() {},
+      };
+    },
   };
 });
 
@@ -153,9 +160,7 @@ describe('SpectrogramProvider renders the range a canvas registered with (#812)'
     // The view draws the clip trimmed: 0.25 s further into the audio, 0.25 s shorter.
     await register(registration({ offsetSamples: 60_000, durationSamples: 36_000 }));
 
-    expect(fake.computeFFT).toEqual([
-      { clipId: 'c1', offsetSamples: 60_000, durationSamples: 36_000 },
-    ]);
+    expect(fake.computeFFT).toEqual([{ offsetSamples: 60_000, durationSamples: 36_000 }]);
     // What one registration costs: one canvas handed over, one FFT, one draw.
     expect(fake.registerCanvas).toEqual(['c1-ch0-chunk0']);
     expect(fake.renderChunks).toEqual([{ canvasIds: ['c1-ch0-chunk0'] }]);
@@ -167,9 +172,7 @@ describe('SpectrogramProvider renders the range a canvas registered with (#812)'
 
     await register(registration());
 
-    expect(fake.computeFFT).toEqual([
-      { clipId: 'c1', offsetSamples: SAMPLE_RATE, durationSamples: SAMPLE_RATE },
-    ]);
+    expect(fake.computeFFT).toEqual([{ offsetSamples: SAMPLE_RATE, durationSamples: SAMPLE_RATE }]);
   });
 
   it('a canvas registered again without geometry is rendered from the committed track again', async () => {
@@ -180,9 +183,7 @@ describe('SpectrogramProvider renders the range a canvas registered with (#812)'
     // The same canvas id with a new canvas and no range: the old range is gone.
     await register(registration());
 
-    expect(fake.computeFFT).toEqual([
-      { clipId: 'c1', offsetSamples: SAMPLE_RATE, durationSamples: SAMPLE_RATE },
-    ]);
+    expect(fake.computeFFT).toEqual([{ offsetSamples: SAMPLE_RATE, durationSamples: SAMPLE_RATE }]);
   });
 
   it('a committed track equal to the registered range redraws nothing (the release of a trim)', async () => {

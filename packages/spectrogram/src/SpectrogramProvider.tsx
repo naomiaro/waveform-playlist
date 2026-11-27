@@ -22,15 +22,15 @@ import {
   classifyChunkTiers,
   computeChunkSampleRange,
   resolveRenderMode,
-  toComputeConfig,
   buildConfigKey,
-  buildFFTKey,
   mapsDiffer,
   registeredClipRange,
   resolveClipRange,
   type ChunkTiers,
   type RegisteredAudioRange,
 } from './spectrogram-helpers';
+import { createAudioKeyOf, spectrogramAudio, channelData } from './audioRegistration';
+import { useStableByContent } from './useStableByContent';
 import { SpectrogramMenuItems } from './components';
 import { SpectrogramSettingsModal } from './components';
 import {
@@ -53,14 +53,17 @@ export interface SpectrogramProviderProps {
 }
 
 export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
-  config: spectrogramConfig,
-  colorMap: spectrogramColorMap,
+  config,
+  colorMap,
   workerPoolSize,
   children,
 }) => {
+  // By content: the guide writes `config={{ … }}` inline (#821).
+  const spectrogramConfig = useStableByContent(config);
+  const spectrogramColorMap = useStableByContent(colorMap);
   const { mono } = usePlaylistView();
   const { samplesPerPixel } = usePlaylistZoom();
-  const { tracks, isReady } = usePlaylistTimeline();
+  const { tracks } = usePlaylistTimeline();
   const { scrollContainerRef } = usePlaybackControls();
 
   // State
@@ -86,15 +89,40 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
 
   // Spectrogram refs
   const prevSpectrogramConfigRef = useRef<Map<string, string>>(new Map());
-  const prevSpectrogramFFTKeyRef = useRef<Map<string, string>>(new Map());
   const spectrogramWorkerRef = useRef<SpectrogramWorkerApi | null>(null);
   const spectrogramGenerationRef = useRef(0);
   const prevCanvasVersionRef = useRef(0);
-  const renderedClipIdsRef = useRef<Set<string>>(new Set());
   const backgroundRenderAbortRef = useRef<{ aborted: boolean } | null>(null);
-  const registeredAudioClipIdsRef = useRef<Set<string>>(new Set());
+  // One key per AudioBuffer: clips that share a buffer share its registration.
+  const [audioKeyOf] = useState(createAudioKeyOf);
 
-  // Terminate worker on unmount
+  // The one place the pool is made: lazily, on the first need. The pool is
+  // created once; a later workerPoolSize applies only to a pool made after a
+  // cleanup terminated this one.
+  const ensureWorkerPool = useCallback((): SpectrogramWorkerApi | null => {
+    if (spectrogramWorkerRef.current) return spectrogramWorkerRef.current;
+    try {
+      const pool = createSpectrogramWorkerPool(
+        () =>
+          new Worker(new URL('@dawcore/spectrogram/worker/spectrogram.worker', import.meta.url), {
+            type: 'module',
+          }),
+        workerPoolSize
+      );
+      spectrogramWorkerRef.current = pool;
+      return pool;
+    } catch (err) {
+      console.warn(
+        `[waveform-playlist] Spectrogram Web Worker unavailable: ${err instanceof Error ? err.message : String(err)}`
+      );
+      return null;
+    }
+  }, [workerPoolSize]);
+
+  // Terminate the pool in every cleanup: an unmount, and also when React keeps
+  // the component and runs its effects again (a hidden <Activity> shown again,
+  // StrictMode). What the pool held goes with it; the effects below ask the
+  // next pool what it holds (#821).
   useEffect(() => {
     return () => {
       spectrogramWorkerRef.current?.terminate();
@@ -102,62 +130,31 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     };
   }, []);
 
-  // Eagerly transfer audio data to worker when tracks load
+  // Pre-register with the pool the audio of every clip on a track that draws a
+  // spectrogram, once per buffer, and release what no such clip uses any more.
+  // The pool is the one owner of what it holds (`registeredAudioClipIds`).
+  // Not gated on the playlist's isReady: a track whose audio is decoded draws
+  // while others still load, and its FFT requests would carry its audio.
   useEffect(() => {
-    if (!isReady || tracks.length === 0) return;
+    const wanted = spectrogramAudio(tracks, trackSpectrogramOverrides, audioKeyOf);
+    // Nothing wanted and no pool yet: nothing to release, and no pool to make.
+    const pool = wanted.size > 0 ? ensureWorkerPool() : spectrogramWorkerRef.current;
+    if (!pool) return;
 
-    let workerApi = spectrogramWorkerRef.current;
-    if (!workerApi) {
-      try {
-        workerApi = createSpectrogramWorkerPool(
-          () =>
-            new Worker(new URL('@dawcore/spectrogram/worker/spectrogram.worker', import.meta.url), {
-              type: 'module',
-            }),
-          workerPoolSize
-        );
-        spectrogramWorkerRef.current = workerApi;
-      } catch (err) {
-        console.warn(
-          `[waveform-playlist] Spectrogram Web Worker unavailable for pre-transfer: ${err instanceof Error ? err.message : String(err)}`
-        );
-        return;
-      }
+    const held = new Set(pool.registeredAudioClipIds());
+    for (const [key, buffer] of wanted) {
+      if (!held.has(key)) pool.registerAudioData(key, channelData(buffer), buffer.sampleRate);
     }
-
-    const currentClipIds = new Set<string>();
-
-    for (const track of tracks) {
-      for (const clip of track.clips) {
-        if (!clip.audioBuffer) continue;
-        currentClipIds.add(clip.id);
-
-        if (!registeredAudioClipIdsRef.current.has(clip.id)) {
-          const channelDataArrays: Float32Array[] = [];
-          for (let ch = 0; ch < clip.audioBuffer.numberOfChannels; ch++) {
-            channelDataArrays.push(clip.audioBuffer.getChannelData(ch));
-          }
-          workerApi.registerAudioData(clip.id, channelDataArrays, clip.audioBuffer.sampleRate);
-          registeredAudioClipIdsRef.current.add(clip.id);
-        }
-      }
+    for (const key of held) {
+      if (!wanted.has(key)) pool.unregisterAudioData(key);
     }
-
-    for (const clipId of registeredAudioClipIdsRef.current) {
-      if (!currentClipIds.has(clipId)) {
-        workerApi.unregisterAudioData(clipId);
-        registeredAudioClipIdsRef.current.delete(clipId);
-      }
-    }
-    // workerPoolSize intentionally omitted — pool is created once via spectrogramWorkerRef guard
-  }, [isReady, tracks]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tracks, trackSpectrogramOverrides, audioKeyOf, ensureWorkerPool]);
 
   // Main spectrogram computation effect
   useEffect(() => {
     if (tracks.length === 0) return;
 
     const currentKeys = new Map<string, string>();
-    const currentFFTKeys = new Map<string, string>();
     tracks.forEach((track) => {
       const override = trackSpectrogramOverrides.get(track.id);
       const mode = resolveRenderMode(override, track.renderMode);
@@ -165,17 +162,10 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
       const cfg = override?.config ?? track.spectrogramConfig ?? spectrogramConfig;
       const cm = override?.colorMap ?? track.spectrogramColorMap ?? spectrogramColorMap;
       currentKeys.set(track.id, buildConfigKey({ mode, cfg, cm, mono }));
-      currentFFTKeys.set(
-        track.id,
-        buildFFTKey({ mode, mono, computeConfig: toComputeConfig(cfg) })
-      );
     });
 
     const prevKeys = prevSpectrogramConfigRef.current;
-    const prevFFTKeys = prevSpectrogramFFTKeyRef.current;
-
     const configChanged = mapsDiffer(prevKeys, currentKeys);
-    const fftKeyChanged = mapsDiffer(prevFFTKeys, currentFFTKeys);
 
     const canvasVersionChanged = spectrogramCanvasVersion !== prevCanvasVersionRef.current;
     prevCanvasVersionRef.current = spectrogramCanvasVersion;
@@ -184,7 +174,6 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
 
     if (configChanged) {
       prevSpectrogramConfigRef.current = currentKeys;
-      prevSpectrogramFFTKeyRef.current = currentFFTKeys;
     }
 
     if (backgroundRenderAbortRef.current) {
@@ -193,33 +182,17 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
 
     const generation = ++spectrogramGenerationRef.current;
 
+    const workerApi = ensureWorkerPool();
+    if (!workerApi) return;
     // Tell the worker to abort any in-flight FFT from previous generations
-    if (spectrogramWorkerRef.current) {
-      spectrogramWorkerRef.current.abortGeneration(generation);
-    }
+    workerApi.abortGeneration(generation);
 
-    let workerApi = spectrogramWorkerRef.current;
-    if (!workerApi) {
-      try {
-        workerApi = createSpectrogramWorkerPool(
-          () =>
-            new Worker(new URL('@dawcore/spectrogram/worker/spectrogram.worker', import.meta.url), {
-              type: 'module',
-            }),
-          workerPoolSize
-        );
-        spectrogramWorkerRef.current = workerApi;
-      } catch (err) {
-        console.error(
-          `[waveform-playlist] Spectrogram Web Worker required but unavailable: ${err instanceof Error ? err.message : String(err)}`
-        );
-        return;
-      }
-    }
-
-    const clipsNeedingFFT: Array<{
+    // Every clip of a track whose look changed or whose canvases registered.
+    // A clip whose FFT the worker already has costs a cache hit, not an FFT.
+    const clipsToRender: Array<{
       clipId: string;
-      trackIndex: number;
+      /** The key the clip's audio is registered under: one per AudioBuffer. */
+      audioKey: string;
       channelDataArrays: Float32Array[];
       config: SpectrogramConfig;
       sampleRate: number;
@@ -229,29 +202,14 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
       monoFlag: boolean;
       colorMap: ColorMapValue;
     }> = [];
-    const clipsNeedingDisplayOnly: Array<{
-      clipId: string;
-      trackIndex: number;
-      channelDataArrays: Float32Array[];
-      config: SpectrogramConfig;
-      sampleRate: number;
-      offsetSamples: number;
-      durationSamples: number;
-      clipStartSample: number;
-      monoFlag: boolean;
-      colorMap: ColorMapValue;
-      numChannels: number;
-    }> = [];
 
-    tracks.forEach((track, i) => {
+    tracks.forEach((track) => {
       const override = trackSpectrogramOverrides.get(track.id);
       const mode = resolveRenderMode(override, track.renderMode);
       if (mode === 'waveform') return;
 
       const trackConfigChanged =
         configChanged && currentKeys.get(track.id) !== prevKeys.get(track.id);
-      const trackFFTChanged =
-        fftKeyChanged && currentFFTKeys.get(track.id) !== prevFFTKeys.get(track.id);
       const hasRegisteredCanvases =
         canvasVersionChanged &&
         track.clips.some((clip) => spectrogramCanvasRegistryRef.current.has(clip.id));
@@ -273,36 +231,10 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
           )
         );
 
-        if (!trackFFTChanged && !hasRegisteredCanvases && renderedClipIdsRef.current.has(clip.id)) {
-          const channelDataArrays: Float32Array[] = [];
-          for (let ch = 0; ch < clip.audioBuffer.numberOfChannels; ch++) {
-            channelDataArrays.push(clip.audioBuffer.getChannelData(ch));
-          }
-          clipsNeedingDisplayOnly.push({
-            clipId: clip.id,
-            trackIndex: i,
-            channelDataArrays,
-            config: cfg,
-            sampleRate: clip.audioBuffer.sampleRate,
-            offsetSamples,
-            durationSamples,
-            clipStartSample: clip.startSample,
-            monoFlag,
-            colorMap: cm,
-            numChannels: monoFlag ? 1 : clip.audioBuffer.numberOfChannels,
-          });
-          continue;
-        }
-
-        const channelDataArrays: Float32Array[] = [];
-        for (let ch = 0; ch < clip.audioBuffer.numberOfChannels; ch++) {
-          channelDataArrays.push(clip.audioBuffer.getChannelData(ch));
-        }
-
-        clipsNeedingFFT.push({
+        clipsToRender.push({
           clipId: clip.id,
-          trackIndex: i,
-          channelDataArrays,
+          audioKey: audioKeyOf(clip.audioBuffer),
+          channelDataArrays: channelData(clip.audioBuffer),
           config: cfg,
           sampleRate: clip.audioBuffer.sampleRate,
           offsetSamples,
@@ -314,7 +246,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
       }
     });
 
-    if (clipsNeedingFFT.length === 0 && clipsNeedingDisplayOnly.length === 0) return;
+    if (clipsToRender.length === 0) return;
 
     // Three-tier chunk classification:
     // - viewportIndices: chunks intersecting the exact viewport (phase 1a — fast first paint)
@@ -396,7 +328,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
       channelInfo: { canvasIds: string[]; canvasWidths: number[] },
       indices: number[],
       item: {
-        clipId: string;
+        audioKey: string;
         channelDataArrays: Float32Array[];
         config: SpectrogramConfig;
         sampleRate: number;
@@ -418,7 +350,8 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
 
       const { cacheKey } = await api.computeFFT(
         {
-          clipId: item.clipId,
+          // The pool's "clip id" names the registered audio: the buffer's key.
+          clipId: item.audioKey,
           channelDataArrays: item.channelDataArrays,
           config: item.config,
           sampleRate: item.sampleRate,
@@ -450,7 +383,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
           remainingIndices: number[];
         }>,
         item: {
-          clipId: string;
+          audioKey: string;
           channelDataArrays: Float32Array[];
           config: SpectrogramConfig;
           sampleRate: number;
@@ -519,7 +452,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
         return false;
       };
 
-      for (const item of clipsNeedingFFT) {
+      for (const item of clipsToRender) {
         if (spectrogramGenerationRef.current !== generation || abortToken.aborted) return;
 
         try {
@@ -610,8 +543,6 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
               }
             }
 
-            renderedClipIdsRef.current.add(item.clipId);
-
             if (spectrogramGenerationRef.current !== generation || abortToken.aborted) return;
 
             // Phase 2: Render off-screen chunks in background batches
@@ -625,98 +556,6 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
           );
         }
       }
-
-      for (const item of clipsNeedingDisplayOnly) {
-        if (spectrogramGenerationRef.current !== generation || abortToken.aborted) return;
-
-        const clipCanvasInfo = spectrogramCanvasRegistryRef.current.get(item.clipId);
-        if (!clipCanvasInfo || clipCanvasInfo.size === 0) continue;
-
-        try {
-          const clipPixelOffset = Math.floor(item.clipStartSample / samplesPerPixel);
-
-          // Three-phase rendering with per-batch FFT (same as FFT path above).
-          // Worker cache provides instant hits for previously computed ranges.
-          const channelRanges: Array<{
-            ch: number;
-            channelInfo: { canvasIds: string[]; canvasWidths: number[] };
-            viewportIndices: number[];
-            bufferIndices: number[];
-            remainingIndices: number[];
-          }> = [];
-          for (let ch = 0; ch < item.numChannels; ch++) {
-            const channelInfo = clipCanvasInfo.get(ch);
-            if (!channelInfo) continue;
-            const range = getVisibleChunkRange(channelInfo, clipPixelOffset);
-            channelRanges.push({ ch, channelInfo, ...range });
-          }
-
-          // Phase 1a: viewport chunks
-          if (channelRanges.length > 0 && channelRanges[0].viewportIndices.length > 0) {
-            const cacheKey = await computeFFTForChunks(
-              workerApi!,
-              channelRanges[0].channelInfo,
-              channelRanges[0].viewportIndices,
-              item,
-              generation
-            );
-            if (spectrogramGenerationRef.current !== generation || abortToken.aborted) return;
-            for (const { ch, channelInfo, viewportIndices } of channelRanges) {
-              await renderChunkSubset(
-                workerApi!,
-                cacheKey,
-                channelInfo,
-                viewportIndices,
-                item,
-                ch,
-                generation
-              );
-            }
-          }
-
-          if (spectrogramGenerationRef.current !== generation || abortToken.aborted) return;
-
-          // Phase 1b: buffer-zone chunks (grouped for contiguous FFT ranges)
-          if (channelRanges.length > 0 && channelRanges[0].bufferIndices.length > 0) {
-            const bufferGroups = groupContiguousIndices(
-              channelRanges[0].channelInfo,
-              channelRanges[0].bufferIndices
-            );
-            for (const group of bufferGroups) {
-              if (spectrogramGenerationRef.current !== generation || abortToken.aborted) return;
-              const cacheKey = await computeFFTForChunks(
-                workerApi!,
-                channelRanges[0].channelInfo,
-                group,
-                item,
-                generation
-              );
-              if (spectrogramGenerationRef.current !== generation || abortToken.aborted) return;
-              for (const { ch, channelInfo } of channelRanges) {
-                await renderChunkSubset(
-                  workerApi!,
-                  cacheKey,
-                  channelInfo,
-                  group,
-                  item,
-                  ch,
-                  generation
-                );
-              }
-            }
-          }
-
-          if (spectrogramGenerationRef.current !== generation || abortToken.aborted) return;
-
-          // Phase 2: Render off-screen chunks in background batches.
-          if (await renderBackgroundBatches(channelRanges, item)) return;
-        } catch (err) {
-          if (err instanceof SpectrogramAbortError) return;
-          console.warn(
-            `[waveform-playlist] Spectrogram display re-render error for clip ${item.clipId}: ${err instanceof Error ? err.message : String(err)}`
-          );
-        }
-      }
     };
 
     computeAsync().catch((err) => {
@@ -724,7 +563,6 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
         `[waveform-playlist] Spectrogram computation failed: ${err instanceof Error ? err.message : String(err)}`
       );
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- workerPoolSize intentionally omitted, pool created once via spectrogramWorkerRef guard
   }, [
     tracks,
     mono,
@@ -734,6 +572,8 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     samplesPerPixel,
     spectrogramCanvasVersion,
     scrollContainerRef,
+    audioKeyOf,
+    ensureWorkerPool,
   ]);
 
   // Setters
@@ -751,38 +591,18 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
       setTrackSpectrogramOverrides((prev) => {
         const next = new Map(prev);
         const existing = next.get(trackId);
+        // No render mode of its own: the track's, or the one chosen in the
+        // menu, keeps applying (review of #926).
         next.set(trackId, {
-          renderMode: existing?.renderMode ?? 'waveform',
+          ...existing,
           config,
-          ...(colorMap !== undefined ? { colorMap } : { colorMap: existing?.colorMap }),
+          colorMap: colorMap ?? existing?.colorMap,
         });
         return next;
       });
     },
     []
   );
-
-  // Lazily create the worker pool — keeps the same fallback path as the
-  // pre-transfer / FFT effects.
-  const ensureWorkerPool = useCallback((): SpectrogramWorkerApi | null => {
-    if (spectrogramWorkerRef.current) return spectrogramWorkerRef.current;
-    try {
-      const pool = createSpectrogramWorkerPool(
-        () =>
-          new Worker(new URL('@dawcore/spectrogram/worker/spectrogram.worker', import.meta.url), {
-            type: 'module',
-          }),
-        workerPoolSize
-      );
-      spectrogramWorkerRef.current = pool;
-      return pool;
-    } catch (err) {
-      console.warn(
-        `[waveform-playlist] Spectrogram Web Worker unavailable: ${err instanceof Error ? err.message : String(err)}`
-      );
-      return null;
-    }
-  }, [workerPoolSize]);
 
   const registerSpectrogramCanvas = useCallback(
     (reg: SpectrogramCanvasRegistration) => {

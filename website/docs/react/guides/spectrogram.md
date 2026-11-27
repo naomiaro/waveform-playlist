@@ -10,7 +10,7 @@ Waveform Playlist can render tracks as FFT spectrograms — color-mapped time-fr
 - **React** — the `@waveform-playlist/spectrogram` package provides `<SpectrogramProvider>` (plus optional menu / modal UI) that wraps `<WaveformPlaylistProvider>`.
 - **Web Components** — `<daw-track render-mode="spectrogram">` on `<daw-editor>`, backed by `@dawcore/spectrogram`.
 
-Both paths share the same framework-agnostic computation, Web Worker, and `SpectrogramOrchestrator` (viewport-aware chunked rendering, generation-based abort, color LUT cache) — the React Provider and the dawcore Lit elements are both thin layers on top.
+Both paths share the same framework-agnostic computation and Web Worker pool. The dawcore elements also use `SpectrogramOrchestrator` (viewport-aware chunked rendering, generation-based abort, color LUT cache); the React Provider keeps its own chunked pipeline.
 
 ## React
 
@@ -229,7 +229,7 @@ Spectrograms need the actual `AudioBuffer` (not pre-computed `.dat` peaks). If y
 
 ## Performance Notes
 
-- **Worker pool** sized by `navigator.hardwareConcurrency` — multiple tracks render in parallel.
+- **Worker pool**: one worker per audio channel (2 by default, `workerPoolSize`), so the channels of a clip are computed in parallel. Only the audio of tracks that draw a spectrogram is sent to the workers.
 - **Viewport-aware rendering** — only visible chunks compute FFT; off-screen chunks defer until scrolled into view.
 - **Generation-based abort** — zoom or config changes cancel in-flight FFT work for the old generation.
 - **Color LUT cache** — `[r, g, b]` lookup table built once per color map; reused across all tracks.
