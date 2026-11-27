@@ -535,6 +535,7 @@ describe('a track that is given a new id', () => {
       muted: false,
       soloed: false,
       pan: -0.5,
+      panLaw: 'auto',
     });
   });
 

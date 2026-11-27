@@ -29,10 +29,11 @@ import type {
   ArrangementTrack,
   AudioClip,
   ClipSource,
+  DecidedPanLaw,
   LoadingClip,
   ValueSource,
 } from '@waveform-playlist/core';
-import { isLoadingClip } from '@waveform-playlist/core';
+import { isDecidedPanLaw, isLoadingClip, trackKind } from '@waveform-playlist/core';
 import { ARRANGEMENT_ATTACH_DECODE, ARRANGEMENT_ATTACH_TIME_BASE } from './attach';
 import type { ArrangementTimeBase, GetDecodeContext } from './attach';
 import { clipBounds, constrainTrim, moveClip, splitClip, trimClip } from './clipEdits';
@@ -53,6 +54,7 @@ import {
   pushStep,
   redoStep,
   sameState,
+  stateWithDecidedPanLaws,
   stateWithMixerValues,
   undoStep,
   withStateTracks,
@@ -600,6 +602,24 @@ export class ArrangementImpl implements Arrangement {
     this._setMixerValues(trackId, { pan }, options);
   }
 
+  /**
+   * Set a track's pan law (#684): a mixer value like the four above. It
+   * takes a decided law; anything else, `'auto'` included, throws before
+   * anything changes (a decided track does not go back to `'auto'`). May be
+   * called before the track holds audio: the law is then decided, and the
+   * first audio does not change it. A MIDI track has no law to set.
+   */
+  setTrackPanLaw(trackId: string, panLaw: DecidedPanLaw, options?: MixerChangeOptions): void {
+    if (!isDecidedPanLaw(panLaw)) {
+      throw new TypeError(
+        `setTrackPanLaw: panLaw must be 'mono' or 'stereo', got ${JSON.stringify(panLaw) ?? String(panLaw)}`
+      );
+    }
+    const track = this._tracks.find((t) => t.id === trackId);
+    if (!track || trackKind(track) === 'midi') return;
+    this._setMixerValues(trackId, { panLaw }, options);
+  }
+
   // ---------------------------------------------------------------------------
   // Recording mute (the track a take is recording onto)
   // ---------------------------------------------------------------------------
@@ -956,7 +976,53 @@ export class ArrangementImpl implements Arrangement {
         state: withStateTracks(state, pass.stored(state.tracks)),
       };
     }
+    this._decidePanLaws();
     return this._tracks === previous ? null : previous;
+  }
+
+  /**
+   * First audio decides a track's pan law (#684): in the current state and
+   * in every state the arrangement can return to, a track whose law is
+   * `'auto'` and that holds decoded audio gets the law of that audio, each
+   * state from its own tracks. Part of the change that brought the audio:
+   * not an undo step. `mixerVersion` counts it when the current mix changed.
+   *
+   * A saved step that no longer differs from the state next to it is
+   * dropped, as `_writeMixerThrough` does (a law set on a track whose only
+   * clip was loading, and the clip turns out to have that law): its undo
+   * would do nothing. A gesture then has no step to join, and its next
+   * change pushes a new one.
+   */
+  private _decidePanLaws(): void {
+    const decide = stateWithDecidedPanLaws();
+    const current = this._currentState();
+    const decided = decide(current);
+    if (decided !== current) {
+      this._mixer = decided.mixer;
+      this._mixerVersion++;
+    }
+    const changedIn = (before: History, after: History): boolean =>
+      after.undo.some((state, i) => state !== before.undo[i]) ||
+      after.redo.some((state, i) => state !== before.redo[i]);
+
+    let base = this._transaction?.state ?? null;
+    if (this._transaction && base) {
+      const decidedBase = decide(base);
+      if (decidedBase !== base) {
+        base = decidedBase;
+        this._transaction = { ...this._transaction, state: decidedBase };
+      }
+    }
+    const mapped = mapHistoryStates(this._history, decide);
+    if (changedIn(this._history, mapped)) {
+      const kept = dropRepeats(mapped, base ?? decided);
+      this._history = kept;
+      if (kept !== mapped) this._gesture = null;
+    }
+    if (this._gesture) {
+      const before = mapHistoryStates(this._gesture.before, decide);
+      if (changedIn(this._gesture.before, before)) this._gesture = { ...this._gesture, before };
+    }
   }
 
   /** A load finished or failed by itself (not inside one of this arrangement's methods). */

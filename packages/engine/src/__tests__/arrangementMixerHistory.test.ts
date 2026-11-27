@@ -83,6 +83,7 @@ describe('a saved state holds the mix', () => {
       muted: false,
       soloed: false,
       pan: 0.5,
+      panLaw: 'auto',
     });
   });
 

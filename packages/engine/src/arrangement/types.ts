@@ -2,7 +2,12 @@
  * The public face of an arrangement.
  */
 
-import type { ArrangementTrack, ClipSource, ValueSource } from '@waveform-playlist/core';
+import type {
+  ArrangementTrack,
+  ClipSource,
+  DecidedPanLaw,
+  ValueSource,
+} from '@waveform-playlist/core';
 import type { LoadSource } from './loadSource';
 import type { ArrangementSourcesValue } from './sources';
 import type { TrackMixerValues } from './mixer';
@@ -144,6 +149,13 @@ export interface Arrangement {
   setTrackMute(trackId: string, muted: boolean, options?: MixerChangeOptions): void;
   setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
   setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
+  /**
+   * Set a track's pan law (#684): `'mono'` or `'stereo'`. Any other value,
+   * `'auto'` included, throws a `TypeError`. A mixer value like the four
+   * above: `'auto'` until the track's first decoded audio decides it, after
+   * which the track's clips do not change it. A MIDI track has none to set.
+   */
+  setTrackPanLaw(trackId: string, panLaw: DecidedPanLaw, options?: MixerChangeOptions): void;
 
   // recording mute (the track a take is recording onto)
   /**
