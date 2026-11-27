@@ -18,7 +18,14 @@ vi.mock('tone', () => {
   const ctor = (name: string) =>
     vi.fn(function () {
       order.push('construct:' + name);
-      return { dispose: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), set: vi.fn() };
+      return {
+        dispose: vi.fn(),
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        set: vi.fn(),
+        // Chorus, Tremolo, AutoPanner and AutoFilter are started by the factory.
+        start: vi.fn(),
+      };
     });
   const names = [
     'Reverb',
