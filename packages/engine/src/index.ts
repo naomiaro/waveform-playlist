@@ -10,6 +10,8 @@ export {
 } from './arrangement';
 export type {
   Arrangement,
+  ArrangementChangeInfo,
+  ArrangementChangeType,
   ArrangementSourceState,
   ArrangementSourcesValue,
   ClipBounds,

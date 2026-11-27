@@ -57,6 +57,40 @@ export interface MixerChangeOptions {
 }
 
 /**
+ * The kind of change a `subscribe` listener is told of:
+ *
+ * - `'set'`: `setTracks` replaced the whole set.
+ * - `'add'`, `'remove'`, `'reorder'`: one track was added, removed or moved.
+ * - `'update'`: one track changed (`updateTrack`, a clip added, removed,
+ *   moved, trimmed or split).
+ * - `'restore'`: an undo, a redo or an abort changed the tracks (and maybe
+ *   the mix); `'restoreMix'`: it changed the mix only.
+ * - `'load'`: audio arrived and loading clips became loaded clips.
+ * - `'mixer'`: a volume, mute, solo, pan or pan law changed.
+ * - `'recording'`: a take started or stopped recording onto a track.
+ * - `'recompute'`: clip positions were recomputed after a tempo change.
+ * - `'history'`: only what can be undone or redone changed.
+ */
+export type ArrangementChangeType =
+  | 'set'
+  | 'add'
+  | 'remove'
+  | 'update'
+  | 'reorder'
+  | 'restore'
+  | 'restoreMix'
+  | 'load'
+  | 'mixer'
+  | 'recording'
+  | 'recompute'
+  | 'history';
+
+/** What a `subscribe` listener is told about a change. */
+export interface ArrangementChangeInfo {
+  readonly type: ArrangementChangeType;
+}
+
+/**
  * The owner of the tracks, of the mix and of the undo history. Everything
  * else reads it (`getTracks`, `getMixer`, `subscribe`) and changes it by
  * calling its methods. A `PlaylistEngine` built on it plays it.
@@ -86,11 +120,12 @@ export interface Arrangement {
   getMixer(): ReadonlyMap<string, TrackMixerValues>;
   /**
    * Be told after every change (tracks, mix or history), once per change, in
-   * the order the changes were made. Returns a function that stops it. A
-   * listener that throws is reported with `console.warn` and does not fail
-   * the change.
+   * the order the changes were made, with the kind of change it was. Read
+   * what changed from the arrangement itself. Returns a function that stops
+   * it. A listener that throws is reported with `console.warn` and does not
+   * fail the change.
    */
-  subscribe(listener: () => void): () => void;
+  subscribe(listener: (change: ArrangementChangeInfo) => void): () => void;
   /** Counts changes to the tracks. */
   readonly tracksVersion: number;
   /** Counts changes to the mix. */

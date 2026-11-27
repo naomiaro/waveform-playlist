@@ -334,6 +334,27 @@ describe('calls made while the engine is being rebuilt (#826)', () => {
     expect(probe.selectedTrackId).toBeNull();
   });
 
+  it('setTracks that drops the selected track keeps the id, as the engine does', async () => {
+    await mountReady();
+    act(() => probe.setSelectedTrackId('track-b'));
+    const tracks = probe.arrangement.getTracks();
+    // A host empties the tracks and adds them again.
+    act(() => probe.arrangement.setTracks([]));
+    expect(probe.selectedTrackId).toBe('track-b');
+    expect(probe.engine()!.getState().selectedTrackId).toBe('track-b');
+    act(() => probe.arrangement.setTracks(tracks));
+    expect(probe.selectedTrackId).toBe('track-b');
+  });
+
+  it('a track change that keeps the selected track keeps the selection', async () => {
+    await mountReady();
+    act(() => probe.setSelectedTrackId('track-b'));
+    act(() => probe.arrangement.removeTrack('track-a'));
+    expect(probe.selectedTrackId).toBe('track-b');
+    act(() => probe.arrangement.undo());
+    expect(probe.selectedTrackId).toBe('track-b');
+  });
+
   it('removing the selected track while no engine exists selects nothing on the next one', async () => {
     const view = await mountReady();
     act(() => probe.setSelectedTrackId('track-b'));

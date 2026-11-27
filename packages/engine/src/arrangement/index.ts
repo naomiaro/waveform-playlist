@@ -3,6 +3,8 @@ import type { Arrangement, CreateArrangementOptions } from './types';
 
 export type {
   Arrangement,
+  ArrangementChangeInfo,
+  ArrangementChangeType,
   ClipBounds,
   CreateArrangementOptions,
   MixerChangeOptions,

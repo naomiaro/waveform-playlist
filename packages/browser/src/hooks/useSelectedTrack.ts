@@ -18,8 +18,10 @@ export interface SelectedTrackControls {
  * gives each new engine the value from the ref. Nothing is read back from an
  * engine.
  *
- * The id names a track of the arrangement: when that track is gone, nothing
- * is selected (the engine has the same rule for its own copy).
+ * The id names a track of the arrangement: when that track is removed, taken
+ * away by an undo, a redo or an abort, or given a new id, nothing is
+ * selected. A `setTracks` that drops the track keeps the id. The engine has
+ * the same rule for its own copy.
  */
 export function useSelectedTrack({
   engineRef,
@@ -41,17 +43,25 @@ export function useSelectedTrack({
     [engineRef]
   );
 
-  useEffect(() => {
-    const clearIfGone = () => {
-      const selected = selectedTrackIdRef.current;
-      if (selected === null) return;
-      if (arrangement.getTracks().some((track) => track.id === selected)) return;
-      setSelectedTrackId(null);
-    };
-    // A track removed between the render and this effect.
-    clearIfGone();
-    return arrangement.subscribe(clearIfGone);
-  }, [arrangement, setSelectedTrackId]);
+  useEffect(
+    () =>
+      arrangement.subscribe((change) => {
+        // The engine's rule (`_onArrangementChange`): a removal, an undo, a
+        // redo or an abort, and a track given a new id. Not `setTracks`: a
+        // host may empty the tracks and add them again. An arrangement made
+        // by an older copy of the engine package says nothing about the
+        // change: then every change is looked at.
+        const type: string | undefined = change?.type;
+        const mayTakeTrackAway =
+          type === undefined || type === 'remove' || type === 'restore' || type === 'update';
+        if (!mayTakeTrackAway) return;
+        const selected = selectedTrackIdRef.current;
+        if (selected === null) return;
+        if (arrangement.getTracks().some((track) => track.id === selected)) return;
+        setSelectedTrackId(null);
+      }),
+    [arrangement, setSelectedTrackId]
+  );
 
   return {
     selectedTrackId,

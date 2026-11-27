@@ -123,7 +123,7 @@ A rebuild (a new `effects` function, other zoom levels, a remount or an `<Activi
 
 - `useSelectionState` — selectionStart, selectionEnd (published through `SelectionContext`, #733). Puts the two ends in order, as the engine does
 - `useLoopState` — isLoopEnabled, loopStart, loopEnd
-- `useSelectedTrack` — selectedTrackId. It subscribes to the arrangement and clears the id when its track is gone (a `removeTrack`, an undo of an `addTrack`); the engine's own `_clearSelectionIfGone()` does the same for the engine's copy, with one difference that is not unified: the engine keeps the id across a `setTracks` that drops the track, the hook does not
+- `useSelectedTrack` — selectedTrackId. It subscribes to the arrangement and clears the id when its track is gone after a `remove`, a `restore` (undo, redo, abort) or an `update` (a track given a new id), and not after a `set`: the engine's rule for its own copy (`_clearSelectionIfGone()`), read from the change type `arrangement.subscribe` hands its listener. An arrangement made by an older copy of the engine package hands over nothing; the hook then looks at every change, `setTracks` included (not covered by a test)
 - `useZoomControls` — samplesPerPixel. `zoomIn` / `zoomOut` step through the provider's zoom levels (`zoomLevels` or `DEFAULT_ZOOM_LEVELS`, the same array the engine is built with) and call `engine.setZoomLevel(next)`; `canZoomIn` / `canZoomOut` are computed during render from the level and the levels, so they are right before the first engine exists
 - `useMasterVolume` — masterVolume
 
