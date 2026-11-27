@@ -5033,6 +5033,33 @@ In plain JavaScript a leftover prop is ignored (`isOverlay` aside, above); for `
 <SpectrogramChannel index={0} length={w} waveHeight={80} clipId={id} onCanvasRegister={reg} onCanvasUnregister={unreg} />
 ```
 
+## Recording types nothing read are removed
+
+**Package:** `@waveform-playlist/recording`.
+
+| Removed | What it did | Replace with |
+| --- | --- | --- |
+| `RecordingState` (type) | nothing: no hook returned it | the fields of `UseRecordingReturn` (`isRecording`, `isPaused`, `progress`) |
+| `RecordingData` (type) | nothing: no hook returned it | `UseRecordingReturn['audioBuffer']` and `progress` |
+| `deviceId` of `RecordingOptions` | nothing: `useRecording` records the stream it is given | `requestAccess(deviceId)` of `useMicrophoneAccess`, or `changeDevice(deviceId)` of `useIntegratedRecording` |
+| `audioConstraints` of `RecordingOptions` | nothing, for the same reason | `requestAccess(deviceId, audioConstraints)`, or the `audioConstraints` option of `useIntegratedRecording`, which stays |
+
+In plain JavaScript a leftover option is ignored, as it was before. TypeScript reports each one.
+
+**Find:** `RecordingState`, `RecordingData`, and `deviceId` or `audioConstraints` in the options of `useRecording(stream, { … })`.
+
+**Replace with:**
+
+```tsx
+// Before: neither option reached the microphone
+const { stream } = useMicrophoneAccess();
+const recording = useRecording(stream, { deviceId, audioConstraints: { echoCancellation: true } });
+// After: the stream is asked for with them
+const { stream, requestAccess } = useMicrophoneAccess();
+const recording = useRecording(stream);
+await requestAccess(deviceId, { echoCancellation: true });
+```
+
 ## `useMediaElementTrack()`: `fadeIn` and `fadeOut` are removed
 
 **Package:** `@waveform-playlist/browser`.

@@ -3,7 +3,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { enumerateMicrophones } from '@waveform-playlist/core';
+import { enumerateMicrophones, watchMicrophoneDevices } from '@waveform-playlist/core';
 import { UseMicrophoneAccessReturn, MicrophoneDevice } from '../types';
 
 export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
@@ -33,7 +33,7 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
       const { devices: audioInputs } = await enumerateMicrophones();
       setDevices(audioInputs);
     } catch (err) {
-      console.error('Failed to enumerate devices:', err);
+      console.warn('[waveform-playlist] Failed to enumerate devices:', String(err));
       setError(err instanceof Error ? err : new Error('Failed to enumerate devices'));
     }
   }, []);
@@ -73,7 +73,17 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
           video: false,
         };
 
-        const newStream = await navigator.mediaDevices.getUserMedia(constraints);
+        // Undefined on an insecure origin (http that is not localhost) and in
+        // very old browsers: say so, in place of a TypeError about `undefined`.
+        const mediaDevices = typeof navigator !== 'undefined' ? navigator.mediaDevices : undefined;
+        if (!mediaDevices || typeof mediaDevices.getUserMedia !== 'function') {
+          throw new Error(
+            'Microphone access is not available: navigator.mediaDevices is undefined. ' +
+              'It needs a secure context (https or localhost).'
+          );
+        }
+
+        const newStream = await mediaDevices.getUserMedia(constraints);
 
         // Superseded by a newer request, stopStream, or unmount while the
         // permission prompt was open — stop the just-granted stream instead
@@ -90,7 +100,7 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
         // Enumerate devices after getting permission (labels will be available)
         await enumerateDevices();
       } catch (err) {
-        console.error('Failed to access microphone:', err);
+        console.warn('[waveform-playlist] Failed to access microphone:', String(err));
         if (generation === requestGenerationRef.current) {
           setError(err instanceof Error ? err : new Error('Failed to access microphone'));
           setHasPermission(false);
@@ -122,24 +132,28 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
     // instance, so a flag left true by the probe-unmount's cleanup would
     // stop every future getUserMedia grant as "stale".
     isUnmountedRef.current = false;
-    // Try to enumerate devices (labels won't be available without permission)
-    enumerateDevices();
+    // List the devices now (labels won't be available without permission) and
+    // again when one is plugged in or removed. Core's watcher does nothing
+    // where navigator.mediaDevices is undefined (an insecure origin), and
+    // survives a failed enumeration.
+    const unwatch = watchMicrophoneDevices(({ devices: audioInputs }) => setDevices(audioInputs));
 
-    // Re-enumerate when devices are plugged in or removed
-    navigator.mediaDevices.addEventListener('devicechange', enumerateDevices);
-
-    // Cleanup on unmount
     return () => {
-      navigator.mediaDevices.removeEventListener('devicechange', enumerateDevices);
+      unwatch();
       // Invalidate any in-flight request (a grant arriving after unmount is
       // stopped by the isUnmounted check) and stop the current stream.
       isUnmountedRef.current = true;
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
+        // This cleanup also runs for Fast Refresh and a hidden <Activity>,
+        // after which the hook lives on: its state must not keep offering a
+        // stopped stream (#822). As after stopStream(), the app asks again.
+        setStream(null);
+        setHasPermission(false);
       }
     };
-  }, [enumerateDevices]);
+  }, []);
 
   return {
     stream,

@@ -184,14 +184,27 @@ function RecordingControls() {
 
 ### Mic Disconnect Detection
 
-`useRecording` automatically detects when the microphone is unplugged or permission is revoked during recording. When the `MediaStreamTrack` 'ended' event fires, the hook calls `stopRecording()` and sets an `error` state:
+`useRecording` automatically detects when the microphone is unplugged or permission is revoked during recording. When the `MediaStreamTrack` 'ended' event fires, the hook stops the take and sets an `error` state. What was recorded until then is kept: it is in `audioBuffer`.
 
 ```tsx
-const { error } = useRecording(stream);
+const { error, audioBuffer } = useRecording(stream);
 
 // error.message === 'Microphone disconnected during recording'
 {error && <p style={{ color: 'red' }}>{error.message}</p>}
 ```
+
+`useIntegratedRecording` adds that take to the track it was started on, as `stopRecording()` does, and reports the same `error`. It does not switch to another microphone while a take is running: when the selected device leaves the list mid-take, the fallback to the first remaining device happens after the take has ended.
+
+### When the Component Is Hidden or Unmounted Mid-Take
+
+React runs the hooks' effect cleanups when the component unmounts, when an `<Activity>` around it is hidden, and on Fast Refresh. The cleanups stop the recording worklet and the microphone stream, and the hooks' state says so:
+
+- `useRecording`: `isRecording` and `isPaused` are `false`, and `audioBuffer` holds what was received until then (the worklet's last partial block, about 16 ms, is not in it). `useIntegratedRecording` adds it to the take's track, also on an unmount.
+- `useMicrophoneAccess`: `stream` is `null` and `hasPermission` is `false`, as after `stopStream()`. Call `requestAccess()` again when the component is shown.
+
+### Without `navigator.mediaDevices`
+
+On an origin that is not a secure context (plain `http` that is not `localhost`) the browser has no `navigator.mediaDevices`. `useMicrophoneAccess` mounts there with an empty `devices` list, and `requestAccess()` sets `error` ("Microphone access is not available: navigator.mediaDevices is undefined. It needs a secure context (https or localhost).").
 
 :::tip Sample Rate Mismatch
 The mic's native sample rate (from `MediaStreamTrack.getSettings().sampleRate`) may differ from the `AudioContext.sampleRate`. The browser automatically resamples at the `MediaStreamAudioSourceNode` boundary. To avoid resampling, match input and output sample rates in your system audio settings (e.g., macOS Audio MIDI Setup).
@@ -546,7 +559,7 @@ This is not a record-arm: it lasts only while a take is recorded, and the app do
 Edges to know:
 
 - A take started during the playlist's first load records without playback: `play()` does nothing before the first [ready](/docs/react/guides/loading-audio#ready).
-- An `<Activity>` hide of the component that calls `useRecordingSession` ends the session (the take's mute is cleared); the reveal mutes the track again.
+- An `<Activity>` hide of the component that calls `useRecordingSession` ends the session (the take's mute is cleared). When that component also calls `useIntegratedRecording`, the hide ends the take as well: it is added to its track, and `isRecording` is `false` when the component is shown again. With `isRecording` from a component that was not hidden, the reveal mutes the track again.
 - Removing the take's track during a take as an undo step: the end of the take still clears its take mute, so undoing the removal after the take brings the track back with its own mute. Undone during the take, the track comes back muted until the take ends.
 - A mute control of your own that toggles from the reported value (`setMuted(!muted)`) during a take sets the track's own mute to false, because `muted` is true for the take: the track stays muted for the take and comes out of it unmuted. Disable it while `isRecording`, as the built-in button is.
 - Only the built-in Mute button is disabled. Solo, volume and pan stay enabled.

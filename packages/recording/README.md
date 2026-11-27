@@ -232,7 +232,7 @@ Batteries-included hook: wires `useMicrophoneAccess` + `useMicrophoneLevel` + `u
 
 ### Types
 
-`RecordingState`, `RecordingData`, `MicrophoneDevice`, `RecordingOptions`, `UseRecordingReturn`, `UseMicrophoneAccessReturn` are all exported from the package root for consumers building their own UI around these hooks.
+`MicrophoneDevice`, `RecordingOptions`, `UseRecordingReturn`, `UseMicrophoneAccessReturn` are all exported from the package root for consumers building their own UI around these hooks.
 
 ## Architecture
 

@@ -1305,8 +1305,10 @@ interface UseIntegratedRecordingReturn {
   /** Resolves true when the capture pipeline actually started; false (and sets error)
    *  when the take is refused. */
   startRecording: () => Promise<boolean>;
-  /** Stops the take and adds it to the track it was started on: one undo step. */
-  stopRecording: () => void;
+  /** Stops the take and adds it to the track it was started on: one undo step.
+   *  A take that ends by itself (microphone unplugged, component hidden or
+   *  unmounted mid-take) is added the same way. */
+  stopRecording: () => Promise<void>;
   pauseRecording: () => void;
   resumeRecording: () => void;
   requestMicAccess: () => Promise<void>;

@@ -2091,8 +2091,10 @@ interface UseIntegratedRecordingReturn {
   startRecording: () => Promise<boolean>;
   /** Stops the take and adds it to the track it was started on: one undo step.
    *  A track gone by then, or one the arrangement refuses the take on, sets
-   *  `error` ("Recording completed but …") and keeps nothing. */
-  stopRecording: () => void;
+   *  `error` ("Recording completed but …") and keeps nothing. Never rejects.
+   *  A take that ends by itself (microphone unplugged: `error` says so;
+   *  component hidden or unmounted mid-take) is added the same way. */
+  stopRecording: () => Promise<void>;
   pauseRecording: () => void;
   resumeRecording: () => void;
   requestMicAccess: () => Promise<void>;   // Refused while recording (would record silence)

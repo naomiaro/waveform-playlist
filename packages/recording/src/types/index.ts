@@ -4,19 +4,6 @@
 
 import type { RecordingProgressSource } from '@waveform-playlist/core';
 
-export interface RecordingState {
-  isRecording: boolean;
-  isPaused: boolean;
-  duration: number; // Duration in seconds
-  sampleRate: number;
-}
-
-export interface RecordingData {
-  buffer: AudioBuffer | null;
-  peaks: (Int8Array | Int16Array)[];
-  duration: number;
-}
-
 export interface MicrophoneDevice {
   deviceId: string;
   label: string;
@@ -44,18 +31,6 @@ export interface RecordingOptions {
    * Default: 16
    */
   bits?: 8 | 16;
-
-  /**
-   * Specific device ID to use for recording
-   */
-  deviceId?: string;
-
-  /**
-   * MediaTrackConstraints for audio recording
-   * Use this to customize echo cancellation, noise suppression, auto gain control, latency, etc.
-   * Default: Recording-optimized settings (all processing disabled, latency: 0 for low latency)
-   */
-  audioConstraints?: MediaTrackConstraints;
 }
 
 export interface UseRecordingReturn {
