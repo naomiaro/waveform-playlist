@@ -194,8 +194,9 @@ describe('SpectrogramProvider on the real worker pool (#821)', () => {
   });
 
   it('while the playlist is still loading, a loaded spectrogram track draws without copying its audio', async () => {
-    // isReady stays false until every track has loaded once; a track whose
-    // audio is decoded already draws meanwhile (review of #926).
+    // isReady is false until an engine is attached and no source is pending
+    // (the first time); a track whose audio is decoded draws meanwhile
+    // (review of #926).
     fake.timeline = {
       tracks: [spectrogramTrack([clip('c1', stereoBuffer())])],
       isReady: false,

@@ -299,7 +299,7 @@ describe('Spectrogram settings write no render mode (review of #926)', () => {
     expect(livePool().audio.size).toBe(1);
   });
 
-  it('applying settings to a waveform track keeps it a waveform', async () => {
+  it('applying settings to a waveform track writes no render mode', async () => {
     setTracks([makeTrack('t1', 'waveform', [makeClip('c1', makeBuffer())])]);
     render(
       <SpectrogramProvider>

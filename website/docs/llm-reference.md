@@ -3064,7 +3064,7 @@ interface SpectrogramData {
 }
 
 interface TrackSpectrogramOverrides {
-  renderMode?: RenderMode;  // set only from the track menu; absent = the track's own renderMode
+  renderMode?: RenderMode;  // set by setTrackRenderMode (the track menu); absent = the track's own renderMode
   config?: SpectrogramConfig;
   colorMap?: ColorMapValue;
 }
