@@ -152,7 +152,7 @@ This is the next API. The stable equivalent is in the [stable Getting Started](h
 
 | Package | Description |
 |---------|-------------|
-| `@waveform-playlist/midi` | The `loadMidiTracks` function: a `.mid` file as MIDI tracks for the arrangement, drawn as piano rolls and played with SoundFont or PolySynth. Re-exports the parser from `@dawcore/midi`. |
+| `@dawcore/midi` | The `loadMidiTracks` function: a `.mid` file as MIDI tracks for the arrangement, drawn as piano rolls and played with SoundFont or PolySynth, and the MIDI parser. Framework-agnostic; the web components use it too. Replaces `@waveform-playlist/midi`. |
 | `@waveform-playlist/annotations` | Time-synced text annotations with drag editing |
 | `@waveform-playlist/recording` | AudioWorklet recording with live waveform preview (requires [setup](https://naomiaro.github.io/waveform-playlist/next/docs/react/guides/recording#audioworklet-setup)) |
 | `@waveform-playlist/worklets` | Shared AudioWorklet processors for metering and recording (auto-installed with recording) |
@@ -264,7 +264,7 @@ npm install @waveform-playlist/playout tone  # Tone.js (effects, MIDI synths)
 | `@dawcore/components` | Lit Web Components for multi-track editing |
 | `@dawcore/transport` | Native Web Audio transport — scheduling, looping, tempo automation, time signatures, metronome |
 | `@dawcore/spectrogram` | Framework-agnostic spectrogram orchestrator, FFT worker pool, and color maps — used by `render-mode="spectrogram"` |
-| `@dawcore/midi` | Framework-agnostic MIDI parser (`parseMidiFile`, `parseMidiUrl`) — used by `editor.loadMidi()` and re-exported by `@waveform-playlist/midi` |
+| `@dawcore/midi` | Framework-agnostic MIDI parser (`parseMidiFile`, `parseMidiUrl`) and `loadMidiTracks` — used by `editor.loadMidi()` and by React apps |
 | `@dawcore/wam` | Web Audio Modules (WAM 2.0) plugin hosting and generic parameter GUIs — used by `editor.addWamPlugin()` and the effects chain (optional peer, loaded on demand) |
 | `@dawcore/faust` | In-browser Faust DSP → WAM 2.0 compilation — used by `editor.addFaustEffect()` (optional peer, loaded on demand) |
 

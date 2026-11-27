@@ -78,7 +78,7 @@ Waveform-playlist is a multitrack Web Audio editor and player with HTML canvas w
 - The `Arrangement` (tracks, mix, undo history, loading): `packages/engine/src/arrangement/`; its React hooks `useCreateArrangement`, `useArrangementTracks`, `useArrangementSources`: `packages/browser/src/hooks/`
 - The annotation store (`AnnotationStore`, `AnnotationStoreOptions`, `createAnnotationStore`; the one owner of the annotations, both providers' `annotationStore` prop): `packages/core/src/annotations/store.ts`, `applyAnnotationBounds` in `bounds.ts`; its React hooks `useCreateAnnotationStore`, `useStoredAnnotations`: `packages/browser/src/hooks/`
 - Effects hooks return types: `packages/browser/src/hooks/useDynamicEffects.ts`, `useTrackDynamicEffects.ts`
-- Peak types (`Peaks`, `Bits`, `PeakData`): `packages/core/src/types/index.ts` (re-exported by `webaudio-peaks` for backwards compat)
+- Peak types (`Peaks`, `Bits`, `PeakData`): `packages/core/src/types/index.ts` (`webaudio-peaks` uses them and does not re-export them)
 
 **Common Doc Drift:** Docs may reference deleted hooks, wrong property names (e.g., `gain` vs `volume`, `seek` vs `seekTo`), or properties attributed to wrong context hooks. Always cross-check docs against source interfaces.
 
@@ -310,7 +310,7 @@ The exceptions that stay, decided on #828 (do not copy them as precedent): `pres
 
 **Label the choices the way they will be answered, and keep what I plan to run out of the list.** On #771 part 2 three choices were numbered 1 to 3 and the answer came back as a), b), c); a sentence after the list about a test I meant to run ("the `immediate: true` case") was then looked for as a question that did not exist. Letter the choices, one line each, and put "next I will run…" in a separate paragraph that says it needs no answer.
 
-**`website` aliases `browser`, `core`, `playout`, `engine`, `ui-components`, `annotations`, `spectrogram`, `midi` and `recording` to source** (`website/docusaurus.config.ts`, read 2026-11-14; `worklets`, `webaudio-peaks` and `@dawcore/*` come from `dist`), so a prototype may edit them with only the dev server running. Bulk file changes under a running Docusaurus dev server can abort it (rspack panic, SIGABRT): check the server's log before trusting a probe after a large patch.
+**`website` aliases `browser`, `core`, `playout`, `engine`, `ui-components`, `annotations`, `spectrogram` and `recording` to source** (`website/docusaurus.config.ts`, read 2026-11-14, `midi` removed with the package in #807; `worklets`, `webaudio-peaks` and `@dawcore/*` come from `dist`), so a prototype may edit them with only the dev server running. Bulk file changes under a running Docusaurus dev server can abort it (rspack panic, SIGABRT): check the server's log before trusting a probe after a large patch.
 
 **GitHub closing keywords don't distribute over comma lists** — `fixes #589, #590, #593` in a squash-merge commit closes ONLY #589; each reference needs its own keyword (`fixes #589, fixes #590, fixes #593`). A `closes #N` in the PR body works independently. After merging a multi-issue PR, verify each issue actually closed (`gh issue view N --json state`).
 
@@ -413,7 +413,7 @@ interface AudioClip {
 
 ### `@dawcore/*` Framework Split (Two Flavors)
 
-When a `@waveform-playlist/*` package has framework-agnostic logic (parsing, computation) plus a React layer, split into `@dawcore/X` (framework-agnostic core) + `@waveform-playlist/X` (React wrapper that depends on `@dawcore/X`). Precedents: `@dawcore/spectrogram` (PR #387), `@dawcore/midi` (PR #392).
+When a `@waveform-playlist/*` package has framework-agnostic logic (parsing, computation) plus a React layer, split into `@dawcore/X` (framework-agnostic core) + `@waveform-playlist/X` (React wrapper that depends on `@dawcore/X`). Precedents: `@dawcore/spectrogram` (PR #387), `@dawcore/midi` (PR #392). **A wrapper with no React code left is removed, not kept as a re-export** (#807): after `useMidiTracks` went (#812), `@waveform-playlist/midi` held `loadMidiTracks` and a re-export of the parser, so `loadMidiTracks` moved into `@dawcore/midi` and the package left the workspace (its published versions stay on npm; deprecating it is a release step). Pending changesets that named it were edited: `changeset version` in pre mode still runs with the package listed in `pre.json`'s `initialVersions` (tried in a throwaway worktree).
 
 **Two bundling choices on `@dawcore/components`:**
 

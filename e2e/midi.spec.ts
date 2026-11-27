@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
  * MIDI example tests
  *
  * The page loads one .mid file with `loadMidiTracks` from
- * `@waveform-playlist/midi`, adds its tracks to the arrangement and only then
+ * `@dawcore/midi`, adds its tracks to the arrangement and only then
  * mounts the playlist: one piano-roll track per MIDI channel.
  */
 

@@ -1,7 +1,7 @@
 /**
  * MIDI Playback Example
  *
- * Demonstrates loading a .mid file via @waveform-playlist/midi.
+ * Demonstrates loading a .mid file via @dawcore/midi.
  * Users can drop additional .mid files or click to browse.
  */
 

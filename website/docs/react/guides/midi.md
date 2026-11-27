@@ -7,20 +7,20 @@ description: "Load MIDI files for piano roll visualization with SoundFont or syn
 
 Waveform Playlist supports MIDI file loading and playback in two flavors:
 
-- **React** — the `@waveform-playlist/midi` package provides `loadMidiTracks`, which loads a `.mid` file as tracks for the arrangement of `WaveformPlaylistProvider`.
+- **React** — the `@dawcore/midi` package provides `loadMidiTracks`, which loads a `.mid` file as tracks for the arrangement of `WaveformPlaylistProvider`.
 - **Web Components** — `<daw-editor>` from `@dawcore/components` exposes an `editor.loadMidi(source, options)` method, backed by the optional `@dawcore/midi` peer dep.
 
-Both paths use the same framework-agnostic parser (`@dawcore/midi`) under the hood — the React package re-exports it. MIDI tracks render as piano roll visualizations and play back using SoundFont samples or Tone.js PolySynth synthesis.
+Both paths use the framework-agnostic `@dawcore/midi`: a React app calls its `loadMidiTracks`, and `editor.loadMidi()` imports it on first use. MIDI tracks render as piano roll visualizations and play back using SoundFont samples or Tone.js PolySynth synthesis.
 
 ## React
 
 ### Installation
 
 ```bash
-npm install @waveform-playlist/midi @tonejs/midi
+npm install @dawcore/midi
 ```
 
-`@tonejs/midi` and `@dawcore/midi` are regular dependencies and will be installed automatically. The package is separate from the core library so users who only need audio don't pay the bundle cost (~8-12 KB gzipped).
+`@tonejs/midi` is a regular dependency of `@dawcore/midi` and is installed with it. MIDI is a package of its own so users who only need audio don't pay the bundle cost (~8-12 KB gzipped).
 
 ### Basic Usage
 
@@ -28,7 +28,7 @@ Load the `.mid` file with `loadMidiTracks`, add its tracks to the arrangement, a
 
 ```tsx
 import { useEffect, useState } from 'react';
-import { loadMidiTracks } from '@waveform-playlist/midi';
+import { loadMidiTracks } from '@dawcore/midi';
 import {
   WaveformPlaylistProvider,
   Waveform,
@@ -82,7 +82,7 @@ A single `.mid` file typically produces multiple `ClipTrack` objects — one per
 `loadMidiTracks` is a plain function: it takes a URL, a `File` or a `Blob` and resolves to `ClipTrack[]` (`kind: 'midi'`, new ids on every call), with no React state. `sampleRate` is required.
 
 ```tsx
-import { loadMidiTracks } from '@waveform-playlist/midi';
+import { loadMidiTracks } from '@dawcore/midi';
 
 const controller = new AbortController();
 const tracks = await loadMidiTracks(file, {
@@ -202,7 +202,7 @@ MIDI and audio tracks can be played together: they are tracks of one arrangement
 
 ```tsx
 import { useEffect, useState } from 'react';
-import { loadMidiTracks } from '@waveform-playlist/midi';
+import { loadMidiTracks } from '@dawcore/midi';
 import { useCreateArrangement } from '@waveform-playlist/browser';
 import { audioTrack } from '@waveform-playlist/core';
 
@@ -320,12 +320,10 @@ If `@dawcore/midi` isn't installed, `loadMidi` rejects with a friendly install h
 
 ## Pure Parsing (No React, No DOM)
 
-The `parseMidiFile` function works without React or web components — useful for Node.js scripts, build-time tooling, or non-React apps. It lives in `@dawcore/midi` (re-exported from `@waveform-playlist/midi`).
+The `parseMidiFile` function works without React or web components — useful for Node.js scripts, build-time tooling, or non-React apps. It is exported by `@dawcore/midi`, with `loadMidiTracks`.
 
 ```typescript
 import { parseMidiFile } from '@dawcore/midi';
-// or, equivalently from the React package re-export:
-// import { parseMidiFile } from '@waveform-playlist/midi';
 
 const response = await fetch('/music/song.mid');
 const buffer = await response.arrayBuffer();
@@ -356,4 +354,4 @@ Track names are derived from the MIDI file content:
 - **Program > 0** → Title-cased GM instrument name (e.g., "Electric Bass (Finger)")
 - **Program 0** → Track name from the MIDI file, or "Acoustic Grand Piano", or "Channel N"
 
-When loading user-dropped files with a config `name`, individual track names from the MIDI file are used directly (not prefixed with the config name).
+The `name` option of `loadMidiTracks` names the track only when the file yields exactly one (a single-track file, or `flatten`). A file with several tracks keeps the names above, not prefixed with `name`.
