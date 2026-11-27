@@ -351,8 +351,10 @@ export class SpectrogramOrchestrator extends EventTarget {
       } catch (err) {
         if (this.generation !== generation || this.disposed) return;
         if (err instanceof SpectrogramAbortError) {
-          // Normal abort — generation bumped mid-render. Not an error.
-          return;
+          // Not an error. A changed generation returned above, and renderGroup
+          // skips a group whose computation was dropped (#928), so this is a
+          // fallback: go on with the next track.
+          continue;
         }
         const error = err instanceof Error ? err : new Error(String(err));
         console.warn(
@@ -409,6 +411,13 @@ export class SpectrogramOrchestrator extends EventTarget {
       await this.renderGroupOnce(group, generation, viewport, clip);
     } catch (err) {
       if (this.generation !== generation || this.disposed) throw err;
+      if (err instanceof SpectrogramAbortError) {
+        // Same generation: the worker dropped a computation whose clip audio
+        // was replaced or removed while it ran (#928). Skip this group only;
+        // the rest of the pass still draws, and a clip registered again
+        // schedules its own render (registerClip).
+        return;
+      }
       // Concurrent computes can LRU-evict the FFT entry between computeFFT
       // resolving and renderChunks executing (16-entry cache). Recompute once
       // instead of surfacing a viewport-error for a transient race (#558).
