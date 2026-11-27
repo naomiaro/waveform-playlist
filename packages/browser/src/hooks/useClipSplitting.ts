@@ -37,8 +37,8 @@ export interface UseClipSplittingResult {
  * ```
  */
 export const useClipSplitting = (): UseClipSplittingResult => {
-  const { samplesPerPixel } = usePlaylistZoom();
   const arrangement = useArrangement();
+  const { samplesPerPixel } = usePlaylistZoom();
   const { sampleRate } = usePlaylistView();
   const { currentTimeRef } = usePlaybackRefs();
   const { selectedTrackId } = useSelectedTrackId();

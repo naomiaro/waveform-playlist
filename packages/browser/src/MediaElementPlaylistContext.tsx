@@ -25,6 +25,7 @@ import {
 } from './providerInternals/useAnnotationState';
 import { useFrameCallbacks } from './providerInternals/useFrameCallbacks';
 import { centrePlayhead, useScrollFollow } from './providerInternals/useScrollFollow';
+import { useZoomAnchor } from './providerInternals/zoomAnchor';
 import { useMergedTheme } from './providerInternals/useMergedTheme';
 import { useTimeFormat } from './hooks/useTimeFormat';
 import { useShallowStable } from './hooks/useShallowStable';
@@ -92,8 +93,12 @@ export interface MediaElementPlaylistProviderProps {
   /** Single track configuration with source URL and waveform data */
   track: MediaElementTrackConfig;
   /** Samples per pixel (the zoom level; default 1024). Followed: a new value
-   *  redraws the waveform at it. There is no zoom control under this
-   *  provider, so the prop is the only place the level is set. */
+   *  redraws the waveform at it, keeping the time under the hovering pointer
+   *  in place (the centre when the pointer is not over the waveform). A value
+   *  finer than the waveform data (its `scale`) is drawn at the data's own
+   *  resolution, which `usePlaylistZoom().samplesPerPixel` reports. There is
+   *  no zoom control under this provider, so the prop is the only place the
+   *  level is set. */
   samplesPerPixel?: number;
   /** Playback rate (default 1). Not clamped by the provider: the bundled
    *  engine is created at it as given, while `setPlaybackRate` clamps to
@@ -169,7 +174,7 @@ export interface MediaElementPlaylistProviderProps {
  */
 export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProviderProps> = ({
   track,
-  samplesPerPixel = 1024,
+  samplesPerPixel: samplesPerPixelProp = 1024,
   playbackRate: initialPlaybackRate = 1,
   preservesPitch = true,
   automaticScroll = false,
@@ -269,10 +274,12 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
   // Refs
   const playoutRef = useRef<MediaElementPlayout | null>(null);
   const currentTimeRef = useRef<number>(0);
-  // For the animation loop. Written during render: the prop is followed
-  // (#828) and the loop reads the level of the latest render.
-  const samplesPerPixelRef = useRef<number>(samplesPerPixel);
-  samplesPerPixelRef.current = samplesPerPixel;
+  // The zoom level follows the prop (#828), no finer than the waveform data:
+  // peaks cannot be drawn below the data's own samples per pixel.
+  const samplesPerPixel = Math.max(samplesPerPixelProp, track.waveformData.scale);
+  // The committed level for the animation loop; a change keeps the time under
+  // the hovering pointer (or the centre) in place, as the WebAudio provider does.
+  const samplesPerPixelRef = useZoomAnchor(scrollContainerRef, samplesPerPixel);
   const { startAnimationFrameLoop, stopAnimationFrameLoop } = useAnimationFrameLoop();
 
   // What the play that is running (or queued) is, in the WebAudio provider's
@@ -943,8 +950,8 @@ export const MediaElementPlaylistProvider: React.FC<MediaElementPlaylistProvider
     ]
   );
 
-  // A single track at a fixed zoom level: the two provider modes and both
-  // zoom directions are always off.
+  // A single track, zoomed by the `samplesPerPixel` prop only: the two
+  // provider modes and both zoom directions are always off.
   const viewValue: PlaylistViewContextValue = useMemo(
     () => ({ sampleRate, mono: false, indefinitePlayback: false }),
     [sampleRate]

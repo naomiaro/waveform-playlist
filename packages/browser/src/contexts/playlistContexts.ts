@@ -226,7 +226,8 @@ export interface PlaylistSettingsContextValue {
 
 /**
  * The zoom level (#768). Changes on a zoom. Under the MediaElement provider
- * the level is fixed: `canZoomIn` and `canZoomOut` are always false.
+ * the level is its `samplesPerPixel` prop (followed, no finer than the
+ * waveform data); `canZoomIn` and `canZoomOut` are always false.
  */
 export interface PlaylistZoomContextValue {
   samplesPerPixel: number;

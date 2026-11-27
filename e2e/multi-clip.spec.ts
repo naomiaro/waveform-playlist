@@ -34,6 +34,34 @@ test.describe('Multi-Clip Example', () => {
     }).toPass({ timeout: 10000 });
   });
 
+  // #828: a zoom keeps the time under the pointer where it is when the
+  // pointer is over the tracks, and the time at the centre of the view
+  // otherwise. A click on a zoom button puts the pointer on the button.
+  // (Zoom In is disabled after two clicks on this page: the last zoom level.)
+  test('a zoom button keeps the time at the centre of the view where it is', async ({ page }) => {
+    const zoomIn = page.getByRole('button', { name: 'Zoom In' });
+    await zoomIn.click();
+    await zoomIn.click();
+    const container = page.locator('[data-scroll-container]').first();
+    // Scroll to the middle of the timeline.
+    await expect(async () => {
+      const scrolled = await container.evaluate((el) => {
+        el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+        return el.scrollLeft;
+      });
+      expect(scrolled).toBeGreaterThan(100);
+    }).toPass({ timeout: 5000 });
+    const centreShare = () =>
+      container.evaluate((el) => (el.scrollLeft + el.clientWidth / 2) / el.scrollWidth);
+    const before = await centreShare();
+    const widthBefore = await container.evaluate((el) => el.scrollWidth);
+    await page.getByRole('button', { name: 'Zoom Out' }).click();
+    await expect(async () => {
+      expect(await container.evaluate((el) => el.scrollWidth)).toBeLessThan(widthBefore * 0.75);
+      expect(Math.abs((await centreShare()) - before)).toBeLessThan(0.005);
+    }).toPass({ timeout: 5000 });
+  });
+
   test.describe('Playhead Positioning', () => {
     test('clicking on waveform area moves playhead', async ({ page }) => {
       // Get the first clip container - this ensures we click on actual waveform content

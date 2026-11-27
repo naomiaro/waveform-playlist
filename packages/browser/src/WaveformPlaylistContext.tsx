@@ -42,6 +42,7 @@ import {
 import { useFrameCallbacks, type FrameData } from './providerInternals/useFrameCallbacks';
 import { centrePlayhead, useScrollFollow } from './providerInternals/useScrollFollow';
 import { useMergedTheme } from './providerInternals/useMergedTheme';
+import { useZoomAnchor } from './providerInternals/zoomAnchor';
 import { useTrimPreview } from './providerInternals/useTrimPreview';
 import { useEngineLifetime } from './providerInternals/useEngineLifetime';
 import { useArrangementView } from './providerInternals/useArrangementView';
@@ -367,8 +368,6 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   // don't restart afterward don't need suppression — see the mirror's own
   // comment for why.
   const suppressEngineStopMirrorRef = useRef(false);
-  // Viewport zoom for scroll-position math and animation loop pixels.
-  const samplesPerPixelRef = useRef<number>(initialSamplesPerPixel);
   // The latest engine zoom, available to a rebuild before React commits it.
   const engineSamplesPerPixelRef = useRef(initialSamplesPerPixel);
   // True while the bounded play in progress is the highlighted selection itself
@@ -451,6 +450,9 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
   const { timeFormat, setTimeFormat } = useTimeFormat();
   const zoom = useZoomControls({ engineRef, initialSamplesPerPixel });
   const { samplesPerPixel, onEngineState: onZoomEngineState } = zoom;
+  // The committed zoom level for the animation loop; a zoom change keeps the
+  // time under the hovering pointer (or the centre) in place (#828).
+  const samplesPerPixelRef = useZoomAnchor(scrollContainerRef, samplesPerPixel);
   const volume = useMasterVolume({ engineRef, initialVolume: 1.0 });
   const {
     masterVolume,
@@ -537,31 +539,6 @@ const ProviderOnArrangement: React.FC<WaveformPlaylistProviderProps> = ({
       setLoopRegion(start, end);
     }
   }, [setLoopRegion, selectionStartRef, selectionEndRef]);
-
-  // Adjust scroll position proportionally when zoom changes
-  useEffect(() => {
-    if (!scrollContainerRef.current || duration === 0) return;
-
-    const container = scrollContainerRef.current;
-    const oldSamplesPerPixel = samplesPerPixelRef.current;
-    const newSamplesPerPixel = samplesPerPixel;
-
-    if (oldSamplesPerPixel === newSamplesPerPixel) return;
-
-    // Calculate the current center time in the viewport
-    const containerWidth = container.clientWidth;
-    const currentScrollLeft = container.scrollLeft;
-    const centerPixel = currentScrollLeft + containerWidth / 2;
-    const sr = sampleRateRef.current;
-    const centerTime = (centerPixel * oldSamplesPerPixel) / sr;
-
-    // Calculate new scroll position to keep the same center time
-    const newCenterPixel = (centerTime * sr) / newSamplesPerPixel;
-    const newScrollLeft = Math.max(0, newCenterPixel - containerWidth / 2);
-
-    container.scrollLeft = newScrollLeft;
-    samplesPerPixelRef.current = newSamplesPerPixel;
-  }, [samplesPerPixel, duration, scrollContainerRef]);
 
   // Forward late-arriving / swapped SoundFontCache to the live adapter so
   // MIDI tracks upgrade from PolySynth without an engine rebuild. Before the
