@@ -1,4 +1,4 @@
-import { trackPanLaw, type PlayoutTrack } from '@waveform-playlist/core';
+import { trackPanLaw, type PanLaw, type PlayoutTrack } from '@waveform-playlist/core';
 import type {
   Tick,
   Sample,
@@ -578,6 +578,23 @@ export class Transport {
       return;
     }
     node.setPan(pan);
+  }
+
+  /**
+   * Set a track's pan law (#684): `'mono'`, `'stereo'`, or `'auto'` for
+   * "from the clips of the track the transport holds". The clips are not
+   * touched: playing sources go on playing, and the pan stage ramps to the
+   * new law. A later `updateTrack` or `setTracks` takes the law from the
+   * track it is given (its `panLaw`, else its clips).
+   */
+  setTrackPanLaw(trackId: string, panLaw: PanLaw): void {
+    const node = this._trackNodes.get(trackId);
+    const track = this._tracks.find((t) => t.id === trackId);
+    if (!node || !track) {
+      console.warn('[waveform-playlist] setTrackPanLaw: unknown trackId "' + trackId + '"');
+      return;
+    }
+    node.setPanLaw(trackPanLaw({ ...track, panLaw }));
   }
 
   setTrackMute(trackId: string, muted: boolean): void {

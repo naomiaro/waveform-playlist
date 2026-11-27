@@ -1068,6 +1068,49 @@ describe('Transport', () => {
       expect(monoLawGains(ctx)).toBe(2);
     });
 
+    it('setTrackPanLaw switches the law without touching the clips', () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      transport.setTracks([makeTrack([makeClip({ audioBuffer: monoBuffer })])]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const clipPlayerUpdate = vi.spyOn((transport as any)._clipPlayer, 'updateTrack');
+      expect(monoLawGains(ctx)).toBe(2);
+
+      transport.setTrackPanLaw('track-1', 'stereo');
+      expect(monoLawGains(ctx)).toBe(0);
+
+      // 'auto': from the clips again (mono).
+      transport.setTrackPanLaw('track-1', 'auto');
+      expect(monoLawGains(ctx)).toBe(2);
+      expect(clipPlayerUpdate).not.toHaveBeenCalled();
+    });
+
+    it('a later update that carries the law set with setTrackPanLaw keeps it', () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      const monoClip = makeClip({ audioBuffer: monoBuffer });
+      transport.setTracks([makeTrack([monoClip])]);
+      transport.setTrackPanLaw('track-1', 'stereo');
+
+      // A later update that carries the same law keeps it.
+      transport.updateTrack('track-1', makeTrack([monoClip], { panLaw: 'stereo' }));
+
+      expect(monoLawGains(ctx)).toBe(0);
+    });
+
+    it('setTrackPanLaw for an id it does not hold warns and does not throw', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const transport = new Transport(mockAudioContext());
+      transport.setTracks([]);
+
+      expect(() => transport.setTrackPanLaw('nope', 'stereo')).not.toThrow();
+
+      expect(warn).toHaveBeenCalledWith(
+        '[waveform-playlist] setTrackPanLaw: unknown trackId "nope"'
+      );
+      warn.mockRestore();
+    });
+
     it("a track sent with 'auto' takes the law from its clips", () => {
       const ctx = mockAudioContext();
       new Transport(ctx).setTracks([makeTrack([makeClip()], { panLaw: 'auto' })]);
