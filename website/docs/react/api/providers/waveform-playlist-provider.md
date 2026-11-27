@@ -232,7 +232,7 @@ By default playback **auto-stops** at the end of the timeline and the cursor ret
 
 **Type:** `number`
 
-The sample rate to create the `AudioContext` at (default Tone.js adapter). Pre-computed peaks (`.dat` files) are drawn from the file when their rate matches; otherwise peaks are generated from the decoded audio. Read when an engine is built.
+The sample rate the default Tone.js adapter asks its `AudioContext` for. It is a request: playout's `configureGlobalContext` keeps the rate of a global context that already exists (one made by `getGlobalAudioContext()`, for example for a SoundFont cache), Tone.js 15.1.22 ignores it with a console warning (15.5.x honours it), and with `createAdapter` it is not used for the context. The provider then uses the rate of the context it gets. Pre-computed peaks (`.dat` files) are drawn from the file when their rate matches; otherwise peaks are generated from the decoded audio. Read when an engine is built.
 
 It also tells the provider its sample rate before the first adapter exists. Placeholders for clips that are still loading are drawn only once the provider knows its real rate: from mount with this prop, otherwise from the first adapter on. Without the prop, and with an adapter that can never be built, no placeholder is drawn.
 

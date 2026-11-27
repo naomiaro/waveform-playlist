@@ -29,6 +29,7 @@ Load the `.mid` file with `loadMidiTracks`, add its tracks to the arrangement, a
 ```tsx
 import { useEffect, useState } from 'react';
 import { loadMidiTracks } from '@dawcore/midi';
+import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import {
   WaveformPlaylistProvider,
   Waveform,
@@ -44,7 +45,10 @@ function MidiPlayer() {
 
   useEffect(() => {
     const controller = new AbortController();
-    loadMidiTracks('/music/song.mid', { sampleRate: 48000, signal: controller.signal })
+    loadMidiTracks('/music/song.mid', {
+      sampleRate: getGlobalAudioContext().sampleRate,
+      signal: controller.signal,
+    })
       .then((tracks) => {
         // An effect run again (StrictMode, Fast Refresh) must not add them twice
         if (arrangement.getTracks().length === 0) {
@@ -63,7 +67,7 @@ function MidiPlayer() {
   if (status !== 'loaded') return <div>Error: {status}</div>;
 
   return (
-    <WaveformPlaylistProvider arrangement={arrangement} sampleRate={48000}>
+    <WaveformPlaylistProvider arrangement={arrangement}>
       <PlayButton /> <StopButton />
       <Waveform />
     </WaveformPlaylistProvider>
@@ -73,7 +77,7 @@ function MidiPlayer() {
 
 The provider is rendered after the tracks are in because the playlist's [ready](/docs/react/guides/loading-audio#ready) happens once per mount and waits only for audio sources: a provider mounted over the empty arrangement would be ready at once. A dropped `.mid` file later is `loadMidiTracks(file, …)` followed by `arrangement.addTrack(track)` for each track, an undo step like any added track.
 
-`sampleRate` is the rate the clips are positioned at: pass the rate of the provider's `AudioContext` (48000 here, set with the provider's `sampleRate` prop).
+`sampleRate` is the rate the clips are positioned at: pass the rate of the `AudioContext` the playlist plays on. With the default Tone.js adapter that is `getGlobalAudioContext().sampleRate` from `@waveform-playlist/playout`, as here; with `createAdapter`, the rate of your adapter's context. A fixed number is wrong on hardware that runs at another rate: the provider's [`sampleRate` prop](/docs/react/api/providers/waveform-playlist-provider#samplerate) only requests a rate, and the context can run at another one.
 
 A single `.mid` file typically produces multiple `ClipTrack` objects — one per MIDI track of the file (e.g., Piano, Bass, Drums).
 
@@ -114,6 +118,7 @@ If you already have note data (e.g., from a custom parser or algorithm), build t
 
 ```tsx
 import { createClipFromSeconds, createTrack } from '@waveform-playlist/core';
+import { getGlobalAudioContext } from '@waveform-playlist/playout';
 
 const melody = createTrack({
   name: 'Melody',
@@ -122,7 +127,7 @@ const melody = createTrack({
     createClipFromSeconds({
       startTime: 0,
       duration: 4,
-      sampleRate: 48000,
+      sampleRate: getGlobalAudioContext().sampleRate,
       sourceDuration: 4,
       name: 'Melody',
       midiNotes: [
@@ -141,7 +146,10 @@ const arrangement = useCreateArrangement(() => [melody]);
 By default, each MIDI track of the file becomes a separate track. Use `flatten: true` to merge them into one:
 
 ```tsx
-const tracks = await loadMidiTracks('/music/song.mid', { sampleRate: 48000, flatten: true });
+const tracks = await loadMidiTracks('/music/song.mid', {
+  sampleRate: getGlobalAudioContext().sampleRate,
+  flatten: true,
+});
 ```
 
 ### SoundFont Playback
@@ -203,6 +211,7 @@ MIDI and audio tracks can be played together: they are tracks of one arrangement
 ```tsx
 import { useEffect, useState } from 'react';
 import { loadMidiTracks } from '@dawcore/midi';
+import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { useCreateArrangement } from '@waveform-playlist/browser';
 import { audioTrack } from '@waveform-playlist/core';
 
@@ -215,7 +224,10 @@ function useMixedArrangement() {
 
   useEffect(() => {
     const controller = new AbortController();
-    loadMidiTracks('/music/song.mid', { sampleRate: 48000, signal: controller.signal })
+    loadMidiTracks('/music/song.mid', {
+      sampleRate: getGlobalAudioContext().sampleRate,
+      signal: controller.signal,
+    })
       .then((tracks) => tracks.forEach((track) => arrangement.addTrack(track)))
       .catch((err: unknown) => {
         // An abort (unmount, StrictMode's first run) is not an error

@@ -4534,14 +4534,10 @@ useEffect(() => {
 
 if (error) return <p>Error: {error}</p>;
 if (!loaded) return <p>Loading MIDI…</p>;
-return (
-  <WaveformPlaylistProvider arrangement={arrangement} sampleRate={48000}>
-    …
-  </WaveformPlaylistProvider>
-);
+return <WaveformPlaylistProvider arrangement={arrangement}>…</WaveformPlaylistProvider>;
 ```
 
-Render the provider after the tracks are in: the playlist's ready happens once per mount and waits only for audio sources ([MIDI guide](/docs/react/guides/midi#basic-usage)).
+Render the provider after the tracks are in: the playlist's ready happens once per mount and waits only for audio sources ([MIDI guide](/docs/react/guides/midi#basic-usage)). `sampleRate` means what it meant for the hook; the MIDI guide recommends passing the rate of the context the playlist plays on (`getGlobalAudioContext().sampleRate` with the default adapter) rather than a fixed number.
 
 Notes you already have, with no file:
 

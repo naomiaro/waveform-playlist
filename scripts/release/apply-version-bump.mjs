@@ -147,8 +147,9 @@ if (problems.length > 0) fail(problems);
 // pre.json whose file was deleted (tried on #937), so the union with
 // pre.changesets would keep a deleted id, and a later changeset of that
 // name would count as consumed already.
+// The same files @changesets/read reads: no dotfile, no README.md in any case.
 const changesetIds = readdirSync(join(repoRoot, '.changeset'))
-  .filter((file) => file.endsWith('.md') && file !== 'README.md')
+  .filter((file) => !file.startsWith('.') && file.endsWith('.md') && !/^README\.md$/i.test(file))
   .map((file) => file.slice(0, -'.md'.length));
 // Kept in name order, as changesets writes it.
 const consumed = [...new Set(changesetIds)].sort();

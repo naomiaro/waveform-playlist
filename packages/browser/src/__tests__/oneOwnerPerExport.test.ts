@@ -50,7 +50,10 @@ function exportedNames(file: string, seen = new Set<string>()): Set<string> {
   const names = new Set<string>();
   if (seen.has(file)) return names;
   seen.add(file);
-  const text = readFileSync(file, 'utf8');
+  // Comments removed first: an `export` written in a comment exports nothing.
+  const text = readFileSync(file, 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
   // A `./x.js` specifier names `./x.ts`. A star export that resolves to no file
   // fails the test: skipping it would drop its names from the comparison.
   const resolve = (spec: string): string => {

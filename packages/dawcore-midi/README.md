@@ -40,6 +40,7 @@ Note timings are in seconds, already tempo-adjusted by `@tonejs/midi`. Tracks wi
 ```tsx
 import { useEffect, useState } from 'react';
 import { loadMidiTracks } from '@dawcore/midi';
+import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import { WaveformPlaylistProvider, useCreateArrangement } from '@waveform-playlist/browser';
 
 function MidiPlaylist() {
@@ -50,7 +51,10 @@ function MidiPlaylist() {
 
   useEffect(() => {
     const controller = new AbortController();
-    loadMidiTracks('/music/song.mid', { sampleRate: 48000, signal: controller.signal })
+    loadMidiTracks('/music/song.mid', {
+      sampleRate: getGlobalAudioContext().sampleRate,
+      signal: controller.signal,
+    })
       .then((tracks) => {
         if (arrangement.getTracks().length === 0) {
           tracks.forEach((track) => arrangement.addTrack(track));
@@ -70,14 +74,14 @@ function MidiPlaylist() {
 
   // Rendered once the tracks are in: the playlist's ready happens once per mount
   return (
-    <WaveformPlaylistProvider arrangement={arrangement} sampleRate={48000}>
+    <WaveformPlaylistProvider arrangement={arrangement}>
       {/* your UI */}
     </WaveformPlaylistProvider>
   );
 }
 ```
 
-`sampleRate` positions the clips in samples: pass the rate of the playlist's `AudioContext` (48000 here: the provider's `sampleRate` prop creates its AudioContext at that rate). Playing the notes (piano roll, SoundFont or PolySynth) is `@waveform-playlist/browser` with `@waveform-playlist/playout`; see the MIDI guide.
+`sampleRate` positions the clips in samples: pass the rate of the `AudioContext` the playlist plays on (with the default Tone.js adapter, `getGlobalAudioContext().sampleRate` from `@waveform-playlist/playout`, as here). A fixed number is wrong on hardware that runs at another rate: the provider's `sampleRate` prop only requests a rate. Playing the notes (piano roll, SoundFont or PolySynth) is `@waveform-playlist/browser` with `@waveform-playlist/playout`; see the MIDI guide.
 
 ## API
 
