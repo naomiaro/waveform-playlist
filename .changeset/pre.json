@@ -99,6 +99,7 @@
     "shortcuts-respect-focused-controls",
     "small-render-cleanups",
     "smartscale-tick-pixels",
+    "spectrogram-choices-on-the-track",
     "spectrogram-override-mode-optional",
     "spectrogram-pool-audio",
     "spectrogram-pool-channel-per-worker",
