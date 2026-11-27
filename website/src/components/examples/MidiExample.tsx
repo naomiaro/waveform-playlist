@@ -427,7 +427,6 @@ export function MidiExample() {
       {trackCount > 0 ? (
         <WaveformPlaylistProvider
           arrangement={arrangement}
-          sampleRate={48000}
           samplesPerPixel={2048}
           mono
           theme={{ ...theme, ...gradientTheme }}

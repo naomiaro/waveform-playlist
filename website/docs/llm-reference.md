@@ -71,9 +71,12 @@ interface WaveformPlaylistProviderProps {
    *  does. Recording sessions suppress the auto-stop automatically. A provider option, not a
    *  view option: the animation loop and `seekTo` follow it. */
   indefinitePlayback?: boolean;           // Default: false
-  /** Desired AudioContext sample rate for pre-computed peaks matching. Read at build
-   *  time. Also the rate placeholders are drawn at before the first adapter exists:
-   *  without it no placeholder is drawn until an adapter has been built. */
+  /** Requested AudioContext sample rate, default Tone.js adapter only: passed to
+   *  playout's `configureGlobalContext`, which keeps an existing context's rate
+   *  and which Tone.js 15.1.22 ignores (warning when the rates differ). The
+   *  provider uses the rate of the context it gets. Read at build time. Also the
+   *  rate placeholders are drawn at before the first adapter exists: without it
+   *  no placeholder is drawn until an adapter has been built. */
   sampleRate?: number;
   /** Supply a custom playout adapter — skips dynamic import of @waveform-playlist/playout + tone.
    *  Called once per engine build; read at build time. Audio is decoded with the current
@@ -863,7 +866,7 @@ const arrangement = useCreateArrangement(() => [
 <WaveformPlaylistProvider arrangement={arrangement}><Waveform /></WaveformPlaylistProvider>
 ```
 
-Placeholders: a clip still loading that has a `duration` or `waveformData` is drawn as a placeholder record in `peaksDataArray` (`isPlaceholder: true`; from its peaks, else a box of the clip's extent in the colour the waveform's bars are drawn in (`waveFillColor`, `selectedWaveFillColor` on the selected track, `grey` when the theme gives no usable colour), `<ClipPlaceholderBody />` from ui-components, `data-clip-placeholder-body="true"`, with or without clip headers and on spectrogram tracks too; the played-portion tint and fade curves draw over it), dimmed, without handles; a clip that names only its `src` is drawn once loaded. No placeholder is drawn before the provider knows its real sample rate (the `sampleRate` prop, else the first adapter's context). A placeholder's geometry is at the provider's sample rate, also when its peaks file has another.
+Placeholders: a clip still loading that has a `duration` or `waveformData` is drawn as a placeholder record in `peaksDataArray` (`isPlaceholder: true`; from its peaks, else a box of the clip's extent in the colour the waveform's bars are drawn in (`waveFillColor`, `selectedWaveFillColor` on the selected track, `grey` when the theme gives no usable colour), `<ClipPlaceholderBody />` from ui-components, `data-clip-placeholder-body="true"`, with or without clip headers and on spectrogram tracks too; the played-portion tint and fade curves draw over it), dimmed, without handles; a clip that names only its `src` is drawn once loaded. No placeholder is drawn before the provider has a sample rate (from mount the `sampleRate` prop's, which is a request; the first adapter's context rate replaces it). A placeholder's geometry is at the provider's sample rate, also when its peaks file has another.
 
 Rule for apps: change tracks from a handler, an effect or a `sources` listener, not from inside `arrangement.subscribe()` or an engine `statechange` listener: two or more track edits made inside one listener run make the engine send the adapter every track (`setTracks`), which can interrupt playback.
 

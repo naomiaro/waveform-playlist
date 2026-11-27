@@ -120,25 +120,26 @@ If you already have note data (e.g., from a custom parser or algorithm), build t
 import { createClipFromSeconds, createTrack } from '@waveform-playlist/core';
 import { getGlobalAudioContext } from '@waveform-playlist/playout';
 
-const melody = createTrack({
-  name: 'Melody',
-  kind: 'midi',
-  clips: [
-    createClipFromSeconds({
-      startTime: 0,
-      duration: 4,
-      sampleRate: getGlobalAudioContext().sampleRate,
-      sourceDuration: 4,
-      name: 'Melody',
-      midiNotes: [
-        { midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 },
-        { midi: 64, name: 'E4', time: 0.5, duration: 0.5, velocity: 0.7 },
-      ],
-    }),
-  ],
-});
-
-const arrangement = useCreateArrangement(() => [melody]);
+// Built in the initializer, not on every render
+const arrangement = useCreateArrangement(() => [
+  createTrack({
+    name: 'Melody',
+    kind: 'midi',
+    clips: [
+      createClipFromSeconds({
+        startTime: 0,
+        duration: 4,
+        sampleRate: getGlobalAudioContext().sampleRate,
+        sourceDuration: 4,
+        name: 'Melody',
+        midiNotes: [
+          { midi: 60, name: 'C4', time: 0, duration: 0.5, velocity: 0.8 },
+          { midi: 64, name: 'E4', time: 0.5, duration: 0.5, velocity: 0.7 },
+        ],
+      }),
+    ],
+  }),
+]);
 ```
 
 ### Flatten Mode

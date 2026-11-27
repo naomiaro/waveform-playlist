@@ -223,7 +223,7 @@ export interface WaveformPlaylistProviderProps {
   indefinitePlayback?: boolean;
   /** Requested AudioContext sample rate, default Tone.js adapter only: passed to
    *  playout's `configureGlobalContext`, which keeps an existing context's rate
-   *  and which Tone.js 15.1.22 ignores (with a warning). The provider uses the
+   *  and which Tone.js 15.1.22 ignores (warning when the rates differ). The provider uses the
    *  rate of the context it gets. Pre-computed peaks (.dat files) render
    *  instantly when they match. On mismatch, falls back to worker. */
   sampleRate?: number;
