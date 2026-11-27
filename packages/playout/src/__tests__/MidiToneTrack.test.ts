@@ -45,7 +45,7 @@ const mockPanStage = {
   input: { name: 'pan-in' },
   output: { name: 'pan-out', connect: vi.fn() },
   setPan: vi.fn(),
-  setSourceChannelCount: vi.fn(),
+  setPanLaw: vi.fn(),
   dispose: vi.fn(),
 };
 vi.mock('@waveform-playlist/core', async (importOriginal) => ({

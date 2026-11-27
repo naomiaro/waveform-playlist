@@ -27,17 +27,17 @@ vi.mock('@dawcore/faust', () => ({ compileFaustToWam }));
 const panStages: Array<{
   node: ReturnType<typeof mockNode>;
   pan: number;
-  sourceChannelCount: number;
+  panLaw: string;
   dispose: ReturnType<typeof vi.fn>;
 }> = [];
 
 vi.mock('@waveform-playlist/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@waveform-playlist/core')>()),
-  createPanStage: vi.fn((_ctx: unknown, pan: number, sourceChannelCount: number) => {
+  createPanStage: vi.fn((_ctx: unknown, pan: number, panLaw: string) => {
     const node = mockNode();
     const dispose = vi.fn();
-    panStages.push({ node, pan, sourceChannelCount, dispose });
-    return { input: node, output: node, setPan: vi.fn(), setSourceChannelCount: vi.fn(), dispose };
+    panStages.push({ node, pan, panLaw, dispose });
+    return { input: node, output: node, setPan: vi.fn(), setPanLaw: vi.fn(), dispose };
   }),
 }));
 
@@ -561,14 +561,14 @@ describe('exportAudioImpl — pan stage (#669)', () => {
 
   it('a track of mono clips gets the mono law', async () => {
     await exportAudioImpl(hostWith([makeClip({ audioBuffer: monoBuffer })]));
-    expect(panStages[0].sourceChannelCount).toBe(1);
+    expect(panStages[0].panLaw).toBe('mono');
   });
 
   it('a track with any stereo clip gets the stereo law', async () => {
     await exportAudioImpl(
       hostWith([makeClip({ audioBuffer: monoBuffer }), makeClip({ audioBuffer: stereoBuffer })])
     );
-    expect(panStages[0].sourceChannelCount).toBe(2);
+    expect(panStages[0].panLaw).toBe('stereo');
   });
 
   it('releases the stage after rendering', async () => {

@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import {
   gainToDb,
   trackChannelCount,
+  trackPanLaw,
   createPanStage,
   applyFadeIn,
   applyFadeOut,
@@ -297,12 +298,12 @@ async function renderOffline(
           const trackInput = new Gain({ gain: 1 });
           const trackVolume = new Volume(gainToDb(state.volume));
           // Same pan stage as live playback (core's createPanStage, native
-          // nodes on the raw offline context): the law is chosen by the source's
-          // channel count, and a stereo effect on a mono track stays stereo.
+          // nodes on the raw offline context): the law is the track's own, and
+          // a stereo effect on a mono track stays stereo.
           const trackPan = createPanStage(
             context.rawContext as BaseAudioContext,
             state.pan,
-            trackChannelCount(track)
+            trackPanLaw(track)
           );
           const trackMute = new Gain(state.muted ? 0 : 1);
 

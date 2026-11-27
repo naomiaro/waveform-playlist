@@ -9,7 +9,7 @@ import {
   getContext,
   BaseContext,
 } from 'tone';
-import { gainToDb } from '@waveform-playlist/core';
+import { gainToDb, type DecidedPanLaw } from '@waveform-playlist/core';
 import { ToneTrack, ToneTrackOptions, type ClipInfo } from './ToneTrack';
 import { MidiToneTrack, MidiToneTrackOptions } from './MidiToneTrack';
 import type { PlayableTrack } from './MidiToneTrack';
@@ -162,21 +162,21 @@ export class TonePlayout {
   /**
    * Replace clips on a track, preserving the track's audio graph.
    * Only works for ToneTrack (audio clips), not MidiToneTrack.
-   * `sourceChannelCount` (max channel count across the new clips) re-selects
-   * the track's pan law; omit to leave it unchanged.
+   * `panLaw` is the track's pan law (core's trackPanLaw); omit to leave it
+   * unchanged.
    */
   replaceTrackClips(
     trackId: string,
     newClips: ClipInfo[],
     newStartTime?: number,
-    sourceChannelCount?: number
+    panLaw?: DecidedPanLaw
   ): boolean {
     const track = this.tracks.get(trackId);
     if (!track || !('replaceClips' in track)) return false;
     const toneTrack = track as ToneTrack;
     toneTrack.replaceClips(newClips, newStartTime);
-    if (sourceChannelCount !== undefined) {
-      toneTrack.setSourceChannelCount(sourceChannelCount);
+    if (panLaw !== undefined) {
+      toneTrack.setPanLaw(panLaw);
     }
     return true;
   }

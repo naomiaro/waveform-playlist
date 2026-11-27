@@ -17,12 +17,17 @@ function createMockSource() {
 }
 
 function createMockGainNode() {
+  // A ramp is over at once: `value` is where it ends.
+  const gain = {
+    value: 1,
+    linearRampToValueAtTime: vi.fn((value: number) => {
+      gain.value = value;
+    }),
+    setValueAtTime: vi.fn(),
+    cancelScheduledValues: vi.fn(),
+  };
   return {
-    gain: {
-      value: 1,
-      linearRampToValueAtTime: vi.fn(),
-      setValueAtTime: vi.fn(),
-    },
+    gain,
     connect: vi.fn(),
     disconnect: vi.fn(),
   };
@@ -987,7 +992,7 @@ describe('Transport', () => {
     // Should not throw
   });
 
-  describe('pan law follows the track source channel count (#669)', () => {
+  describe("pan law: the track's own, else from its clips (#669, #684)", () => {
     // Real core pan stage on the mock context: a centred MONO-law stage holds
     // two gains at cos(π/4); a centred STEREO-law stage holds none.
     function monoLawGains(ctx: AudioContext): number {
@@ -1009,7 +1014,7 @@ describe('Transport', () => {
       expect(monoLawGains(stereoCtx)).toBe(0);
     });
 
-    it('addTrack uses the track source channel count', () => {
+    it('addTrack: a track that carries no law takes it from its clips', () => {
       const stereoCtx = mockAudioContext();
       const stereoTransport = new Transport(stereoCtx);
       stereoTransport.setTracks([]);
@@ -1023,7 +1028,7 @@ describe('Transport', () => {
       expect(monoLawGains(monoCtx)).toBe(2);
     });
 
-    it('updateTrack switches the law when a stereo clip joins a mono track', () => {
+    it('updateTrack: a track that carries no law follows its clips, as without an arrangement', () => {
       const ctx = mockAudioContext();
       const transport = new Transport(ctx);
       const monoClip = makeClip({ audioBuffer: monoBuffer });
@@ -1035,6 +1040,38 @@ describe('Transport', () => {
 
       transport.updateTrack('track-1', makeTrack([monoClip]));
       expect(monoLawGains(ctx)).toBe(2);
+    });
+
+    it("setTracks and addTrack: the track's own law wins over its clips", () => {
+      const monoCtx = mockAudioContext();
+      new Transport(monoCtx).setTracks([makeTrack([makeClip()], { panLaw: 'mono' })]);
+      expect(monoLawGains(monoCtx)).toBe(2);
+
+      const stereoCtx = mockAudioContext();
+      const transport = new Transport(stereoCtx);
+      transport.setTracks([]);
+      transport.addTrack(makeTrack([makeClip({ audioBuffer: monoBuffer })], { panLaw: 'stereo' }));
+      expect(monoLawGains(stereoCtx)).toBe(0);
+    });
+
+    it('updateTrack: a stereo clip joining a track with the mono law does not switch it', () => {
+      const ctx = mockAudioContext();
+      const transport = new Transport(ctx);
+      const monoClip = makeClip({ audioBuffer: monoBuffer });
+      transport.setTracks([makeTrack([monoClip], { panLaw: 'mono' })]);
+
+      transport.updateTrack(
+        'track-1',
+        makeTrack([monoClip, makeClip({ id: 'clip-2' })], { panLaw: 'mono' })
+      );
+
+      expect(monoLawGains(ctx)).toBe(2);
+    });
+
+    it("a track sent with 'auto' takes the law from its clips", () => {
+      const ctx = mockAudioContext();
+      new Transport(ctx).setTracks([makeTrack([makeClip()], { panLaw: 'auto' })]);
+      expect(monoLawGains(ctx)).toBe(0);
     });
   });
 

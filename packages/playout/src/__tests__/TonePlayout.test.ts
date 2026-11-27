@@ -75,7 +75,7 @@ vi.mock('../ToneTrack', () => {
     this.setVolume = vi.fn();
     this.setPan = vi.fn();
     this.replaceClips = vi.fn();
-    this.setSourceChannelCount = vi.fn();
+    this.setPanLaw = vi.fn();
   });
   return { ToneTrack };
 });
@@ -400,28 +400,28 @@ describe('TonePlayout', () => {
       const playout = new TonePlayout();
       const track = playout.addTrack({ clips: [], track: makeTrack('t1') }) as unknown as {
         replaceClips: ReturnType<typeof vi.fn>;
-        setSourceChannelCount: ReturnType<typeof vi.fn>;
+        setPanLaw: ReturnType<typeof vi.fn>;
       };
 
-      expect(playout.replaceTrackClips('t1', [], 0, 2)).toBe(true);
+      expect(playout.replaceTrackClips('t1', [], 0, 'stereo')).toBe(true);
 
       expect(track.replaceClips).toHaveBeenCalledWith([], 0);
-      expect(track.setSourceChannelCount).toHaveBeenCalledWith(2);
+      expect(track.setPanLaw).toHaveBeenCalledWith('stereo');
     });
 
-    it('leaves the pan law alone when no channel count is given', () => {
+    it('leaves the pan law alone when none is given', () => {
       const playout = new TonePlayout();
       const track = playout.addTrack({ clips: [], track: makeTrack('t1') }) as unknown as {
-        setSourceChannelCount: ReturnType<typeof vi.fn>;
+        setPanLaw: ReturnType<typeof vi.fn>;
       };
 
       playout.replaceTrackClips('t1', []);
 
-      expect(track.setSourceChannelCount).not.toHaveBeenCalled();
+      expect(track.setPanLaw).not.toHaveBeenCalled();
     });
 
     it('returns false for an unknown track', () => {
-      expect(new TonePlayout().replaceTrackClips('nope', [], 0, 2)).toBe(false);
+      expect(new TonePlayout().replaceTrackClips('nope', [], 0, 'stereo')).toBe(false);
     });
   });
 

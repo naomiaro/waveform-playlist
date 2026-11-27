@@ -1,4 +1,4 @@
-import { trackChannelCount, type PlayoutTrack } from '@waveform-playlist/core';
+import { trackPanLaw, type PlayoutTrack } from '@waveform-playlist/core';
 import type {
   Tick,
   Sample,
@@ -482,7 +482,7 @@ export class Transport {
 
     // Create track nodes
     for (const track of tracks) {
-      const trackNode = new TrackNode(track.id, this._audioContext, trackChannelCount(track));
+      const trackNode = new TrackNode(track.id, this._audioContext, trackPanLaw(track));
       trackNode.setVolume(track.volume);
       trackNode.setPan(track.pan);
       trackNode.connectOutput(this._masterNode.input);
@@ -501,7 +501,7 @@ export class Transport {
   }
 
   addTrack(track: PlayoutTrack): void {
-    const trackNode = new TrackNode(track.id, this._audioContext, trackChannelCount(track));
+    const trackNode = new TrackNode(track.id, this._audioContext, trackPanLaw(track));
     trackNode.setVolume(track.volume);
     trackNode.setPan(track.pan);
     trackNode.connectOutput(this._masterNode.input);
@@ -539,9 +539,9 @@ export class Transport {
     if (node) {
       node.setVolume(track.volume);
       node.setPan(track.pan);
-      // Clips may have changed (a stereo take on a mono track): the pan
-      // law follows the track's source material.
-      node.setSourceChannelCount(trackChannelCount(track));
+      // The track's own law (#684). A track that carries none ('auto', or
+      // one given without an arrangement) takes it from its clips.
+      node.setPanLaw(trackPanLaw(track));
     }
 
     // Update mute/solo

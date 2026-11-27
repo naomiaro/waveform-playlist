@@ -6,21 +6,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const panStages: Array<{
   input: unknown;
   output: unknown;
-  args: [number, number];
+  args: [number, string];
   setPan: ReturnType<typeof vi.fn>;
-  setSourceChannelCount: ReturnType<typeof vi.fn>;
+  setPanLaw: ReturnType<typeof vi.fn>;
   dispose: ReturnType<typeof vi.fn>;
 }> = [];
 
 vi.mock('@waveform-playlist/core', () => ({
-  createPanStage: vi.fn((_ctx: unknown, pan: number, sourceChannelCount: number) => {
+  createPanStage: vi.fn((_ctx: unknown, pan: number, panLaw: string) => {
     const node = createNode('pan');
     const stage = {
       input: node,
       output: node,
-      args: [pan, sourceChannelCount] as [number, number],
+      args: [pan, panLaw] as [number, string],
       setPan: vi.fn(),
-      setSourceChannelCount: vi.fn(),
+      setPanLaw: vi.fn(),
       dispose: vi.fn(() => node.outputs.clear()),
     };
     panStages.push(stage);
@@ -145,18 +145,18 @@ describe('TrackNode', () => {
 
   it('builds a mono-law pan stage by default, centred', () => {
     const { stage } = build();
-    expect(stage.args).toEqual([0, 1]);
+    expect(stage.args).toEqual([0, 'mono']);
   });
 
-  it('builds the pan stage for the given source channel count', () => {
-    new TrackNode('track-2', ctx, 2);
-    expect(panStages[panStages.length - 1].args).toEqual([0, 2]);
+  it('builds the pan stage for the given pan law', () => {
+    new TrackNode('track-2', ctx, 'stereo');
+    expect(panStages[panStages.length - 1].args).toEqual([0, 'stereo']);
   });
 
-  it('setSourceChannelCount switches the pan law', () => {
+  it('setPanLaw switches the pan law', () => {
     const { track, stage } = build();
-    track.setSourceChannelCount(2);
-    expect(stage.setSourceChannelCount).toHaveBeenCalledWith(2);
+    track.setPanLaw('stereo');
+    expect(stage.setPanLaw).toHaveBeenCalledWith('stereo');
   });
 
   it('setMute toggles the mute gain', () => {

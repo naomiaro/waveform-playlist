@@ -783,15 +783,15 @@ describe('createToneAdapter', () => {
     });
   });
 
-  describe('updateTrack (pan law, #669)', () => {
-    it('passes the track source channel count with the clip update', () => {
+  describe('pan law (#669, #684)', () => {
+    it('updateTrack: a track that carries no law is sent with the law of its clips', () => {
       const adapter = createToneAdapter();
       const mono = makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 });
       adapter.setTracks([makeTrack('t1', [mono])]);
       const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
       instance.replaceTrackClips.mockReturnValue(true);
 
-      // A stereo clip joins the mono track: the law must follow.
+      // No law on the track (no arrangement): a stereo clip joining decides, as before #684.
       const stereo = makeClip({
         id: 'a2',
         startSample: 44100,
@@ -804,8 +804,51 @@ describe('createToneAdapter', () => {
         't1',
         expect.any(Array),
         expect.any(Number),
-        2
+        'stereo'
       );
+    });
+
+    it("updateTrack: the track's own law is sent, whatever its clips", () => {
+      const adapter = createToneAdapter();
+      const mono = makeClip({ id: 'a1', startSample: 0, durationSamples: 44100 });
+      adapter.setTracks([{ ...makeTrack('t1', [mono]), panLaw: 'mono' }]);
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+      instance.replaceTrackClips.mockReturnValue(true);
+      const stereo = makeClip({
+        id: 'a2',
+        startSample: 44100,
+        durationSamples: 44100,
+        audioBuffer: { numberOfChannels: 2, duration: 1, sampleRate: 44100 } as AudioBuffer,
+      });
+
+      adapter.updateTrack!('t1', { ...makeTrack('t1', [mono, stereo]), panLaw: 'mono' });
+
+      expect(instance.replaceTrackClips).toHaveBeenLastCalledWith(
+        't1',
+        expect.any(Array),
+        expect.any(Number),
+        'mono'
+      );
+    });
+
+    it("setTracks: a track is built with its own law, or the law of its clips for 'auto'", () => {
+      const adapter = createToneAdapter();
+      const stereo = makeClip({
+        id: 'a1',
+        startSample: 0,
+        durationSamples: 44100,
+        audioBuffer: { numberOfChannels: 2, duration: 1, sampleRate: 44100 } as AudioBuffer,
+      });
+      adapter.setTracks([
+        { ...makeTrack('t1', [stereo]), panLaw: 'mono' },
+        { ...makeTrack('t2', [stereo]), panLaw: 'auto' },
+      ]);
+      const instance = (TonePlayout as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
+
+      const laws = instance.addTrack.mock.calls.map(
+        ([options]: [{ panLaw: string }]) => options.panLaw
+      );
+      expect(laws).toEqual(['mono', 'stereo']);
     });
   });
 

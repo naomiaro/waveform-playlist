@@ -65,7 +65,7 @@ const mockPanStage = {
   input: { name: 'pan-in' },
   output: { name: 'pan-out', connect: vi.fn() },
   setPan: vi.fn(),
-  setSourceChannelCount: vi.fn(),
+  setPanLaw: vi.fn(),
   dispose: vi.fn(),
 };
 vi.mock('tone', () => ({
@@ -444,18 +444,18 @@ describe('ToneTrack', () => {
       mockMuteGain.disconnect.mockClear();
     });
 
-    it('builds the pan stage from the source channel count and wires volume → pan → mute', async () => {
+    it('builds the pan stage with the given pan law and wires volume → pan → mute', async () => {
       const { createPanStage } = await import('@waveform-playlist/core');
       mockVolume.connect.mockClear();
       mockPanStage.output.connect.mockClear();
 
-      new ToneTrack({ clips: [], track: makeTrack(), channelCount: 2 });
+      new ToneTrack({ clips: [], track: makeTrack(), panLaw: 'stereo' });
 
       // Built from native nodes on Tone's RAW context, never Tone nodes.
       expect(createPanStage).toHaveBeenLastCalledWith(
         mockContext.rawContext,
         makeTrack().stereoPan,
-        2
+        'stereo'
       );
       expect(mockVolume.connect).toHaveBeenCalledWith(mockPanStage.input);
       expect(mockPanStage.output.connect).toHaveBeenCalledWith(mockMuteGain);
@@ -479,10 +479,20 @@ describe('ToneTrack', () => {
       expect(mockPanStage.setPan).toHaveBeenCalledWith(-0.4);
     });
 
-    it('setSourceChannelCount switches the pan law', () => {
+    it('builds a mono-law pan stage when no law is given', async () => {
+      const { createPanStage } = await import('@waveform-playlist/core');
+      new ToneTrack({ clips: [], track: makeTrack() });
+      expect(createPanStage).toHaveBeenLastCalledWith(
+        mockContext.rawContext,
+        makeTrack().stereoPan,
+        'mono'
+      );
+    });
+
+    it('setPanLaw switches the pan law', () => {
       const track = new ToneTrack({ clips: [], track: makeTrack() });
-      track.setSourceChannelCount(2);
-      expect(mockPanStage.setSourceChannelCount).toHaveBeenCalledWith(2);
+      track.setPanLaw('stereo');
+      expect(mockPanStage.setPanLaw).toHaveBeenCalledWith('stereo');
     });
 
     it('routes input → volume and mute → destination when there are no effects', () => {

@@ -4,7 +4,7 @@ import {
   clipEndTime,
   clipOffsetTime,
   clipDurationTime,
-  trackChannelCount,
+  trackPanLaw,
   trackKind,
 } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
@@ -145,7 +145,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       clips: clipInfos,
       track: trackObj,
       effects: options?.trackEffects?.(track.id),
-      channelCount: trackChannelCount(track),
+      panLaw: trackPanLaw(track),
     });
   }
 
@@ -362,13 +362,13 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
           gain: clip.gain,
         }));
 
-        // The pan law follows the track's clips (a stereo take on a mono
-        // track), exactly as on the native transport and in the export.
+        // The track's own pan law (#684), exactly as on the native transport
+        // and in the export; its clips do not change it.
         const audioUpdated = playout.replaceTrackClips(
           trackId,
           clipInfos,
           startTime,
-          trackChannelCount(track)
+          trackPanLaw(track)
         );
         if (audioUpdated) {
           playout.applyInitialSoloState();

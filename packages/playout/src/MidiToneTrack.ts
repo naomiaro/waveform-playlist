@@ -123,7 +123,7 @@ export class MidiToneTrack implements PlayableTrack {
     this.panStage = createPanStage(
       getContext().rawContext as BaseAudioContext,
       options.track.stereoPan,
-      1
+      'mono'
     );
     this.muteGain = new Gain(options.track.muted ? 0 : 1);
     this.volumeNode.connect(this.panStage.input);
