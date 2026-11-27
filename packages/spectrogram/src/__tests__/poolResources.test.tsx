@@ -1,9 +1,9 @@
 // #821: what the provider keeps in the worker pool. The pool is the one owner
 // of which audio it holds (`registeredAudioClipIds`); the provider asks it, so
-// a pool made again after a cleanup (StrictMode, an <Activity> hide, Fast
-// Refresh) is given the audio again. Audio is registered once per AudioBuffer,
-// only while a track that uses it draws a spectrogram, and released when no
-// such clip is left.
+// a pool made again after a cleanup that keeps the component (an <Activity>
+// hide and reveal, StrictMode) is given the audio again. Audio is registered
+// once per AudioBuffer, only while a track that uses it draws a spectrogram,
+// and released when no such clip is left.
 //
 // The provider with a fake worker pool that keeps its audio the way the real
 // one does (terminate clears it), and the four browser hooks it reads, faked.

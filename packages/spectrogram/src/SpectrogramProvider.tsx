@@ -119,9 +119,10 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     }
   }, [workerPoolSize]);
 
-  // Terminate the pool in every cleanup: an unmount, and also StrictMode's
-  // simulated one, a hidden <Activity> and Fast Refresh. What the pool held
-  // goes with it; the effects below ask the next pool what it holds (#821).
+  // Terminate the pool in every cleanup: an unmount, and also when React keeps
+  // the component and runs its effects again (a hidden <Activity> shown again,
+  // StrictMode). What the pool held goes with it; the effects below ask the
+  // next pool what it holds (#821).
   useEffect(() => {
     return () => {
       spectrogramWorkerRef.current?.terminate();
