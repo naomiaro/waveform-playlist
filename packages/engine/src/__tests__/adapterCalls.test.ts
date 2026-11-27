@@ -11,6 +11,7 @@ import type { ClipTrack } from '@waveform-playlist/core';
 import { PlaylistEngine } from '../PlaylistEngine';
 import type { EngineState } from '../types';
 import { recordingAdapter } from './helpers/recordingAdapter';
+import { withoutViewFields } from './helpers/viewFields';
 import type {
   AdapterCall,
   RecordingAdapterOptions,
@@ -585,6 +586,11 @@ describe('what the adapter is handed, and when', () => {
   // Rule (#812, immutability): nothing is written into a track after it was
   // sent, so "the stored object" is shown by identity with getState().tracks.
   // (Before: by a later in-place mixer write landing on the sent object.)
+  // Rule (review of #930, view fields): the adapter is given the stored track
+  // without core's TRACK_VIEW_FIELDS, a copy of the track object that shares
+  // its clips. So "the stored object" is shown by its clips array, the same
+  // object, and by the copy equalling the stored track without those fields.
+  // (Before: the adapter was given the stored track object itself.)
   it('an undo sends the restored track, and it is the stored object', () => {
     const { adapter, engine } = setup();
     engine.moveClip('A', 'a1', 1000);
@@ -592,7 +598,8 @@ describe('what the adapter is handed, and when', () => {
     engine.undo();
     const sent = sentTrack(adapter.rawCalls[0]);
     expect(sent.clips[0].startSample).toBe(0);
-    expect(sent).toBe(engine.getState().tracks[0]);
+    expect(sent.clips).toBe(engine.getState().tracks[0].clips);
+    expect(sent).toEqual(withoutViewFields(engine.getState().tracks[0]));
   });
 
   it('a mixer write leaves the object the adapter was sent as it was; the next state has a new one', () => {
@@ -604,6 +611,11 @@ describe('what the adapter is handed, and when', () => {
     expect(engine.getState().tracks[0].volume).toBe(0.3);
   });
 
+  // Rule (review of #930, view fields): the adapter is given the stored track
+  // without core's TRACK_VIEW_FIELDS, a copy of the track object that shares
+  // its clips. So "the stored object" is shown by its clips array, the same
+  // object, and by the copy equalling the stored track without those fields.
+  // (Before: the adapter was given the stored track object itself.)
   it('addTrack and updateTrack(id, track) send a track whose clips have ticks, and it is the stored object', () => {
     const { adapter, engine } = setup();
     engine.addTrack(track('C', [clip('c1', 48000)]));
@@ -612,14 +624,25 @@ describe('what the adapter is handed, and when', () => {
     const updated = sentTrack(adapter.rawCalls[1]);
     expect(added.clips[0].startTick).toBe(1920);
     expect(updated.clips[0].startTick).toBe(1920);
-    expect(added).toBe(engine.getState().tracks[2]);
-    expect(updated).toBe(engine.getState().tracks[0]);
+    expect(added.clips).toBe(engine.getState().tracks[2].clips);
+    expect(added).toEqual(withoutViewFields(engine.getState().tracks[2]));
+    expect(updated.clips).toBe(engine.getState().tracks[0].clips);
+    expect(updated).toEqual(withoutViewFields(engine.getState().tracks[0]));
   });
 
-  it('setTracks sends the stored array', () => {
+  // Rule (review of #930, view fields): the adapter is given the stored track
+  // without core's TRACK_VIEW_FIELDS, a copy of the track object that shares
+  // its clips. So "the stored object" is shown by its clips array, the same
+  // object, and by the copy equalling the stored track without those fields.
+  // (Before: the adapter was given the stored track object itself.)
+  it('setTracks sends the stored tracks', () => {
     const { adapter, engine } = setup();
     engine.setTracks(fixture());
-    expect(adapter.rawCalls[0].args[0]).toBe(engine.getState().tracks);
+    const sent = adapter.rawCalls[0].args[0] as ClipTrack[];
+    const stored = engine.getState().tracks;
+    expect(sent.map((t) => t.clips)).toEqual(stored.map((t) => t.clips));
+    sent.forEach((t, i) => expect(t.clips).toBe(stored[i].clips));
+    expect(sent).toEqual(stored.map(withoutViewFields));
   });
 
   it.each([

@@ -8,7 +8,8 @@
  * Not what a clip refers to (its AudioBuffer, peaks, fades, notes).
  */
 
-import type { ArrangementTrack } from '@waveform-playlist/core';
+/** What is frozen: a track with its clips (also one without its view fields, an adapter's). */
+type FreezableTrack = { readonly clips: readonly object[] };
 
 declare const process: { env: { NODE_ENV?: string } };
 
@@ -26,7 +27,7 @@ export function isDevelopmentBuild(): boolean {
 }
 
 /** Freeze one track with its clips. A track that is already frozen is done. */
-export function freezeTrackInDevelopment<T extends ArrangementTrack>(track: T): T {
+export function freezeTrackInDevelopment<T extends FreezableTrack>(track: T): T {
   if (!isDevelopmentBuild() || Object.isFrozen(track)) return track;
   for (const clip of track.clips) Object.freeze(clip);
   Object.freeze(track.clips);
@@ -34,7 +35,7 @@ export function freezeTrackInDevelopment<T extends ArrangementTrack>(track: T): 
 }
 
 /** Freeze a tracks array and every track in it. */
-export function freezeTracksInDevelopment<T extends readonly ArrangementTrack[]>(tracks: T): T {
+export function freezeTracksInDevelopment<T extends readonly FreezableTrack[]>(tracks: T): T {
   if (!isDevelopmentBuild()) return tracks;
   for (const track of tracks) freezeTrackInDevelopment(track);
   return Object.freeze(tracks);

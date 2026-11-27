@@ -12,7 +12,7 @@ A loading clip is held like any clip (copied on its way in, part of the undo ste
 
 Breaking in the engine:
 
-- `getState().tracks` and what a `PlayoutAdapter` is sent are the engine's own objects (the arrangement's tracks with the current mix in their fields), shared with the undo history, typed `readonly ClipTrack[]` and frozen outside production builds. Copy before changing.
+- `getState().tracks` are the engine's own objects (the arrangement's tracks with the current mix in their fields), shared with the undo history, typed `readonly ClipTrack[]` and frozen outside production builds; what a `PlayoutAdapter` is sent is those tracks without their view fields (`PlayoutTrack`), sharing their clips, and frozen the same way. Copy before changing.
 - A track's `volume`, `muted`, `soloed` and `pan` fields set its mix only when its id has no mixer entry. `setTracks` keeps the mix of an id that is in the tracks it replaces and `updateTrack` keeps the track's mix; use the four setters to change it.
 - Undo, redo and `abortTransaction` send the adapter only the tracks that differ. Whether the same tracks are there before and after is decided by track id, not by count; when they are not, the adapter gets `setTracks`.
 - The selected track id is cleared when an undo, a redo or an abort takes its track away, and when `updateTrack` gives the track a new id (before: only by `removeTrack`). `setTracks` leaves it alone, as before.
