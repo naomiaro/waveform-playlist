@@ -229,12 +229,29 @@ describe('SpectrogramSettingsModal', () => {
 });
 
 // #814: Apply sends only what the user changed; every other field of the
-// config, and the colour map, go back as they came in.
+// config, and the colour map, go back as they came in. An Apply that changed
+// nothing calls no onApply (it would be an undo step that does nothing).
 describe('SpectrogramSettingsModal: Apply changes only what was edited (#814)', () => {
   const apply = () => fireEvent.click(screen.getByRole('button', { name: 'Apply' }));
   const maxFrequency = () => screen.getByLabelText('Max Frequency (Hz)') as HTMLInputElement;
 
-  it('Apply with no edit gives back the config it was given, fields the form does not show included', () => {
+  it('Apply with no edit only closes: onApply is not called', () => {
+    const { onApply, onClose } = renderModal({ config: { fftSize: 1024 }, colorMap: 'inferno' });
+    apply();
+    expect(onApply).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('a field set back to the value it had is no edit', () => {
+    const { onApply, selects } = renderModal({ config: { windowFunction: 'hamming' } });
+    fireEvent.change(selects()[3], { target: { value: 'blackman' } });
+    fireEvent.change(selects()[3], { target: { value: 'hamming' } });
+    fireEvent.change(selects()[5], { target: { value: 'magma' } }); // the colour map it had
+    apply();
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it('an edit keeps the fields the form does not show', () => {
     const config: SpectrogramConfig = {
       fftSize: 1024,
       alpha: 0.6,
@@ -242,9 +259,10 @@ describe('SpectrogramSettingsModal: Apply changes only what was edited (#814)', 
       labelsColor: '#abcdef',
       labelsBackground: 'rgba(0, 0, 0, 0.3)',
     };
-    const { onApply } = renderModal({ config, colorMap: 'inferno' });
+    const { onApply, numbers } = renderModal({ config, colorMap: 'inferno' });
+    fireEvent.change(numbers()[2], { target: { value: '60' } }); // range
     apply();
-    expect(onApply).toHaveBeenCalledWith(config, 'inferno');
+    expect(onApply).toHaveBeenCalledWith({ ...config, rangeDb: 60 }, 'inferno');
   });
 
   it('an edit is added to the config, and nothing else is written', () => {
@@ -256,11 +274,12 @@ describe('SpectrogramSettingsModal: Apply changes only what was edited (#814)', 
   });
 
   it('with no maxFrequency, the field shows half the sample rate and Apply leaves it unset', () => {
-    const { onApply } = renderModal({ config: {}, sampleRate: 48000 });
+    const { onApply, numbers } = renderModal({ config: {}, sampleRate: 48000 });
     expect(maxFrequency().value).toBe('24000');
     expect(maxFrequency().max).toBe('24000');
+    fireEvent.change(numbers()[3], { target: { value: '35' } }); // gain
     apply();
-    expect(onApply.mock.lastCall?.[0]).toEqual({});
+    expect(onApply.mock.lastCall?.[0]).toEqual({ gainDb: 35 });
   });
 
   it('with no maxFrequency and no sample rate, the field is empty', () => {
@@ -287,9 +306,10 @@ describe('SpectrogramSettingsModal: Apply changes only what was edited (#814)', 
       [0, 0, 0],
       [255, 255, 255],
     ];
-    const { onApply, selects } = renderModal({ colorMap: custom });
+    const { onApply, selects, numbers } = renderModal({ colorMap: custom });
     const colorMap = selects()[5];
     expect(colorMap.selectedOptions[0].textContent).toBe('custom');
+    fireEvent.change(numbers()[3], { target: { value: '35' } }); // gain
     apply();
     expect(onApply.mock.lastCall?.[1]).toBe(custom);
   });

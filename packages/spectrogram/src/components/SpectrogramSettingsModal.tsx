@@ -16,6 +16,7 @@ export interface SpectrogramSettingsModalProps {
   /**
    * Called on Apply with the config it was given plus the fields the user
    * changed, and the colour map (the one given unless the user picked one).
+   * Not called when nothing was changed: Apply then only closes.
    */
   onApply: (config: SpectrogramConfig, colorMap: ColorMapValue) => void;
   /**
@@ -178,7 +179,15 @@ const SettingsForm: React.FC<SettingsFormProps> = ({
   const colorMapValue = editedColorMap ?? (isCustomColorMap ? CUSTOM_COLOR_MAP : colorMap);
 
   const handleApply = () => {
-    onApply({ ...config, ...edits }, editedColorMap ?? colorMap);
+    // A field set back to the value it had is no change. With none, Apply
+    // only closes: an onApply would be an undo step that changes nothing.
+    const configChanged = (Object.keys(edits) as Array<keyof SpectrogramConfig>).some(
+      (key) => edits[key] !== config[key]
+    );
+    const colorMapChanged = editedColorMap !== undefined && editedColorMap !== colorMap;
+    if (configChanged || colorMapChanged) {
+      onApply({ ...config, ...edits }, editedColorMap ?? colorMap);
+    }
     onClose();
   };
 

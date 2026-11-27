@@ -4710,7 +4710,7 @@ try {
 
 The track menu, `useTrack().setRenderMode` and the spectrogram settings dialog change the track in the arrangement: its `renderMode`, `spectrogramConfig` and `spectrogramColorMap`. `SpectrogramProvider` keeps no per-track overrides of its own. What a consumer sees:
 
-- Each choice is an undo step, and clears the redo history like any edit. Choosing the mode a track already has changes nothing.
+- Each choice is an undo step, and clears the redo history like any edit. Choosing the mode a track already has changes nothing, and so does an Apply in the settings dialog that changed nothing.
 - A change the app makes to the track with `arrangement.updateTrack` after a choice in the menu is drawn. Before, the menu's override won for good.
 - `arrangement.getTracks()` holds the choices. `arrangement.setTracks(…)` replaces them with the tracks it is given (before, a choice survived it by track id), and a track added with the id of a removed one starts from its own fields.
 
