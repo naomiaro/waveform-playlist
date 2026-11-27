@@ -5,7 +5,7 @@
  * sample rate, a clip of the wrong kind refused. Pure functions; the editor
  * calls the arrangement.
  */
-import { createClip, createTrack } from '@waveform-playlist/core';
+import { createClip, createTrack, isDecidedPanLaw } from '@waveform-playlist/core';
 import type {
   ArrangementTrack,
   AudioClip,
@@ -189,7 +189,12 @@ export function buildArrangementTrack(
     else clips.push(isMidi ? buildMidiClip(identified, sampleRate) : buildLoadingClip(identified));
     return identified;
   });
-  const base = createTrack({ name: descriptor.name, kind: descriptor.kind, clips: [], ...mix });
+  const { panLaw, ...fields } = mix;
+  const base = {
+    ...createTrack({ name: descriptor.name, kind: descriptor.kind, clips: [], ...fields }),
+    // The law the track enters with (#684); 'auto' is the arrangement's default.
+    ...(isDecidedPanLaw(panLaw) && { panLaw }),
+  };
   const track: ArrangementTrack = { ...base, id: trackId, clips };
   return { track, descriptor: changed ? { ...descriptor, clips: descClips } : descriptor, refused };
 }

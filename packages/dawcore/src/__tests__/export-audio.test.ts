@@ -545,14 +545,33 @@ describe('exportAudioImpl — track signal order (#660)', () => {
 describe('exportAudioImpl — pan stage (#669)', () => {
   const stereoBuffer = { duration: 4, sampleRate: 48000, numberOfChannels: 2 };
   const monoBuffer = { duration: 4, sampleRate: 48000, numberOfChannels: 1 };
-  function hostWith(clips: unknown[], pan = 0) {
+  function hostWith(clips: unknown[], pan = 0, panLaw?: 'auto' | 'mono' | 'stereo') {
     return makeHost({
       tracks: [
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        { id: 't', volume: 1, pan, muted: false, soloed: false, clips: clips as any },
+        {
+          id: 't',
+          volume: 1,
+          pan,
+          muted: false,
+          soloed: false,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          clips: clips as any,
+          ...(panLaw && { panLaw }),
+        },
       ],
     });
   }
+
+  it("the track's own law wins over its clips (#684)", async () => {
+    await exportAudioImpl(hostWith([makeClip({ audioBuffer: monoBuffer })], 0, 'stereo'));
+    await exportAudioImpl(hostWith([makeClip({ audioBuffer: stereoBuffer })], 0, 'mono'));
+    expect(panStages.map((stage) => stage.panLaw)).toEqual(['stereo', 'mono']);
+  });
+
+  it("a track whose law is 'auto' takes it from its clips", async () => {
+    await exportAudioImpl(hostWith([makeClip({ audioBuffer: stereoBuffer })], 0, 'auto'));
+    expect(panStages[0].panLaw).toBe('stereo');
+  });
 
   it('passes the track pan to the stage', async () => {
     await exportAudioImpl(hostWith([makeClip({ audioBuffer: monoBuffer })], -0.25));

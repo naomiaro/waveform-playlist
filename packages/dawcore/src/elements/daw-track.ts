@@ -1,7 +1,7 @@
 import { LitElement } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { PropertyValues } from 'lit';
-import type { RenderMode, SpectrogramConfig, TrackKind } from '@waveform-playlist/core';
+import type { PanLaw, RenderMode, SpectrogramConfig, TrackKind } from '@waveform-playlist/core';
 import type { EffectState as TrackEffectState, SerializedEffectEntry } from '../effects/types';
 import { normalizeRenderMode } from '../types';
 import type { DawTrackUpdateDetail } from '../events';
@@ -11,11 +11,13 @@ import {
   setCustomState,
   type TrackLinkValues,
 } from '../interactions/element-links';
+import { declaredPanLaw } from '../utils/track-mix';
 
 /** The properties whose change the editor hears about (`daw-track-update`). */
 const TRACK_PROPS: readonly string[] = [
   'volume',
   'pan',
+  'panLaw',
   'muted',
   'soloed',
   'src',
@@ -82,6 +84,23 @@ export class DawTrackElement extends LitElement {
   set pan(value: number) {
     this._request('pan', value);
   }
+  /**
+   * The track's pan law (#684): `'mono'` (equal power, −3 dB per side at
+   * centre) or `'stereo'` (unity at centre, panning folds one channel into
+   * the other). `pan-law` declares the law the track enters with; without
+   * it the track's first decoded audio decides, and the track then keeps
+   * that law whatever clips follow. Live: reads the arrangement's value
+   * (`'auto'` while the track has no audio), and the editor writes no
+   * attribute. Setting `'mono'` or `'stereo'` on an entered track is a
+   * request (an undo step); `'auto'` there changes nothing.
+   */
+  @property({ attribute: 'pan-law', noAccessor: true })
+  get panLaw(): PanLaw {
+    return this._linked('panLaw');
+  }
+  set panLaw(value: PanLaw) {
+    this._request('panLaw', declaredPanLaw(value));
+  }
   /** The stored mute (a take's mute is not shown here). */
   @property({ type: Boolean, noAccessor: true })
   get muted(): boolean {
@@ -104,7 +123,14 @@ export class DawTrackElement extends LitElement {
   }
 
   /** What the page declared: the attributes, and a property set before the track entered. */
-  private _declared: TrackLinkValues = { name: '', volume: 1, pan: 0, muted: false, soloed: false };
+  private _declared: TrackLinkValues = {
+    name: '',
+    volume: 1,
+    pan: 0,
+    panLaw: 'auto',
+    muted: false,
+    soloed: false,
+  };
   private _fromAttribute = false;
   private _internals: ElementInternals | null = this.attachInternals?.() ?? null;
 

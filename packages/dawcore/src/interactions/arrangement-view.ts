@@ -17,7 +17,13 @@ interface Cached {
 const views = new WeakMap<ArrangementTrack, Cached>();
 
 function sameMix(a: TrackMixerValues, b: TrackMixerValues): boolean {
-  return a.volume === b.volume && a.pan === b.pan && a.muted === b.muted && a.soloed === b.soloed;
+  return (
+    a.volume === b.volume &&
+    a.pan === b.pan &&
+    a.muted === b.muted &&
+    a.soloed === b.soloed &&
+    a.panLaw === b.panLaw
+  );
 }
 
 /**
@@ -39,6 +45,8 @@ export function loadedTrack(
     pan: mix.pan,
     muted: mix.muted || recording,
     soloed: mix.soloed,
+    // What both exports pan the track with (core's trackPanLaw, #684).
+    panLaw: mix.panLaw,
   };
   views.set(track, { mix: { ...mix }, recording, view });
   return view;

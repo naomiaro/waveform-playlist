@@ -1,4 +1,5 @@
 import { createPanStage, trackPanLaw } from '@waveform-playlist/core';
+import type { PanLaw } from '@waveform-playlist/core';
 import {
   createEffectInstance,
   ensureEffectPrepared,
@@ -34,6 +35,8 @@ interface ExportTrack {
   id: string;
   volume: number;
   pan: number;
+  /** The track's pan law (the arrangement's mixer value). `'auto'` or none: from its clips. */
+  panLaw?: PanLaw;
   muted: boolean;
   soloed: boolean;
   clips: ExportClip[];
