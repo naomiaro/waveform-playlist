@@ -781,7 +781,6 @@ describe('WaveformViewOptions (#689)', () => {
 
   it('the frequency labels of a spectrogram track are as tall as the row', async () => {
     const spectrogram = {
-      trackSpectrogramOverrides: new Map([['t1', { renderMode: 'spectrogram' }]]),
       spectrogramConfig: { labels: true },
       setTrackRenderMode: () => {},
       setTrackSpectrogramConfig: () => {},
@@ -791,15 +790,22 @@ describe('WaveformViewOptions (#689)', () => {
       getFrequencyScale: () => (f: number) => f,
     } as unknown as SpectrogramIntegration;
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
-    await mountMultitrack(() => (
-      <SpectrogramIntegrationContext value={spectrogram}>
-        <WaveformViewOptions waveHeight={64}>
-          <WaveformRoot>
-            <WaveformTracks />
-          </WaveformRoot>
-        </WaveformViewOptions>
-      </SpectrogramIntegrationContext>
-    ));
+    await mountMultitrack(
+      () => (
+        <SpectrogramIntegrationContext value={spectrogram}>
+          <WaveformViewOptions waveHeight={64}>
+            <WaveformRoot>
+              <WaveformTracks />
+            </WaveformRoot>
+          </WaveformViewOptions>
+        </SpectrogramIntegrationContext>
+      ),
+      {
+        tracks: TRACKS.map((t) =>
+          t.id === 't1' ? { ...t, renderMode: 'spectrogram' as const } : t
+        ),
+      }
+    );
     // The labels canvas is the one 72 px wide; the channels' canvases are as
     // wide as their clip.
     const labels = [...document.querySelectorAll('canvas')].filter(

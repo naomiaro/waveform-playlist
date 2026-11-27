@@ -4,7 +4,6 @@ import {
   type SpectrogramConfig,
   type ColorMapValue,
   type RenderMode,
-  type TrackSpectrogramOverrides,
 } from '@waveform-playlist/core';
 import { computePaddedFftRange } from '@dawcore/spectrogram';
 
@@ -187,12 +186,9 @@ export function computeChunkSampleRange({
   });
 }
 
-/** Resolve a track's effective render mode: override → track → `'waveform'`. */
-export function resolveRenderMode(
-  override: TrackSpectrogramOverrides | undefined,
-  trackRenderMode: RenderMode | undefined
-): RenderMode {
-  return override?.renderMode ?? trackRenderMode ?? 'waveform';
+/** Resolve a track's effective render mode: the track's own, else `'waveform'`. */
+export function resolveRenderMode(trackRenderMode: RenderMode | undefined): RenderMode {
+  return trackRenderMode ?? 'waveform';
 }
 
 /**

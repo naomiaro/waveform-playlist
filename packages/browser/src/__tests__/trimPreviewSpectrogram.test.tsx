@@ -61,7 +61,6 @@ if (typeof globalThis.requestAnimationFrame === 'undefined') {
 }
 
 const INTEGRATION: SpectrogramIntegration = {
-  trackSpectrogramOverrides: new Map(),
   setTrackRenderMode: () => {},
   setTrackSpectrogramConfig: () => {},
   registerSpectrogramCanvas: (reg: SpectrogramCanvasRegistration) => {

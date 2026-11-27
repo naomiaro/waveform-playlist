@@ -5,5 +5,9 @@ declare module 'styled-components' {
     timescaleBackgroundColor?: string;
     textColor?: string;
     waveProgressColor?: string;
+    buttonBackground?: string;
+    buttonText?: string;
+    buttonBorder?: string;
+    buttonHoverBackground?: string;
   }
 }

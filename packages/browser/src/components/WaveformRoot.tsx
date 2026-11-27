@@ -91,18 +91,9 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
     const helpers = new Map<string, SpectrogramTrackHelpers>();
     if (!spectrogram) return helpers;
     tracks.forEach((track) => {
-      const mode = trackRenderMode(
-        track,
-        spectrogram.trackSpectrogramOverrides.get(track.id)?.renderMode
-      );
-      if (mode === 'waveform') return;
-      const overrides = spectrogram.trackSpectrogramOverrides.get(track.id);
-      const cm =
-        overrides?.colorMap ??
-        track.spectrogramColorMap ??
-        spectrogram.spectrogramColorMap ??
-        'viridis';
-      const cfg = overrides?.config ?? track.spectrogramConfig ?? spectrogram.spectrogramConfig;
+      if (trackRenderMode(track) === 'waveform') return;
+      const cm = track.spectrogramColorMap ?? spectrogram.spectrogramColorMap ?? 'viridis';
+      const cfg = track.spectrogramConfig ?? spectrogram.spectrogramConfig;
       helpers.set(track.id, {
         colorLUT: spectrogram.getColorMap(cm),
         frequencyScaleFn: spectrogram.getFrequencyScale(cfg?.frequencyScale ?? 'mel'),
@@ -112,19 +103,16 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
     return helpers;
   }, [tracks, spectrogram]);
 
-  // Render mode per track (see trackRenderMode): an audio track takes a
-  // spectrogram override, else its own mode, else a waveform. A MIDI track is
-  // drawn as a piano roll from its kind and has no render mode.
+  // Render mode per track (see trackRenderMode): an audio track's own mode,
+  // else a waveform. A MIDI track is drawn as a piano roll from its kind and
+  // has no render mode.
   const renderModeById = useMemo(() => {
     const modes = new Map<string, RenderMode>();
     tracks.forEach((track) => {
-      modes.set(
-        track.id,
-        trackRenderMode(track, spectrogram?.trackSpectrogramOverrides.get(track.id)?.renderMode)
-      );
+      modes.set(track.id, trackRenderMode(track));
     });
     return modes;
-  }, [tracks, spectrogram]);
+  }, [tracks]);
 
   // The recording, reduced to what the layout depends on: numbers that change
   // rarely, read through selectors. `recordingState` itself is usually a new
@@ -305,6 +293,9 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
     onClickWhileStopped: setCurrentTime,
   });
 
+  const settingsTrack =
+    settingsModalTrackId !== null ? tracks.find((t) => t.id === settingsModalTrackId) : undefined;
+
   return (
     <DevicePixelRatioProvider>
       {frame}
@@ -315,21 +306,14 @@ export const WaveformRoot: React.FC<WaveformRootProps> = ({ className, children 
             open={settingsModalTrackId !== null}
             onClose={closeSettingsModal}
             config={
-              settingsModalTrackId !== null
-                ? (spectrogram.trackSpectrogramOverrides.get(settingsModalTrackId)?.config ??
-                  tracks.find((t) => t.id === settingsModalTrackId)?.spectrogramConfig ??
-                  spectrogram.spectrogramConfig ??
-                  EMPTY_SPECTROGRAM_CONFIG)
-                : EMPTY_SPECTROGRAM_CONFIG
+              settingsTrack?.spectrogramConfig ??
+              spectrogram.spectrogramConfig ??
+              EMPTY_SPECTROGRAM_CONFIG
             }
             colorMap={
-              settingsModalTrackId !== null
-                ? (spectrogram.trackSpectrogramOverrides.get(settingsModalTrackId)?.colorMap ??
-                  tracks.find((t) => t.id === settingsModalTrackId)?.spectrogramColorMap ??
-                  spectrogram.spectrogramColorMap ??
-                  'viridis')
-                : 'viridis'
+              settingsTrack?.spectrogramColorMap ?? spectrogram.spectrogramColorMap ?? 'viridis'
             }
+            sampleRate={sampleRate}
             onApply={(newConfig, newColorMap) => {
               if (settingsModalTrackId !== null) {
                 spectrogram.setTrackSpectrogramConfig(settingsModalTrackId, newConfig, newColorMap);

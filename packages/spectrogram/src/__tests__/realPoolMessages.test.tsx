@@ -24,6 +24,7 @@ interface WorkerRecord {
 }
 
 const fake = vi.hoisted(() => ({
+  arrangement: { updateTrack() {} },
   workers: [] as WorkerRecord[],
   timeline: { tracks: [] as unknown[], isReady: true },
   values: [] as Array<{
@@ -75,6 +76,8 @@ vi.mock('@waveform-playlist/browser', () => ({
   usePlaylistView: () => ({ mono: false }),
   usePlaylistZoom: () => ({ samplesPerPixel: 100 }),
   usePlaylistTimeline: () => fake.timeline,
+  // One object, as the real hook returns.
+  useArrangement: () => fake.arrangement,
 }));
 
 import { SpectrogramProvider } from '../SpectrogramProvider';

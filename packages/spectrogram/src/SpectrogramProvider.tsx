@@ -4,7 +4,7 @@ import {
   type SpectrogramConfig,
   type ColorMapValue,
   type RenderMode,
-  type TrackSpectrogramOverrides,
+  type ArrangementTrack,
   type SpectrogramCanvasRegistration,
 } from '@waveform-playlist/core';
 import {
@@ -38,6 +38,7 @@ import {
   type SpectrogramIntegration,
 } from '@waveform-playlist/browser';
 import {
+  useArrangement,
   usePlaybackControls,
   usePlaylistView,
   usePlaylistZoom,
@@ -65,11 +66,9 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
   const { samplesPerPixel } = usePlaylistZoom();
   const { tracks } = usePlaylistTimeline();
   const { scrollContainerRef } = usePlaybackControls();
-
-  // State
-  const [trackSpectrogramOverrides, setTrackSpectrogramOverrides] = useState<
-    Map<string, TrackSpectrogramOverrides>
-  >(() => new Map());
+  // The owner of each track's render mode, spectrogram config and colour map
+  // (#814): the setters below change the track, and everything here reads it.
+  const arrangement = useArrangement();
 
   // OffscreenCanvas registry for worker-rendered spectrograms
   const spectrogramCanvasRegistryRef = useRef<
@@ -136,7 +135,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
   // Not gated on the playlist's isReady: a track whose audio is decoded draws
   // while others still load, and its FFT requests would carry its audio.
   useEffect(() => {
-    const wanted = spectrogramAudio(tracks, trackSpectrogramOverrides, audioKeyOf);
+    const wanted = spectrogramAudio(tracks, audioKeyOf);
     // Nothing wanted and no pool yet: nothing to release, and no pool to make.
     const pool = wanted.size > 0 ? ensureWorkerPool() : spectrogramWorkerRef.current;
     if (!pool) return;
@@ -148,7 +147,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     for (const key of held) {
       if (!wanted.has(key)) pool.unregisterAudioData(key);
     }
-  }, [tracks, trackSpectrogramOverrides, audioKeyOf, ensureWorkerPool]);
+  }, [tracks, audioKeyOf, ensureWorkerPool]);
 
   // Main spectrogram computation effect
   useEffect(() => {
@@ -156,11 +155,10 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
 
     const currentKeys = new Map<string, string>();
     tracks.forEach((track) => {
-      const override = trackSpectrogramOverrides.get(track.id);
-      const mode = resolveRenderMode(override, track.renderMode);
+      const mode = resolveRenderMode(track.renderMode);
       if (mode === 'waveform') return;
-      const cfg = override?.config ?? track.spectrogramConfig ?? spectrogramConfig;
-      const cm = override?.colorMap ?? track.spectrogramColorMap ?? spectrogramColorMap;
+      const cfg = track.spectrogramConfig ?? spectrogramConfig;
+      const cm = track.spectrogramColorMap ?? spectrogramColorMap;
       currentKeys.set(track.id, buildConfigKey({ mode, cfg, cm, mono }));
     });
 
@@ -204,8 +202,7 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     }> = [];
 
     tracks.forEach((track) => {
-      const override = trackSpectrogramOverrides.get(track.id);
-      const mode = resolveRenderMode(override, track.renderMode);
+      const mode = resolveRenderMode(track.renderMode);
       if (mode === 'waveform') return;
 
       const trackConfigChanged =
@@ -215,9 +212,8 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
         track.clips.some((clip) => spectrogramCanvasRegistryRef.current.has(clip.id));
       if (!trackConfigChanged && !hasRegisteredCanvases) return;
 
-      const cfg = override?.config ?? track.spectrogramConfig ?? spectrogramConfig ?? {};
-      const cm =
-        override?.colorMap ?? track.spectrogramColorMap ?? spectrogramColorMap ?? 'viridis';
+      const cfg = track.spectrogramConfig ?? spectrogramConfig ?? {};
+      const cm = track.spectrogramColorMap ?? spectrogramColorMap ?? 'viridis';
 
       for (const clip of track.clips) {
         if (!clip.audioBuffer) continue;
@@ -568,7 +564,6 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     mono,
     spectrogramConfig,
     spectrogramColorMap,
-    trackSpectrogramOverrides,
     samplesPerPixel,
     spectrogramCanvasVersion,
     scrollContainerRef,
@@ -576,32 +571,27 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
     ensureWorkerPool,
   ]);
 
-  // Setters
-  const setTrackRenderMode = useCallback((trackId: string, mode: RenderMode) => {
-    setTrackSpectrogramOverrides((prev) => {
-      const next = new Map(prev);
-      const existing = next.get(trackId);
-      next.set(trackId, { ...existing, renderMode: mode });
-      return next;
-    });
-  }, []);
+  // Setters: each a change of the track in the arrangement, so an undo step
+  // (#814). Returning the track as it is changes nothing and pushes no step.
+  const setTrackRenderMode = useCallback(
+    (trackId: string, mode: RenderMode) => {
+      arrangement.updateTrack(trackId, (track: ArrangementTrack) =>
+        track.renderMode === mode ? track : { ...track, renderMode: mode }
+      );
+    },
+    [arrangement]
+  );
 
   const setTrackSpectrogramConfig = useCallback(
     (trackId: string, config: SpectrogramConfig, colorMap?: ColorMapValue) => {
-      setTrackSpectrogramOverrides((prev) => {
-        const next = new Map(prev);
-        const existing = next.get(trackId);
-        // No render mode of its own: the track's, or the one chosen in the
-        // menu, keeps applying (review of #926).
-        next.set(trackId, {
-          ...existing,
-          config,
-          colorMap: colorMap ?? existing?.colorMap,
-        });
-        return next;
-      });
+      // The render mode is left as it is (review of #926).
+      arrangement.updateTrack(trackId, (track: ArrangementTrack) => ({
+        ...track,
+        spectrogramConfig: config,
+        spectrogramColorMap: colorMap ?? track.spectrogramColorMap,
+      }));
     },
-    []
+    [arrangement]
   );
 
   const registerSpectrogramCanvas = useCallback(
@@ -703,7 +693,6 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
 
   const value: SpectrogramIntegration = useMemo(
     () => ({
-      trackSpectrogramOverrides,
       spectrogramConfig,
       spectrogramColorMap,
       setTrackRenderMode,
@@ -718,7 +707,6 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
       ) => (f: number, minF: number, maxF: number) => number,
     }),
     [
-      trackSpectrogramOverrides,
       spectrogramConfig,
       spectrogramColorMap,
       setTrackRenderMode,

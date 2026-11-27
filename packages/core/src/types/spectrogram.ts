@@ -96,15 +96,3 @@ export type SpectrogramDisplayConfig = Pick<
  * mode: it is always drawn as a piano roll.
  */
 export type RenderMode = 'waveform' | 'spectrogram' | 'both';
-
-/**
- * Per-track overrides for spectrogram rendering, each set only when the user
- * chose it: a render mode from the track menu, a config and colour map from
- * the settings. A field left out falls back to the track's own value.
- */
-export interface TrackSpectrogramOverrides {
-  /** Absent until a mode is chosen; the track's own `renderMode` applies meanwhile. */
-  renderMode?: RenderMode;
-  config?: SpectrogramConfig;
-  colorMap?: ColorMapValue;
-}

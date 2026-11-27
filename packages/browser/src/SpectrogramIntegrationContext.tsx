@@ -4,16 +4,24 @@ import type {
   SpectrogramConfig,
   ColorMapValue,
   RenderMode,
-  TrackSpectrogramOverrides,
   SpectrogramCanvasRegistration,
 } from '@waveform-playlist/core';
 import type { TrackMenuItem } from '@waveform-playlist/ui-components';
 
 export interface SpectrogramIntegration {
-  trackSpectrogramOverrides: Map<string, TrackSpectrogramOverrides>;
   spectrogramConfig?: SpectrogramConfig;
   spectrogramColorMap?: ColorMapValue;
+  /**
+   * Set a track's `renderMode` in the arrangement (an undo step; the mode the
+   * track already has changes nothing). The track menu and
+   * `useTrack().setRenderMode` call it.
+   */
   setTrackRenderMode: (trackId: string, mode: RenderMode) => void;
+  /**
+   * Set a track's `spectrogramConfig`, and its `spectrogramColorMap` when one
+   * is given, in the arrangement (an undo step). The settings dialog's Apply
+   * calls it.
+   */
   setTrackSpectrogramConfig: (
     trackId: string,
     config: SpectrogramConfig,
@@ -36,6 +44,8 @@ export interface SpectrogramIntegration {
     config: SpectrogramConfig;
     colorMap: ColorMapValue;
     onApply: (config: SpectrogramConfig, colorMap: ColorMapValue) => void;
+    /** The provider's sample rate (its audio context's); half of it is the default top frequency. */
+    sampleRate?: number;
   }>;
   /** Get color lookup table for a color map name */
   getColorMap: (name: ColorMapValue) => Uint8Array;

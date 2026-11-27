@@ -17,7 +17,6 @@ import type {
   SpectrogramCanvasRegistration,
   SpectrogramConfig,
   ColorMapValue,
-  TrackSpectrogramOverrides,
 } from '@waveform-playlist/core';
 
 interface FakePool {
@@ -27,6 +26,7 @@ interface FakePool {
 }
 
 const fake = vi.hoisted(() => ({
+  arrangement: { updateTrack() {} },
   timeline: { tracks: [] as unknown[], isReady: true },
   values: [] as Array<{
     setTrackRenderMode: (trackId: string, mode: RenderMode) => void;
@@ -35,7 +35,6 @@ const fake = vi.hoisted(() => ({
       config: SpectrogramConfig,
       colorMap?: ColorMapValue
     ) => void;
-    trackSpectrogramOverrides: Map<string, TrackSpectrogramOverrides>;
     registerSpectrogramCanvas: (reg: SpectrogramCanvasRegistration) => void;
   }>,
   pools: [] as FakePool[],
@@ -93,6 +92,10 @@ vi.mock('@waveform-playlist/browser', () => ({
   usePlaylistView: () => fake.view,
   usePlaylistZoom: () => fake.zoom,
   usePlaylistTimeline: () => fake.timeline,
+  // The setters' writes are covered with a real arrangement in
+  // choicesOnTheTrack.test.tsx; here the tracks are set by the test.
+  // One object, as the real hook returns.
+  useArrangement: () => fake.arrangement,
 }));
 
 import { SpectrogramProvider } from '../SpectrogramProvider';
@@ -238,22 +241,6 @@ describe('SpectrogramProvider sends audio only while a track draws a spectrogram
     expect(fake.pools).toEqual([]);
   });
 
-  it('switching a track to a spectrogram sends its audio, and back to waveform releases it', async () => {
-    setTracks([makeTrack('t1', 'waveform', [makeClip('c1', makeBuffer())])]);
-    render(
-      <SpectrogramProvider>
-        <div />
-      </SpectrogramProvider>
-    );
-    await settle();
-
-    await act(async () => latestValue().setTrackRenderMode('t1', 'both'));
-    expect(livePool().audio.size).toBe(1);
-
-    await act(async () => latestValue().setTrackRenderMode('t1', 'waveform'));
-    expect(livePool().audio.size).toBe(0);
-  });
-
   it.each([
     ['before', 'after'],
     ['after', 'before'],
@@ -278,61 +265,6 @@ describe('SpectrogramProvider sends audio only while a track draws a spectrogram
       expect(livePool().audio.size).toBe(1);
     }
   );
-});
-
-describe('Spectrogram settings write no render mode (review of #926)', () => {
-  it('applying settings to a track whose own mode is spectrogram keeps it a spectrogram', async () => {
-    setTracks([makeTrack('t1', 'spectrogram', [makeClip('c1', makeBuffer())])]);
-    render(
-      <SpectrogramProvider>
-        <div />
-      </SpectrogramProvider>
-    );
-    await settle();
-
-    await act(async () =>
-      latestValue().setTrackSpectrogramConfig('t1', { fftSize: 4096 }, 'magma')
-    );
-
-    const override = latestValue().trackSpectrogramOverrides.get('t1');
-    expect(override).toEqual({ config: { fftSize: 4096 }, colorMap: 'magma' });
-    expect(livePool().audio.size).toBe(1);
-  });
-
-  it('applying settings to a waveform track writes no render mode', async () => {
-    setTracks([makeTrack('t1', 'waveform', [makeClip('c1', makeBuffer())])]);
-    render(
-      <SpectrogramProvider>
-        <div />
-      </SpectrogramProvider>
-    );
-    await settle();
-
-    await act(async () => latestValue().setTrackSpectrogramConfig('t1', { fftSize: 4096 }));
-
-    expect(latestValue().trackSpectrogramOverrides.get('t1')?.renderMode).toBeUndefined();
-    expect(fake.pools).toEqual([]);
-  });
-
-  it('a mode chosen in the menu stays when settings are applied after it', async () => {
-    setTracks([makeTrack('t1', 'waveform', [makeClip('c1', makeBuffer())])]);
-    render(
-      <SpectrogramProvider>
-        <div />
-      </SpectrogramProvider>
-    );
-    await settle();
-
-    await act(async () => latestValue().setTrackRenderMode('t1', 'both'));
-    await act(async () => latestValue().setTrackSpectrogramConfig('t1', { fftSize: 4096 }));
-
-    expect(latestValue().trackSpectrogramOverrides.get('t1')).toEqual({
-      renderMode: 'both',
-      config: { fftSize: 4096 },
-      colorMap: undefined,
-    });
-    expect(livePool().audio.size).toBe(1);
-  });
 });
 
 describe('SpectrogramProvider registers each AudioBuffer once (#821)', () => {

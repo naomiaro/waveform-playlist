@@ -2472,7 +2472,11 @@ interface TrackContextValue {
   moveUp: () => void;
   /** Moves the track one position down. Nothing happens for the last track. */
   moveDown: () => void;
-  /** Nothing happens without a `<SpectrogramProvider>`. */
+  /**
+   * Sets the track's `renderMode` in the arrangement: an undo step (the mode
+   * the track already has changes nothing). Nothing happens without a
+   * `<SpectrogramProvider>`.
+   */
   setRenderMode: (mode: RenderMode) => void;
   /** Opens the spectrogram settings of this track. Nothing happens without a `<SpectrogramProvider>`. */
   openSpectrogramSettings: () => void;
@@ -3061,12 +3065,6 @@ interface SpectrogramData {
   data: Float32Array;                  // frameCount * frequencyBinCount (row-major)
   gainDb: number;
   rangeDb: number;
-}
-
-interface TrackSpectrogramOverrides {
-  renderMode?: RenderMode;  // set by setTrackRenderMode (the track menu); absent = the track's own renderMode
-  config?: SpectrogramConfig;
-  colorMap?: ColorMapValue;
 }
 
 // From @dawcore/spectrogram

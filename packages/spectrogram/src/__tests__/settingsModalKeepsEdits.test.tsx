@@ -93,7 +93,6 @@ const createAdapter = () =>
   }) as never;
 
 const INTEGRATION: SpectrogramIntegration = {
-  trackSpectrogramOverrides: new Map(),
   setTrackRenderMode: () => {},
   setTrackSpectrogramConfig: () => {},
   registerSpectrogramCanvas: () => {},
@@ -172,5 +171,42 @@ describe('spectrogram settings modal on a track with no config', () => {
     expect(samplesPerPixel).not.toBe(before);
 
     expect(fftSize().value).toBe('8192');
+  });
+});
+
+// #814: with no maxFrequency the field shows half the rate of the audio
+// context the provider plays with, which the drawing goes up to.
+describe('spectrogram settings modal: the default top frequency', () => {
+  it('shows half the sample rate of the adapter’s audio context', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const CONTEXT_RATE = 44100;
+    const adapterAt44k = () => {
+      const adapter = createAdapter() as unknown as { audioContext: { sampleRate: number } };
+      return { ...adapter, audioContext: { ...adapter.audioContext, sampleRate: CONTEXT_RATE } };
+    };
+    // No sampleRate prop: the provider learns the rate from the adapter.
+    const At44k: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+      const arrangement = useCreateArrangement(() => TRACKS);
+      return (
+        <WaveformPlaylistProvider arrangement={arrangement} createAdapter={adapterAt44k as never}>
+          {children}
+        </WaveformPlaylistProvider>
+      );
+    };
+
+    render(
+      <At44k>
+        <SpectrogramIntegrationProvider value={INTEGRATION}>
+          <Waveform />
+        </SpectrogramIntegrationProvider>
+      </At44k>
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Track menu' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open spectrogram settings' }));
+
+    const maxFrequency = screen.getByLabelText('Max Frequency (Hz)') as HTMLInputElement;
+    expect(maxFrequency.value).toBe(String(CONTEXT_RATE / 2));
   });
 });

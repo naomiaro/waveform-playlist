@@ -45,7 +45,7 @@ function MyEditor() {
 }
 ```
 
-`<SpectrogramProvider>` exposes one config + one color map at a time; per-track overrides come from that track's own `spectrogramConfig` / `spectrogramColorMap` fields, or via `<SpectrogramSettingsModal>` at runtime.
+`<SpectrogramProvider>` exposes one config + one color map at a time; per-track overrides come from that track's own `spectrogramConfig` / `spectrogramColorMap` fields, which the track menu and `<SpectrogramSettingsModal>` change at runtime (each change an undo step).
 
 ## Examples & Documentation
 
