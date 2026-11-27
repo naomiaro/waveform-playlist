@@ -47,7 +47,7 @@ Next:
 npm install @waveform-playlist/browser@next @waveform-playlist/playout@next @waveform-playlist/core@next tone @dnd-kit/react
 ```
 
-`tone`, `@waveform-playlist/playout` (the Tone.js engine) and `@dnd-kit/react` are peer dependencies of `browser`. So are `react`, `react-dom`, `styled-components`, `@dnd-kit/dom` and `@dnd-kit/abstract`, which npm installs for you (yarn classic does not). `@waveform-playlist/core` is listed because your own code imports from it.
+`tone`, `@waveform-playlist/playout` (the Tone.js engine) and `@dnd-kit/react` are peer dependencies of `browser`. So are `react`, `react-dom`, `styled-components`, `@dnd-kit/dom` and `@dnd-kit/abstract`, which npm 7 and later installs for you (Yarn does not). `@waveform-playlist/core` is listed because your own code imports from it.
 
 **On next, add `@next` to every `@waveform-playlist/*` and `@dawcore/*` package you install,** not only the ones above. A `latest` package beside `@next` ones can fail its own peer ranges (`annotations@latest` peers on `browser ^16`). The commands in the next docs carry the tag already.
 

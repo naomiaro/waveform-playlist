@@ -1692,7 +1692,7 @@ Since #848 the editor draws and lists what its arrangement holds and keeps no co
 
 ### Backwards-compat surface
 
-`editor.engine` remains exposed for power users who need to wire effects, taps, or analyzers (the master tap is `editor.adapter.transport.masterOutputNode`, not on the engine). Mutation methods on the engine are out of scope for the documented Web Component API.
+`editor.engine` remains exposed for power users who need to wire effects, taps, or analyzers (the master tap is `editor.adapter.masterOutputNode`, on the adapter, not on the engine). Mutation methods on the engine are out of scope for the documented Web Component API.
 
 ---
 
@@ -1925,7 +1925,7 @@ A mixer move is one step per gesture: one slider drag or key press in `<daw-trac
 
 Each undo step stores a frozen copy of `tracks[]` and the mix (by track id) before the operation. Undo restores the previous snapshot; redo re-applies the undone snapshot. No per-operation inverse logic — eliminates a class of bugs from incorrect reverse operations.
 
-The stack has a fixed default limit of **100 steps**, configurable via `engine.undoLimit` or `editor.undoLimit`. When the limit is reached, the oldest entry is dropped.
+The stack has a fixed default limit of **100 steps**, set with the `undoLimit` option of `createArrangement()` (read back as `arrangement.undoLimit` or `engine.undoLimit`; `editor.undoLimit` is not implemented, #466). When the limit is reached, the oldest entry is dropped.
 
 Any new structural edit clears the redo stack (standard behavior — you can't redo after making a new change). `clearHistory()` is called automatically when tracks are fully replaced via `setTracks()`, since old snapshots reference a different track set. `<daw-editor>` no longer calls `setTracks()` when a track loads (#848): loading never clears the history; the page's own `<daw-track>` elements that enter while it is empty are not steps.
 
