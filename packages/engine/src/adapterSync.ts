@@ -66,12 +66,6 @@ export class AdapterSync {
   >();
   /** Per track object of the arrangement that holds a loading clip: the track without them. */
   private _loadedMemo = new WeakMap<ArrangementTrack, ClipTrack>();
-  /** What the adapter is given for each projected track: the track without its view fields. */
-  private _playoutMemo = new WeakMap<ClipTrack, PlayoutTrack>();
-  private _playoutProjection: {
-    tracks: readonly ClipTrack[];
-    playout: readonly PlayoutTrack[];
-  } | null = null;
 
   constructor(
     private readonly _arrangement: ArrangementImpl,
@@ -98,14 +92,13 @@ export class AdapterSync {
     return tracks;
   }
 
-  /** `tracks()` as the adapter is given them: without the view fields. */
+  /**
+   * `tracks()` as the adapter is given them: without the view fields. Made
+   * for each send; nothing depends on the adapter's tracks keeping their
+   * identity between sends.
+   */
   private _playoutTracks(): readonly PlayoutTrack[] {
-    const tracks = this.tracks();
-    const cached = this._playoutProjection;
-    if (cached && cached.tracks === tracks) return cached.playout;
-    const playout = freezeTracksInDevelopment(tracks.map((track) => this._playout(track)));
-    this._playoutProjection = { tracks, playout };
-    return playout;
+    return freezeTracksInDevelopment(this.tracks().map((track) => this._playout(track)));
   }
 
   /** When an engine attaches: send the tracks that are there. With none, the adapter is in step as it is. */
@@ -323,21 +316,17 @@ export class AdapterSync {
     );
   }
 
+  /** A projected track without its view fields: a copy that shares its clips. */
+  private _playout(track: ClipTrack): PlayoutTrack {
+    const copy: Partial<Pick<ClipTrack, TrackViewField>> & PlayoutTrack = { ...track };
+    for (const field of TRACK_VIEW_FIELDS) delete copy[field];
+    return freezeTrackInDevelopment(copy);
+  }
+
   /**
    * One track with its current mixer values in its fields, muted while a
    * take records onto it (memoized per track object).
    */
-  /** A projected track without its view fields (memoized per track object). */
-  private _playout(track: ClipTrack): PlayoutTrack {
-    const known = this._playoutMemo.get(track);
-    if (known) return known;
-    const copy: Partial<Pick<ClipTrack, TrackViewField>> & PlayoutTrack = { ...track };
-    for (const field of TRACK_VIEW_FIELDS) delete copy[field];
-    const playout: PlayoutTrack = freezeTrackInDevelopment(copy);
-    this._playoutMemo.set(track, playout);
-    return playout;
-  }
-
   private _withMix(track: ClipTrack): ClipTrack {
     const values = this._arrangement.getMixer().get(track.id);
     const recording = this._recordingNow(track.id);

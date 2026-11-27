@@ -191,7 +191,7 @@ A track's `volume`, `muted`, `soloed` and `pan` fields are the mix it enters wit
 
 The mix holds an entry for each current track; each undo and redo step keeps the mix it had, so a removed track's entry is in the step from before the removal and comes back with it.
 
-`updateTrack(id, track)` calls the adapter only when the track plays differently from before. A track whose loaded clips are the same objects in the same order and whose own fields are unchanged is not sent; the undo step and the `statechange` are the same either way. Clips are compared by identity: a clip object this track already holds (one taken from this track in `getState().tracks` or `arrangement.getTracks()`) is kept as it is, and any other clip object, also one held by another track, is copied and counts as changed.
+`updateTrack(id, track)` calls the adapter only when the track plays differently from before. A track whose loaded clips are the same objects in the same order and whose own fields are unchanged, apart from the view fields (`TRACK_VIEW_FIELDS`: name, colour, height, render mode, spectrogram config and colour map), is not sent; the undo step and the `statechange` are the same either way. Clips are compared by identity: a clip object this track already holds (one taken from this track in `getState().tracks` or `arrangement.getTracks()`) is kept as it is, and any other clip object, also one held by another track, is copied and counts as changed.
 
 `updateTrack(id, track)` may give the track an ID no other track has. The track keeps its mix, and the adapter receives every track through `setTracks`.
 
@@ -500,7 +500,7 @@ A `src` is a URL string, a `Blob` or a `File`. A string is one source however ma
 - It cannot be edited. `moveClip()`, `trimClip()` and `splitClip()` on it log a console warning (`… is still loading and cannot be edited until its audio has loaded`) and change nothing; `getClipBounds()` returns `null` and `constrainTrimDelta()` returns `0`. A loaded clip that is moved or trimmed does not collide with it.
 - It is an audio clip, whatever else it carries. `createArrangement({ tracks })`, `setTracks()`, `addTrack()` and `updateTrack()` throw for a `kind: 'midi'` track that holds one, with the same error as for a MIDI track that holds a loaded audio clip, and change nothing.
 - An engine neither plays nor reports it. The tracks an adapter is sent and `getState().tracks` are each track without its loading clips, and `getState().duration` counts loaded clips only. Read `arrangement.getTracks()` to draw the clips that are still loading.
-- A change that leaves a track's loaded clips (the same objects in the same order) and its own fields as they were makes no adapter call for that track: adding, replacing or removing a loading clip, and an undo or a redo of that. The `statechange` is still emitted. `engine.updateTrack(id)` with no track always sends.
+- A change that leaves a track's loaded clips (the same objects in the same order) and its own fields other than the view fields as they were makes no adapter call for that track: adding, replacing or removing a loading clip, a change of a view field, and an undo or a redo of those. The `statechange` is still emitted. `engine.updateTrack(id)` with no track always sends.
 
 #### Which sources are loaded
 
@@ -660,7 +660,7 @@ class MyAudioAdapter implements PlayoutAdapter {
   setTracks(tracks: readonly PlayoutTrack[]): void {
     // Rebuild audio graph from tracks.
     // Read the tracks, never write to them. They carry no view fields (name,
-    // color, renderMode…): a change of those alone is never sent here.
+    // color, renderMode…): a change of those alone never causes a call.
   }
 
   play(startTime: number, endTime?: number): void {
@@ -833,7 +833,7 @@ The tracks are immutable. A change replaces the tracks array and only the track 
 
 - `setTracks()`, `addTrack()` and `updateTrack()` copy each track and clip they are given — your objects are not retained
 - `updateTrack()` keeps a clip object the track already holds, so a clip you did not replace is the same object afterwards
-- `getState().tracks`, `arrangement.getTracks()` and the tracks an adapter receives are **not** copies. They are typed `readonly ClipTrack[]` (`readonly ArrangementTrack[]` for `getTracks()`, which also holds the clips that are still loading)
+- `getState().tracks` and `arrangement.getTracks()` are **not** copies. They are typed `readonly ClipTrack[]` (`readonly ArrangementTrack[]` for `getTracks()`, which also holds the clips that are still loading). The tracks an adapter receives are copies without the view fields (core's `TRACK_VIEW_FIELDS`, typed `PlayoutTrack`) that share these clips, frozen the same way.
 - Outside production builds (`process.env.NODE_ENV` is not `'production'`; a page that loads the module with no bundler, and so has no `process`, counts as production) the tracks array, each track, its `clips` array and each clip are frozen, so a write throws in a module. What a clip refers to (its `AudioBuffer`, peaks, fades, notes) is not frozen
 
 To change a track, build a new one from it:

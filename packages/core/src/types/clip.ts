@@ -171,8 +171,8 @@ export interface LoadingClip {
  * The fields of a track that say how it is drawn, not how it plays. An
  * adapter is never given them (`PlayoutTrack`), and the engine makes no
  * adapter call for a change of these fields alone: on the native transport an
- * `updateTrack` restarts the track's sources, so a render-mode choice during
- * playback silenced it (review of #930). The one list; the engine reads it.
+ * `updateTrack` stops the track's playing sources (silent until its next
+ * clip), so a render-mode choice during playback silenced it (review of #930). The one list; the engine reads it.
  */
 export const TRACK_VIEW_FIELDS = [
   'name',

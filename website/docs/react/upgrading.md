@@ -3760,7 +3760,9 @@ Also:
 
 **Packages:** `@waveform-playlist/engine` (`PlayoutAdapter`), `@waveform-playlist/core` (`TRACK_VIEW_FIELDS`, `PlayoutTrack`), `@waveform-playlist/playout`, `@dawcore/transport`.
 
-The fields that say how a track is drawn are listed in core's `TRACK_VIEW_FIELDS`: `name`, `color`, `height`, `renderMode`, `spectrogramConfig`, `spectrogramColorMap`. The engine gives an adapter its tracks without them (core's `PlayoutTrack`), and a change of those fields alone makes no adapter call: a rename or a render-mode choice during playback no longer restarts the track's audio on the native transport. It is still an undo step and a `statechange`, and `getState().tracks` keeps the fields. The adapter's tracks are copies that share the engine's clips, so they are not the same objects as `getState().tracks`.
+The fields that say how a track is drawn are listed in core's `TRACK_VIEW_FIELDS`: `name`, `color`, `height`, `renderMode`, `spectrogramConfig`, `spectrogramColorMap`. The engine gives an adapter its tracks without them (core's `PlayoutTrack`), and a change of those fields alone makes no adapter call: a rename or a render-mode choice during playback no longer stops the track's audio on the native transport (it stayed silent until the track's next clip). It is still an undo step and a `statechange`, and `getState().tracks` keeps the fields. The adapter's tracks are copies that share the engine's clips, so they are not the same objects as `getState().tracks`.
+
+An adapter whose own methods still say `ClipTrack` keeps compiling (TypeScript checks method parameters bivariantly) and reads `undefined` for those fields at runtime; only the search below finds it.
 
 **Find:** in a `PlayoutAdapter` of your own, a read of `track.name`, `track.color`, `track.height`, `track.renderMode`, `track.spectrogramConfig` or `track.spectrogramColorMap` on a track the engine gave it; and a comparison of a given track with `engine.getState().tracks` by identity.
 
