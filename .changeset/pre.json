@@ -123,6 +123,7 @@
     "undo-during-drag-browser",
     "use-context-sweep",
     "use-midi-tracks-removed",
+    "view-fields-skip-adapter",
     "view-options",
     "visualization-memo-boundaries",
     "wam-gui-fallback-no-element",
