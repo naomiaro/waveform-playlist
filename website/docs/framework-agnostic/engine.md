@@ -287,6 +287,8 @@ engine.setTrackVolume(trackId: string, volume: number, options?: MixerChangeOpti
 engine.setTrackMute(trackId: string, muted: boolean, options?: MixerChangeOptions): void;
 engine.setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
 engine.setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
+// The pan law: 'mono' or 'stereo'. Any other value, 'auto' included, throws a TypeError
+engine.setTrackPanLaw(trackId: string, panLaw: 'mono' | 'stereo', options?: MixerChangeOptions): void;
 
 interface MixerChangeOptions {
   /** Changes with the same id, one after another, are one undo step. */
@@ -319,7 +321,7 @@ engine.commitTransaction(): void;
 engine.abortTransaction(): void; // put the tracks and the mix back as they were at beginTransaction()
 ```
 
-- Undo steps are made by `addTrack()`, `removeTrack()`, `updateTrack(id, track)`, `reorderTrack()`, `moveClip()`, `trimClip()`, `splitClip()`, `setTrackVolume()`, `setTrackMute()`, `setTrackSolo()` and `setTrackPan()`. `setTracks()` clears the history. `setTrackRecording()`, `setTempo()`, the master volume, selection, loop and zoom are not undo steps.
+- Undo steps are made by `addTrack()`, `removeTrack()`, `updateTrack(id, track)`, `reorderTrack()`, `moveClip()`, `trimClip()`, `splitClip()`, `setTrackVolume()`, `setTrackMute()`, `setTrackSolo()`, `setTrackPan()` and `setTrackPanLaw()`. `setTracks()` clears the history. `setTrackRecording()`, `setTempo()`, the master volume, selection, loop and zoom are not undo steps.
 - Undo, redo and an aborted transaction restore the tracks, the clips and the mix of the state they return to. Undoing a `removeTrack()` brings the track back with the mix it had; undoing an `updateTrack()` that gave a track a new ID brings back the old ID with the mix it had then. An undoable mixer change made inside a transaction is part of it, and an abort takes it back; one made with `{ undoable: false }` is written into the transaction's base as well, so an abort keeps it. An undo that changes only the mix increments `mixerVersion`, not `tracksVersion`.
 - `undo()` and `redo()` called while a transaction is open abort the transaction first.
 - `commitTransaction()` adds one undo step and emits `statechange` when the transaction changed something. When the tracks and the mix are back where the transaction began (the same track objects in the same order and the same mixer values; for example a track added during the transaction and then taken out with the arrangement's `removeTrack(id, { undoable: false })`. A clip moved away and back is not that: the clip is a new object), it adds no step and emits nothing. `clearHistory()` emits `statechange` when there was history. So `canUndo` and `canRedo` in the state are current.
@@ -418,7 +420,7 @@ Make track changes from an event handler (or a listener of `arrangement.sources`
 
 ### Changing
 
-The arrangement has the engine's track, clip, mixer, recording and history methods: `setTracks`, `addTrack`, `removeTrack`, `updateTrack`, `reorderTrack`, `moveClip`, `trimClip`, `splitClip`, `getClipBounds`, `constrainTrimDelta`, `setTrackVolume`, `setTrackMute`, `setTrackSolo`, `setTrackPan` (each with the same `options`), `setTrackRecording`, `undo`, `redo`, `clearHistory`, `beginTransaction`, `commitTransaction` and `abortTransaction`. The engine's methods call them, so a change made through either reaches the adapter and emits `statechange`.
+The arrangement has the engine's track, clip, mixer, recording and history methods: `setTracks`, `addTrack`, `removeTrack`, `updateTrack`, `reorderTrack`, `moveClip`, `trimClip`, `splitClip`, `getClipBounds`, `constrainTrimDelta`, `setTrackVolume`, `setTrackMute`, `setTrackSolo`, `setTrackPan`, `setTrackPanLaw` (each with the same `options`), `setTrackRecording`, `undo`, `redo`, `clearHistory`, `beginTransaction`, `commitTransaction` and `abortTransaction`. The engine's methods call them, so a change made through either reaches the adapter and emits `statechange`.
 
 Besides [loading audio](#loading-audio), three things are on the arrangement only:
 
@@ -858,7 +860,7 @@ Consumers can trust that `EngineState.selectionStart <= selectionEnd` and `loopS
 
 The `tracksVersion` field in `EngineState` is a monotonic counter that increments **only** on structural track changes: `setTracks`, `addTrack`, `removeTrack`, `reorderTrack`, `updateTrack(id, track)`, `moveClip`, `trimClip`, `splitClip`, `undo`, `redo`, an aborted transaction that had changed something, a `setTempo` that the adapter did not refuse (`setTempo` with the tempo the engine already has and no `atTick` returns before that), and an engine being built on an arrangement that has clips without a `startTick`, or whose ticks are in another `ppqn` (they are converted), and the audio of a loading clip in the current tracks arriving (see [Loading Audio](#loading-audio)). It does **not** increment on selection, zoom, master volume, or loop changes, on a change of the undo history alone (`commitTransaction`, `clearHistory`), nor on per-track mixer edits. Use it to skip expensive operations (like audio graph rebuilds or peak regeneration) when only non-structural state changed.
 
-Per-track mixer edits (`setTrackVolume`, `setTrackMute`, `setTrackSolo`, `setTrackPan`) instead bump a separate `mixerVersion` counter (and emit `statechange`). This lets a consumer refresh what it shows of the mix without re-running the structural work gated on `tracksVersion`. The split matters because mixer setters fire continuously during a volume/pan slider drag.
+Per-track mixer edits (`setTrackVolume`, `setTrackMute`, `setTrackSolo`, `setTrackPan`, `setTrackPanLaw`) instead bump a separate `mixerVersion` counter (and emit `statechange`). This lets a consumer refresh what it shows of the mix without re-running the structural work gated on `tracksVersion`. The split matters because mixer setters fire continuously during a volume/pan slider drag.
 
 ## Example: Vanilla JavaScript
 
@@ -1135,6 +1137,7 @@ interface Arrangement {
   setTrackMute(trackId: string, muted: boolean, options?: MixerChangeOptions): void;
   setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
   setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
+  setTrackPanLaw(trackId: string, panLaw: 'mono' | 'stereo', options?: MixerChangeOptions): void;
 
   // the take's mute: the tracks a take is recording onto (outside the history)
   readonly recordingTrackIds: ReadonlySet<string>;
@@ -1178,6 +1181,9 @@ interface PlayoutAdapter {
   setTrackMute(trackId: string, muted: boolean): void;
   setTrackSolo(trackId: string, soloed: boolean): void;
   setTrackPan(trackId: string, pan: number): void;
+  /** Optional. A track's pan law changed; 'auto' means "from the track's clips" (`trackPanLaw` from core).
+   *  Without it the engine sends the track again (`updateTrack`, else `setTracks`). */
+  setTrackPanLaw?(trackId: string, panLaw: 'auto' | 'mono' | 'stereo'): void;
   setLoop(enabled: boolean, start: number, end: number): void;
   dispose(): void;
 }

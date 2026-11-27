@@ -222,7 +222,7 @@ clip AudioBufferSourceNode
 
 Key design choices:
 - **Separate mute GainNode** — Volume and mute are independent. Unmuting restores the original volume.
-- **Gain-matrix pan stage, not a `StereoPannerNode`** — A `StereoPannerNode` picks its pan law from the layout it receives, which behind a pre-fader insert is the effects chain's output: a stereo effect on a mono track would be ~3 dB louder at centre. The stage (explicit-stereo input gain → splitter → four gains → merger) implements the same two laws but takes the law from the track's source channel count (`trackChannelCount(track)`), and always passes stereo through.
+- **Gain-matrix pan stage, not a `StereoPannerNode`** — A `StereoPannerNode` picks its pan law from the layout it receives, which behind a pre-fader insert is the effects chain's output: a stereo effect on a mono track would be ~3 dB louder at centre. The stage (explicit-stereo input gain → splitter → four gains → merger) implements the same two laws but takes the law from the track (`trackPanLaw(track)` from core: the track's own `panLaw`, else the law of its clips), and always passes stereo through. `setTrackPanLaw` switches it without touching the clips (#684).
 - **Pre-fader effects insert** — `connectEffects(input, output)` routes the track input through any `AudioNode` chain and returns it ahead of the volume stage, without the transport knowing what's in it. The fader, pan and mute act on the processed signal, so the fader never changes how hard a level-dependent effect works.
 
 ## Playback Lifecycle

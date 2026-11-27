@@ -119,6 +119,58 @@ A function that already connected its last node to the second argument needs no 
 
 The [effects guide](./guides/effects.md#track-signal-chain-and-panning) describes the new signal chain.
 
+## A track keeps the pan law of its first audio
+
+**Packages:** `@waveform-playlist/core`, `engine`, `playout`, `browser`.
+
+Every audio track now has a pan law of its own, `'mono'` or `'stereo'`. It is decided by the first decoded audio the track holds and then kept; it is a mixer value of the arrangement, beside `pan`. Previously the law was derived from the track's clips each time the track was built (the highest channel count among them), so it could change when the clips changed.
+
+**What you will hear:**
+
+- A track of mono clips only, or of stereo clips only, sounds as before.
+- A stereo clip added to a track of mono clips (a file dropped on it, a recorded take, `updateTrack`) no longer makes the mono clips 3 dB louder at centre. The stereo clip plays under the track's mono law: 3 dB lower at centre than on a stereo-law track, and a hard pan mutes one side instead of folding it in.
+- Removing the last stereo clip from such a track no longer makes the mono clips 3 dB quieter.
+- A track that was emptied keeps its law for the next audio it is given.
+- A new track whose first clips are a mono file and a stereo file, both loading, takes the law of whichever finishes first. Previously it had the stereo law once both were in.
+
+**Find:** nothing to search for in most apps. If you want a particular law on a track that mixes mono and stereo clips, say so:
+
+```tsx
+// When the track is made
+audioTrack({ src: '/audio/room.wav', panLaw: 'stereo' });
+
+// Later (an undo step)
+const { setTrackPanLaw } = useEditorControls();
+setTrackPanLaw(trackId, 'stereo');
+```
+
+**Find:** code that builds a `TrackState` object (the items of `usePlaylistMixer().trackStates`), for example in a test or a story.
+
+**Replace with:** the same object with a `panLaw`:
+
+```tsx
+// Before
+const state: TrackState = { name: 'Vocals', muted: false, soloed: false, volume: 1, pan: 0 };
+
+// After
+const state: TrackState = {
+  name: 'Vocals',
+  muted: false,
+  soloed: false,
+  volume: 1,
+  pan: 0,
+  panLaw: 'auto',
+};
+```
+
+The states you pass to `exportWav(tracks, trackStates)` may leave `panLaw` out: a track is then exported with its own law.
+
+**Find:** a `PlayoutAdapter` of your own.
+
+**Replace with:** read the law from the track you are given, with `trackPanLaw(track)` from `@waveform-playlist/core` (`track.panLaw` when it is `'mono'` or `'stereo'`, else the law of the track's clips). Optionally add `setTrackPanLaw(trackId, panLaw)`; without it the engine sends the track again through `updateTrack` when only the law changed. An adapter that goes on deriving the law from the clips will disagree with the WAV export on a track that mixes mono and stereo clips.
+
+The [effects guide](./guides/effects.md#a-tracks-pan-law) describes the two laws.
+
 ## `PlayoutProvider`, `usePlayoutStatus` and `usePlayoutStatusUpdate` are removed
 
 **Package:** `@waveform-playlist/ui-components`.

@@ -463,6 +463,8 @@ interface EditorControlsContextValue {
   setTrackSolo: (trackId: string, soloed: boolean, options?: MixerChangeOptions) => void;
   setTrackVolume: (trackId: string, volume: number, options?: MixerChangeOptions) => void;
   setTrackPan: (trackId: string, pan: number, options?: MixerChangeOptions) => void;
+  /** 'mono' or 'stereo'; any other value, 'auto' included, throws a TypeError. */
+  setTrackPanLaw: (trackId: string, panLaw: DecidedPanLaw, options?: MixerChangeOptions) => void;
 
   /** Move a track to a new index in the vertical track order. Purely
    *  organizational — playback is not interrupted. An undo step of the
@@ -698,6 +700,7 @@ interface ClipTrack {
   soloed: boolean;
   volume: number;         // 0.0 to 1.0+
   pan: number;            // -1.0 to 1.0
+  panLaw?: PanLaw;        // The law the track ENTERS with (default 'auto'); the arrangement's mixer holds the live value
   color?: string;
   height?: number;
   renderMode?: RenderMode;  // Audio tracks only. A MIDI track is always drawn as a piano roll
@@ -765,6 +768,7 @@ interface AudioTrackOptions {
   fadeIn?: Fade; fadeOut?: Fade; gain?: number;
   color?: string;                       // On the track and on the clip
   muted?: boolean; soloed?: boolean; volume?: number; pan?: number;
+  panLaw?: PanLaw;                      // The law the track enters with. Default: decided by its first decoded audio
   renderMode?: RenderMode; spectrogramConfig?: SpectrogramConfig; spectrogramColorMap?: ColorMapValue;
 }
 
@@ -788,6 +792,8 @@ interface TrackState {
   soloed: boolean;
   volume: number;
   pan: number;
+  /** 'auto' until the track's first decoded audio decides it (#684). */
+  panLaw: PanLaw;
 }
 
 interface ClipPeaks {
@@ -1759,6 +1765,8 @@ interface TrackMixerValues {
   muted: boolean;
   soloed: boolean;
   pan: number;
+  /** 'auto' until the track's first decoded audio decides it; then the clips never change it. */
+  panLaw: PanLaw;
 }
 
 interface ClipBounds {
@@ -1812,6 +1820,8 @@ interface Arrangement {
   setTrackMute(trackId: string, muted: boolean, options?: MixerChangeOptions): void;
   setTrackSolo(trackId: string, soloed: boolean, options?: MixerChangeOptions): void;
   setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void;
+  /** 'mono' or 'stereo'; any other value, 'auto' included, throws a TypeError. Nothing for a MIDI track. */
+  setTrackPanLaw(trackId: string, panLaw: DecidedPanLaw, options?: MixerChangeOptions): void;
 
   // recording mute (the track a take is recording onto)
   /**
@@ -1887,7 +1897,7 @@ interface EngineState {
 // Key methods on PlaylistEngine:
 // Track management: setTracks(tracks: readonly ClipTrack[]), addTrack(), removeTrack(), updateTrack(), reorderTrack(), selectTrack()
 // Clip editing: moveClip(), trimClip(), splitClip(), getClipBounds(), constrainTrimDelta()
-// Track mix (undo steps): setTrackVolume(trackId, volume, options?: MixerChangeOptions), setTrackMute(), setTrackSolo(), setTrackPan()
+// Track mix (undo steps): setTrackVolume(trackId, volume, options?: MixerChangeOptions), setTrackMute(), setTrackSolo(), setTrackPan(), setTrackPanLaw(trackId, 'mono' | 'stereo', options?)
 // The take's mute (not an undo step; the track a take records onto plays muted): setTrackRecording(trackId: string, recording: boolean)
 // History: undo(), redo(), clearHistory(), beginTransaction(), commitTransaction(), abortTransaction(), canUndo, canRedo
 // Playback: play(), pause(), stop(), seek()
@@ -2438,6 +2448,8 @@ interface TrackContextValue {
   volume: number;
   /** -1 (left) to 1 (right). */
   pan: number;
+  /** The pan law: 'auto' until the track's first decoded audio decides it. */
+  panLaw: PanLaw;
   /** How the track is drawn. Always `'waveform'` for a MIDI track. */
   renderMode: RenderMode;
 
@@ -2470,6 +2482,8 @@ interface TrackContextValue {
   setSoloed: (soloed: boolean, options?: MixerChangeOptions) => void;
   setVolume: (volume: number, options?: MixerChangeOptions) => void;
   setPan: (pan: number, options?: MixerChangeOptions) => void;
+  /** 'mono' or 'stereo'; any other value throws a TypeError. Nothing happens for a MIDI track. */
+  setPanLaw: (panLaw: DecidedPanLaw, options?: MixerChangeOptions) => void;
   /** Makes this the selected track. */
   select: () => void;
   /** Moves the track one position up. Nothing happens for the first track. */
@@ -3157,22 +3171,38 @@ getAvailableEffects(): EffectDefinition[]; // built-ins, then (native-context mo
 // `@waveform-playlist/core` — see "Effect registry" above.
 
 // Pan stage (from `@waveform-playlist/core`) — every renderer pans tracks with
-// this, never a StereoPannerNode or Tone Panner: the law comes from the track's
-// SOURCE channel count, not from the layout its pre-fader effects output.
+// this, never a StereoPannerNode or Tone Panner: the law is the TRACK's own,
+// not the layout its pre-fader effects output.
+//
+// A track's pan law (#684). 'mono': equal power, -3 dB per side at centre, the
+// channels never mixed. 'stereo': unity at centre, panning folds one channel
+// into the other. 'auto': not decided yet (the default). In an arrangement the
+// law is a mixer value: the first decoded audio a track holds decides it, and
+// the track's clips never change it afterwards (only setTrackPanLaw, undo, redo).
+type PanLaw = 'auto' | 'mono' | 'stereo';
+type DecidedPanLaw = 'mono' | 'stereo';
+const DEFAULT_PAN_LAW: PanLaw; // 'auto'
+isDecidedPanLaw(value: unknown): value is DecidedPanLaw;
+// 'stereo' if a clip's buffer has 2+ channels, 'mono' if a clip has a buffer, else null
+audioPanLaw(track: { clips: ReadonlyArray<{ audioBuffer?: { numberOfChannels: number } }> }): DecidedPanLaw | null;
+// The law a renderer pans with: track.panLaw when decided, else audioPanLaw(track), else 'mono'
+trackPanLaw(track: { panLaw?: PanLaw; clips: ReadonlyArray<{ audioBuffer?: { numberOfChannels: number } }> }): DecidedPanLaw;
+
 interface PanMatrix { ll: number; lr: number; rl: number; rr: number }
 type PanStageContext = Pick<
   BaseAudioContext,
-  'createGain' | 'createChannelSplitter' | 'createChannelMerger'
+  'createGain' | 'createChannelSplitter' | 'createChannelMerger' | 'currentTime'
 >;
 interface PanStage {
   readonly input: AudioNode;
   readonly output: AudioNode;
   setPan(pan: number): void; // -1 … 1
-  setSourceChannelCount(sourceChannelCount: number): void; // 1 = mono law, 2+ = stereo law
+  setPanLaw(panLaw: DecidedPanLaw): void; // the four gains ramp over PAN_LAW_RAMP_SECONDS (0.01)
   dispose(): void;
 }
-panMatrix(pan: number, sourceChannelCount: number): PanMatrix;
-createPanStage(context: PanStageContext, pan: number, sourceChannelCount: number): PanStage;
+const PAN_LAW_RAMP_SECONDS: number; // 0.01
+panMatrix(pan: number, panLaw: DecidedPanLaw): PanMatrix;
+createPanStage(context: PanStageContext, pan: number, panLaw: DecidedPanLaw): PanStage;
 trackChannelCount(track: { clips: ReadonlyArray<{ audioBuffer?: { numberOfChannels: number } }> }): number;
 
 // Keyboard: the `KeyboardShortcut` type and `handleKeyboardEvent` are from

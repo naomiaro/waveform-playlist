@@ -183,7 +183,7 @@ transport.disconnectMasterOutput();
 - A mono clip reaches the chain as mono, at full level (not as two channels at −3 dB from a centred panner).
 - Do **not** connect the chain's output to `masterOutputNode` yourself — the transport returns it into the track. Routing it to the master would bypass the fader, pan, mute and solo.
 - Mute and solo silence a track including its effect tails.
-- Pan is unaffected by what the chain outputs: the pan law follows the track's clips, not the chain. A stereo reverb on a mono track stays stereo and sits at the same centre level as the dry track (see [Panning](#panning)).
+- Pan is unaffected by what the chain outputs: the pan law is the track's own, not the chain's. A stereo reverb on a mono track stays stereo and sits at the same centre level as the dry track (see [Panning](#panning)).
 
 `setTracks()` rebuilds every track node and drops these hookups — reconnect afterwards. (Before 0.0.16 the hook was `connectTrackOutput(trackId, node)`, post-fader, with the caller wiring the chain to the master.)
 
@@ -193,11 +193,18 @@ A track is panned by a small gain matrix (`createPanStage` from `@waveform-playl
 
 Why: a `StereoPannerNode` chooses its pan law from the signal it _receives_ — the equal-power law for mono input (−3 dB per side at centre), the stereo law for stereo input (unity at centre). With pre-fader effects the panner is fed by the effects chain, so the law would follow the chain's output instead of the track: a mono track with a stereo reverb or a typical WAM plugin would jump about 3 dB at centre and get a different pan curve the moment the effect was added.
 
-The pan stage implements the same two laws — its output matches a `StereoPannerNode` fed the raw clip to within float rounding — but takes the law from the track's **source material**: the highest channel count among the track's clips (`trackChannelCount(track)`), re-evaluated on `setTracks`, `addTrack` and `updateTrack`.
+The pan stage implements the same two laws — its output matches a `StereoPannerNode` fed the raw clip to within float rounding — but takes the law from the **track**: `trackPanLaw(track)` from `@waveform-playlist/core`, read on `setTracks`, `addTrack` and `updateTrack`, and changed with `setTrackPanLaw`.
 
-- Mono track: equal-power pan. The stage never mixes the two channels, so a stereo effect stays stereo.
-- Stereo track: the stereo law — centre passes both channels at unity; panning left folds the right channel into the left, and vice versa.
-- A track with both mono and stereo clips uses the stereo law for all of them, so its mono clips play 3 dB louder at centre than they would on a mono-only track. Adding the first stereo clip to a mono track (or removing the last one) therefore shifts the track's mono clips by 3 dB at centre. (Before 0.0.16 the law depended on which clips happened to be sounding.)
+- `'mono'`: equal-power pan. The stage never mixes the two channels, so a stereo effect stays stereo.
+- `'stereo'`: centre passes both channels at unity; panning left folds the right channel into the left, and vice versa.
+
+**Which law a track has.** `trackPanLaw(track)` is the track's own `panLaw` when that is `'mono'` or `'stereo'`. A track that carries none (or `'auto'`) gets the law of its clips: `'stereo'` if any clip's buffer has two or more channels, else `'mono'`.
+
+- **Under a `PlaylistEngine`** (the React provider, `<daw-editor>`), the arrangement decides each track's law from the first decoded audio the track holds, keeps it, and sends it in `track.panLaw`. Adding or removing clips then never moves the level of the audio already on the track.
+- **Used on its own**, the transport holds no such memory: a track you pass without `panLaw` follows its clips each time you pass it. Adding the first stereo clip to a track of mono clips, or removing the last one, then moves the mono clips by 3 dB at centre (the gains ramp over 10 ms, so the step does not click). Put `panLaw: 'mono'` or `'stereo'` on the tracks you pass in to keep the level where it is.
+
+`setTrackPanLaw(trackId, panLaw)` switches a track's law without touching its clips: playing sources go on playing. `'auto'` there means "from the clips of the track the transport holds".
+- A clip of the other kind plays under the track's law: a stereo clip on a `'mono'` track stays stereo, 3 dB lower at centre, and a hard pan mutes one side; a mono clip on a `'stereo'` track plays 3 dB louder at centre than on a `'mono'` track. (Before 0.0.16 the law depended on which clips happened to be sounding.)
 
 The Tone.js adapter (`@waveform-playlist/playout`) and both offline renderers use the same stage, so pan positions and levels match across backends and between playback and export.
 
@@ -243,6 +250,7 @@ new Transport(audioContext: AudioContext, options?: TransportOptions)
 **Track Controls:**
 - `setTrackVolume(trackId, volume)`
 - `setTrackPan(trackId, pan)`
+- `setTrackPanLaw(trackId, panLaw)` — `'mono'`, `'stereo'`, or `'auto'` (from the track's clips); see [Panning](#panning)
 - `setTrackMute(trackId, muted)`
 - `setTrackSolo(trackId, soloed)`
 - `setMasterVolume(volume)`

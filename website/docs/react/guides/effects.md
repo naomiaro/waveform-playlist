@@ -692,9 +692,42 @@ Waveform Playlist pans every track with its own small pan stage (`createPanStage
 - A **`StereoPannerNode`** chooses its pan law from the signal it receives: equal-power for mono input (−3 dB per side at centre), a different law for stereo input (unity at centre). Because effects come before the pan, the panner would see the effects' output instead of the track's audio. A mono track would get about 3 dB louder at centre, and pan differently, as soon as you added a stereo reverb.
 - Tone.js's **`Panner`** wraps a `StereoPannerNode` with a fixed channel count that cannot be changed on Tone's default audio context. A mono track's panner is locked to one channel, so a stereo effect on that track would be summed to mono.
 
-The pan stage uses the same two pan laws as `StereoPannerNode`, so levels and pan positions are the ones you would expect, but it picks the law from the track's audio (mono or stereo clips) instead of from the effects' output, and it always keeps a stereo signal stereo. The same stage is used for playback and WAV export, with the Tone.js engine and with the native `@dawcore/transport`.
+The pan stage uses the same two pan laws as `StereoPannerNode`, so levels and pan positions are the ones you would expect, but the law is the track's own instead of following the effects' output, and it always keeps a stereo signal stereo. The same stage is used for playback and WAV export, with the Tone.js engine and with the native `@dawcore/transport`.
 
-A track that mixes mono and stereo clips is panned with the stereo law, so its mono clips play 3 dB louder at centre than on a mono-only track. Keep mono and stereo material on separate tracks if you want a track's level to stay put when clips are added or removed.
+### A track's pan law
+
+Every audio track has one pan law, and its clips do not change it:
+
+- **`'mono'`**: equal power. A centred signal is 3 dB down on each side, and the two channels are never mixed.
+- **`'stereo'`**: unity at centre. Panning left folds the right channel into the left, and the other way round.
+
+A track takes its law from the **first decoded audio it holds**: a mono clip makes it a mono-law track, a stereo clip a stereo-law track. It then keeps that law. Adding a clip of the other kind, removing clips, recording a take or emptying the track does not move the audio already on it. Until a track has audio its law reads `'auto'`.
+
+A clip of the other kind still plays, under the track's law. The law converts nothing:
+
+- a stereo clip on a mono-law track stays stereo, plays 3 dB lower at centre than it would on a stereo-law track, and a hard pan mutes one side instead of folding it in;
+- a mono clip on a stereo-law track plays 3 dB louder at centre than it would on a mono-law track.
+
+To choose the law yourself, set it when you make the track, or change it later. A change is an undo step, and it takes effect during playback without restarting the track's clips:
+
+```tsx
+// When the track is made
+audioTrack({ src: '/audio/vocals.mp3', panLaw: 'mono' });
+
+// In a track's panel
+const { panLaw, setPanLaw } = useTrack(); // panLaw: 'auto' | 'mono' | 'stereo'
+setPanLaw('stereo');
+
+// Anywhere under the provider
+const { setTrackPanLaw } = useEditorControls();
+setTrackPanLaw(trackId, 'stereo');
+```
+
+`setPanLaw` and `setTrackPanLaw` take `'mono'` or `'stereo'`. Any other value, `'auto'` included, throws a `TypeError`: a track that has a law does not go back to `'auto'`. A MIDI track always plays with the mono law and has none to set.
+
+One case depends on order: a new track whose first clips are a mono file and a stereo file that are both still loading takes the law of whichever finishes first. Give such a track a `panLaw` when you make it.
+
+The WAV export pans each track with the same law, and writes a stereo file when any audible track has the stereo law or a stereo clip.
 
 You can still use `Panner`, `AutoPanner` or a `StereoPannerNode` as an **effect** inside a track's chain.
 

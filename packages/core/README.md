@@ -63,7 +63,8 @@ parseSpectrogramCanvasId(id);
 | `clipTimeHelpers` | `clipStartTime`, `clipEndTime`, `clipOffsetTime`, `clipDurationTime`, `clipPixelWidth`, `trackChannelCount` |
 | clip constructors (`types/clip`) | `createClip`, `createClipFromSeconds`, `createClipFromTicks`, `createTrack`, `createTimeline`, `getClipsInRange`, `getClipsAtSample`, `clipsOverlap`, `sortClipsByTime`, `findGaps` |
 | `fades` | `applyFadeIn`, `applyFadeOut`, `generateCurve`, `linearCurve`, `exponentialCurve`, `logarithmicCurve`, `sCurveCurve` |
-| `panStage` | `createPanStage`, `panMatrix`, `PanStage`, `PanMatrix`, `PanStageContext` |
+| `panStage` | `createPanStage`, `panMatrix`, `PAN_LAW_RAMP_SECONDS`, `PanStage`, `PanMatrix`, `PanStageContext` |
+| `panLaw` | `PanLaw`, `DecidedPanLaw`, `DEFAULT_PAN_LAW`, `isDecidedPanLaw`, `audioPanLaw`, `trackPanLaw`, `TrackPanLawSource` |
 | `utils/dBUtils` | `gainToDb`, `dBToNormalized`, `normalizedToDb`, `gainToNormalized` |
 | `utils/conversions` | `samplesToSeconds`, `secondsToSamples`, `samplesToPixels`, `pixelsToSamples`, `pixelsToSeconds`, `secondsToPixels` |
 | `utils/beatsAndBars` | `PPQN`, `ticksPerBeat`, `ticksPerBar`, `ticksToSamples`, `samplesToTicks`, `snapToGrid` |
@@ -91,17 +92,17 @@ MIT
 
 ## Pan stage
 
-`createPanStage(audioContext, pan, sourceChannelCount)` builds a track's pan stage from plain gain, splitter and merger nodes. Every renderer in this project pans with it — the native transport, the Tone.js adapter and both offline exports — instead of a Web Audio `StereoPannerNode` or a Tone.js `Panner`.
+`createPanStage(audioContext, pan, panLaw)` builds a track's pan stage from plain gain, splitter and merger nodes. Every renderer in this project pans with it — the native transport, the Tone.js adapter and both offline exports — instead of a Web Audio `StereoPannerNode` or a Tone.js `Panner`.
 
 ```typescript
-import { createPanStage, trackChannelCount } from '@waveform-playlist/core';
+import { createPanStage, trackPanLaw } from '@waveform-playlist/core';
 
-const stage = createPanStage(audioContext, track.pan, trackChannelCount(track));
+const stage = createPanStage(audioContext, track.pan, trackPanLaw(track)); // 'mono' | 'stereo'
 faderNode.connect(stage.input);
 stage.output.connect(muteNode);
 
 stage.setPan(-0.5);
-stage.setSourceChannelCount(2); // the track gained a stereo clip
+stage.setPanLaw('stereo'); // the four gains ramp over 10 ms
 stage.dispose();
 ```
 
@@ -110,7 +111,13 @@ Why not the built-in nodes:
 - **`StereoPannerNode`** chooses its pan law from the signal it receives: equal-power for mono input (−3 dB per side at centre), the stereo law for stereo input (unity at centre). Track effects are pre-fader inserts, so the panner would be fed by the effects chain and the law would follow the chain's output: a mono track would jump about 3 dB at centre as soon as a stereo effect was added.
 - **Tone.js `Panner`** wraps a `StereoPannerNode` with a fixed channel count. On Tone's default context (standardized-audio-context) that setting cannot be changed, so a mono track's panner is locked to one channel and a stereo effect on the track is summed to mono before it is panned.
 
-The stage implements the same two laws as `StereoPannerNode` (`panMatrix(pan, sourceChannelCount)` is the pure math) but takes the law from the caller — the channel count of the track's source material — and always passes stereo through. It works on any `AudioContext` or `OfflineAudioContext`, and on the raw context behind Tone.js.
+The stage implements the same two laws as `StereoPannerNode` (`panMatrix(pan, panLaw)` is the pure math) but takes the law from the caller and always passes stereo through. It works on any `AudioContext` or `OfflineAudioContext`, and on the raw context behind Tone.js.
+
+### A track's pan law
+
+`PanLaw` is `'auto' | 'mono' | 'stereo'`. `'mono'` is equal power (−3 dB per side at centre, the channels never mixed); `'stereo'` is unity at centre with fold-over; `'auto'` means not decided yet. `ClipTrack.panLaw` is the law a track enters an arrangement with (default `'auto'`), and `audioTrack({ panLaw })` sets it.
+
+`trackPanLaw(track)` is the law a renderer pans a track with: the track's own when it is `'mono'` or `'stereo'`, else the law of its clips (`audioPanLaw(track)`: `'stereo'` if a clip's buffer has two or more channels, `'mono'` if a clip has a buffer), else `'mono'`. In an arrangement (`@waveform-playlist/engine`) the law is a mixer value that the track's first decoded audio decides and its clips never change afterwards. The law converts no audio.
 
 ## Effect registry
 
