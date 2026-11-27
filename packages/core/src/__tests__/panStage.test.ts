@@ -288,12 +288,14 @@ describe('createPanStage', () => {
     raw.currentTime = 1;
     stage.setPanLaw('stereo');
     raw.currentTime = 1.004;
+    // Part of the way through the ramp: a value neither law's matrix has.
+    ll.value = 0.85;
 
     stage.setPanLaw('mono');
 
     expect(ll.cancelScheduledValues).toHaveBeenLastCalledWith(1.004);
-    // From where the gain is (this mock's ramp is over at once: the stereo law's 1), not from the old matrix.
-    expect(ll.setValueAtTime).toHaveBeenLastCalledWith(1, 1.004);
+    // From where the gain is, not from the last law's matrix or the new one.
+    expect(ll.setValueAtTime).toHaveBeenLastCalledWith(0.85, 1.004);
     expect(ll.linearRampToValueAtTime).toHaveBeenLastCalledWith(
       expect.closeTo(SQRT_HALF, 10),
       1.014

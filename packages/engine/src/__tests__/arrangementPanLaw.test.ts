@@ -404,6 +404,52 @@ describe('a clip that finishes loading', () => {
     expect(law(arrangement, 't')).toBe('stereo');
   });
 
+  it('a redo step the load makes a no-op is dropped too', async () => {
+    const { arrangement, settle } = await withLoads([track('t', [loading('S', 's.opus')])]);
+    arrangement.setTrackPanLaw('t', 'stereo');
+    arrangement.undo();
+    expect(law(arrangement, 't')).toBe('auto');
+    expect(arrangement.canRedo).toBe(true);
+
+    await settle('s.opus', 2);
+
+    // The current state got the law the redo step holds: a redo would change nothing.
+    expect(law(arrangement, 't')).toBe('stereo');
+    expect(arrangement.canRedo).toBe(false);
+    expect(arrangement.canUndo).toBe(false);
+  });
+
+  it('a redo step that still differs after the load is kept', async () => {
+    const { arrangement, settle } = await withLoads([track('t', [loading('S', 's.opus')])]);
+    arrangement.setTrackPanLaw('t', 'mono');
+    arrangement.undo();
+
+    await settle('s.opus', 2);
+
+    expect(law(arrangement, 't')).toBe('stereo');
+    expect(arrangement.canRedo).toBe(true);
+    arrangement.redo();
+    expect(law(arrangement, 't')).toBe('mono');
+  });
+
+  it('a gesture goes on as one step when the load drops a step below its own', async () => {
+    const { arrangement, settle } = await withLoads([
+      track('t', [loading('S', 's.opus')]),
+      track('u'),
+    ]);
+    arrangement.setTrackPanLaw('t', 'stereo');
+    arrangement.setTrackPan('u', 0.3, { gesture: 'g' });
+
+    // The step from before the law now equals the gesture's step, and is dropped.
+    await settle('s.opus', 2);
+    arrangement.setTrackPan('u', 0.7, { gesture: 'g' });
+
+    arrangement.undo();
+    expect(arrangement.getMixer().get('u')?.pan).toBe(0);
+    expect(law(arrangement, 't')).toBe('stereo');
+    expect(arrangement.canUndo).toBe(false);
+  });
+
   it('a step that still differs after the load is kept', async () => {
     const { arrangement, settle } = await withLoads([track('t', [loading('S', 's.opus')])]);
     arrangement.setTrackPanLaw('t', 'mono');

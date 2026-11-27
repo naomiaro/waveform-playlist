@@ -989,9 +989,10 @@ export class ArrangementImpl implements Arrangement {
    *
    * A saved step that no longer differs from the state next to it is
    * dropped, as `_writeMixerThrough` does (a law set on a track whose only
-   * clip was loading, and the clip turns out to have that law): its undo
-   * would do nothing. A gesture then has no step to join, and its next
-   * change pushes a new one.
+   * clip was loading, and the clip turns out to have that law): its undo, or
+   * its redo, would do nothing. A gesture whose own step went has no step to
+   * join, and its next change pushes a new one; a gesture whose step is still
+   * the top one goes on.
    */
   private _decidePanLaws(): void {
     const decide = stateWithDecidedPanLaws();
@@ -1014,10 +1015,25 @@ export class ArrangementImpl implements Arrangement {
       }
     }
     const mapped = mapHistoryStates(this._history, decide);
-    if (changedIn(this._history, mapped)) {
+    const savedChanged = changedIn(this._history, mapped);
+    // A step can stop differing because IT was filled (an undo step from
+    // before a law was set) or because the CURRENT state was (a redo step
+    // that holds the law the audio turned out to have).
+    if (savedChanged || decided !== current) {
+      // The gesture's step, as the fill leaves it.
+      const top = mapped.undo[mapped.undo.length - 1];
       const kept = dropRepeats(mapped, base ?? decided);
-      this._history = kept;
-      if (kept !== mapped) this._gesture = null;
+      if (savedChanged || kept !== mapped) this._history = kept;
+      if (this._gesture && kept !== mapped) {
+        // As in `_writeMixerThrough`: the gesture goes on when the step now
+        // on top equals the one it joined (a step below became equal to it,
+        // and `dropRepeats` kept the older of the two). When its own step is
+        // gone, its next change pushes a new one.
+        const newTop = kept.undo[kept.undo.length - 1];
+        if (!(newTop !== undefined && top !== undefined && sameState(newTop, top))) {
+          this._gesture = null;
+        }
+      }
     }
     if (this._gesture) {
       const before = mapHistoryStates(this._gesture.before, decide);

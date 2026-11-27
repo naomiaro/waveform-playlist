@@ -171,7 +171,7 @@ The states you pass to `exportWav(tracks, trackStates)` may leave `panLaw` out: 
 
 **Find:** `channelCount` in the options of a `ToneTrack` you construct yourself, or of `TonePlayout.addTrack` (`@waveform-playlist/playout`). It set the channel count of the track's panner.
 
-**Replace with:** `panLaw`. A leftover `channelCount` is ignored, and the track gets the mono law.
+**Replace with:** `panLaw`. TypeScript reports a leftover `channelCount` in an object literal; in plain JavaScript it is ignored, and the track gets the mono law.
 
 ```tsx
 // Before

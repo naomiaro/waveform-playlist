@@ -102,7 +102,7 @@ The returned `EngineState` contains:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `tracks` | `readonly ClipTrack[]` | The tracks and their clips, each track with its current volume, mute, solo and pan. Not a copy: read it, never write to it |
+| `tracks` | `readonly ClipTrack[]` | The tracks and their clips, each track with its current volume, mute, solo, pan and pan law. Not a copy: read it, never write to it |
 | `tracksVersion` | `number` | Monotonic counter — increments on structural track changes only |
 | `mixerVersion` | `number` | Monotonic counter — increments on every change of the current mix: a per-track mixer edit (volume/mute/solo/pan/pan law), a track's first decoded audio deciding its pan law, an undo, a redo or an aborted transaction that brings back other values, and the start or end of a take's mute on a track that is in the current tracks |
 | `duration` | `number` | Total timeline duration in seconds |
@@ -376,7 +376,7 @@ With `{ keepAdapter: true }` the adapter is not disposed: playback is stopped fi
 
 ## The Arrangement
 
-An arrangement is the owner of three things: the tracks with their clips, the mix (volume, mute, solo and pan by track ID), and the undo history with its transactions. Everything else reads it and changes it by calling its methods. A `PlaylistEngine` plays an arrangement: it follows it by subscription, and for each change it makes the adapter call and emits `statechange`. The engine owns the rest: transport, selection, loop, zoom, the selected track and the master volume.
+An arrangement is the owner of three things: the tracks with their clips, the mix (volume, mute, solo, pan and pan law by track ID), and the undo history with its transactions. Everything else reads it and changes it by calling its methods. A `PlaylistEngine` plays an arrangement: it follows it by subscription, and for each change it makes the adapter call and emits `statechange`. The engine owns the rest: transport, selection, loop, zoom, the selected track and the master volume.
 
 An engine built without the `arrangement` option makes an arrangement of its own, and every example above works that way. Make the arrangement yourself when it has to exist before the engine does, or outlive it:
 

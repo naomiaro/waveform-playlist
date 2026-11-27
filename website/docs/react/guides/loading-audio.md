@@ -55,7 +55,7 @@ interface AudioTrackOptions {
   muted?: boolean;           // Start muted (default false)
   soloed?: boolean;          // Start soloed (default false)
   pan?: number;              // Pan -1 to 1 (default 0)
-  panLaw?: PanLaw;           // 'mono' | 'stereo' (default: the track's first audio decides)
+  panLaw?: PanLaw;           // 'mono' | 'stereo' (default 'auto': the track's first audio decides)
   renderMode?: RenderMode;   // 'waveform' | 'spectrogram' | 'both'
   spectrogramConfig?: SpectrogramConfig;
   spectrogramColorMap?: ColorMapValue;
