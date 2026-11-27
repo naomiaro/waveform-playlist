@@ -11,12 +11,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // Phaser has a start() here because it has one on Tone 15.5.x (it shares a
 // base class with Tremolo there) while still starting itself: a second
 // start() at the same time throws "Start time must be strictly greater than
-// previous start time" (run in a browser on 15.5.73, in an offline render).
-// So "has start()" is not the rule; the four are named.
-const { NEEDS_START, HAS_START, starts } = vi.hoisted(() => ({
+// previous start time" (seen in a throwaway browser probe on 15.5.73, in an
+// offline render). So "has start()" is not the rule; the four are named.
+// `toneLfoEffects.test.ts` checks the installed Tone build for which effects
+// start themselves.
+const { NEEDS_START, HAS_START, starts, disposed, failStart } = vi.hoisted(() => ({
   NEEDS_START: ['Chorus', 'Tremolo', 'AutoPanner', 'AutoFilter'],
   HAS_START: ['Chorus', 'Tremolo', 'AutoPanner', 'AutoFilter', 'Phaser'],
   starts: [] as { name: string; args: unknown[] }[],
+  disposed: [] as string[],
+  failStart: { message: undefined as string | undefined },
 }));
 
 vi.mock('@waveform-playlist/playout', () => ({
@@ -27,12 +31,15 @@ vi.mock('tone', () => {
   const ctor = (name: string) =>
     vi.fn(function () {
       const node: Record<string, unknown> = {
-        dispose: vi.fn(),
+        dispose: () => {
+          disposed.push(name);
+        },
         connect: vi.fn(),
         disconnect: vi.fn(),
       };
       if (HAS_START.includes(name)) {
         node.start = (...args: unknown[]) => {
+          if (failStart.message !== undefined) throw new Error(failStart.message);
           starts.push({ name, args });
           return node;
         };
@@ -73,6 +80,8 @@ import { effectDefinitions } from '../effects/effectDefinitions';
 
 beforeEach(() => {
   starts.length = 0;
+  disposed.length = 0;
+  failStart.message = undefined;
 });
 
 describe('createToneEffectInstance starts the four effects whose LFO is built stopped', () => {
@@ -101,5 +110,13 @@ describe('createToneEffectInstance starts the four effects whose LFO is built st
 
     expect(instance.id).toBe('phaser');
     expect(starts).toEqual([]);
+  });
+
+  it('disposes the effect and rethrows when start() throws', () => {
+    failStart.message = 'Start time must be strictly greater than previous start time';
+    const tremolo = effectDefinitions.find((d) => d.id === 'tremolo')!;
+
+    expect(() => createToneEffectInstance(tremolo)).toThrow(/strictly greater than previous/);
+    expect(disposed).toEqual(['Tremolo']);
   });
 });

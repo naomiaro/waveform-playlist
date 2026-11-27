@@ -3164,6 +3164,7 @@ effectDefinitions: EffectDefinition[];
 effectCategories: { id: EffectCategory; name: string }[];
 getEffectDefinition(id: string): EffectDefinition | undefined;
 getEffectsByCategory(category: EffectCategory): EffectDefinition[];
+// chorus, tremolo, autoPanner and autoFilter are returned with their LFO started: do not call start() on instance.input
 createToneEffectInstance(
   definition: EffectDefinition,
   initialParams?: Record<string, number | string | boolean>

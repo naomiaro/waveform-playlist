@@ -5168,3 +5168,26 @@ setMasterVolume(0.5);
 ```
 
 `setSelection` from `usePlaybackControls()` also moves the cursor to the start of the range and restarts playback there if it is running; the engine's own `setSelection` did neither. There is no replacement for `setZoomLevel` with an arbitrary level: zoom moves one step at a time through `zoomLevels`.
+
+## Chorus, tremolo, auto panner and auto filter are started for you
+
+**Package:** `@waveform-playlist/browser` (`@waveform-playlist/browser/tone`).
+
+Tone.js builds the LFO of `Chorus`, `Tremolo`, `AutoPanner` and `AutoFilter` stopped; until `start()` is called each is a fixed delay, gain, pan and filter. The library never called it, so these four built-in effects did not move, during playback or in an exported WAV. `createToneEffectInstance` now starts them, and with it the effects hooks and the WAV export. A mix that uses one of the four sounds different.
+
+Nothing to change unless you worked around it by starting the node yourself. That second `start()` now throws in Tone.js when it lands at the same audio time as the library's ("Start time must be strictly greater than previous start time"), which is always the case while the audio context is suspended and in an offline render.
+
+**Find:** `.start()` called on the node of an effect instance: `instance.effect.start()` (before [`effect` became `input` and `output`](#effectinstanceeffect-is-replaced-by-input-and-output)) or `instance.input.start()`.
+
+**Replace with:**
+
+```tsx
+// Before
+const instance = createEffectInstance(getEffectDefinition('tremolo')!);
+(instance.effect as Tremolo).start();
+
+// After
+const instance = createToneEffectInstance(getEffectDefinition('tremolo')!);
+```
+
+A Tone.js effect you construct yourself (`new Tremolo()`) is not touched: start it as before.

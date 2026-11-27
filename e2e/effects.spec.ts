@@ -327,6 +327,12 @@ test.describe('Effects Example', () => {
     // on the master chain: the file has to change over time.
     test.describe('an LFO effect modulates in an exported WAV', () => {
       test.beforeEach(async ({ page }) => {
+        // The page starts with a reverb on the master chain. Its tail is
+        // noise that is still dying away in the measured second, so it goes.
+        await expect(page.getByRole('heading', { name: 'Reverb', exact: true })).toBeVisible();
+        await page.getByRole('button', { name: 'Clear All', exact: true }).click();
+        await expect(page.getByRole('heading', { name: 'Reverb', exact: true })).toHaveCount(0);
+
         await page.locator('input[type="file"]').setInputFiles({
           name: 'steady.wav',
           mimeType: 'audio/wav',

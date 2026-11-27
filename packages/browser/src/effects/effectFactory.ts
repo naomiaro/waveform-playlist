@@ -89,8 +89,10 @@ const effectConstructors: Record<string, EffectConstructor> = {
  * The four are named, not found by "has a `start()`": on Tone 15.5.x Phaser
  * has one too (it shares a base class with Tremolo there) and still starts
  * itself, and a second `start()` at the same time throws "Start time must be
- * strictly greater than previous start time". For the same reason code that
- * gets an instance from `createToneEffectInstance` must not start it again.
+ * strictly greater than previous start time".
+ * `src/__tests__/toneLfoEffects.test.ts` reads the installed Tone build and
+ * fails when one of the four begins to start itself, or Phaser or Vibrato
+ * stops doing so.
  *
  * The LFO is not tied to the transport: live it runs from when the effect is
  * added (from the first resume when the context is still suspended), in a WAV
@@ -110,7 +112,12 @@ const generateInstanceId = (): string => {
 };
 
 /**
- * Create an effect instance from a definition with initial parameter values
+ * Create an effect instance from a definition with initial parameter values.
+ *
+ * Chorus, tremolo, auto panner and auto filter are returned with their LFO
+ * started. Do not call `start()` on the node (`instance.input`) again: a
+ * second start at the same audio time (always the case while the context is
+ * suspended, and in an offline render) throws in Tone.js.
  */
 export function createToneEffectInstance(
   definition: EffectDefinition,
@@ -143,7 +150,14 @@ export function createToneEffectInstance(
   // Create the effect instance
   const effect = new Constructor(options);
   if (EFFECTS_WITH_A_STOPPED_LFO.has(definition.id)) {
-    (effect as ToneAudioNode & { start: () => unknown }).start();
+    try {
+      (effect as ToneAudioNode & { start: () => unknown }).start();
+    } catch (err) {
+      // Nobody else holds the node yet: without this it would stay built,
+      // with whichever LFO did start still running.
+      effect.dispose();
+      throw err;
+    }
   }
   const instanceId = generateInstanceId();
 
