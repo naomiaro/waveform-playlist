@@ -335,9 +335,11 @@ export class SpectrogramOrchestrator extends EventTarget {
       try {
         const tiers = classifyViewport(trackCanvases, viewport);
         // Phase 1a: viewport tier — render synchronously (priority)
-        await this.renderTier(tiers.viewport, generation, viewport);
+        const viewportDrawn = await this.renderTier(tiers.viewport, generation, viewport);
         if (this.generation !== generation || this.disposed) return;
-        if (!this.readyDispatched.has(trackId)) {
+        // A group whose computation was dropped while another pass is queued
+        // is drawn by that pass: the track is ready then (#928).
+        if (viewportDrawn && !this.readyDispatched.has(trackId)) {
           this.readyDispatched.add(trackId);
           this.dispatchEvent(
             new CustomEvent('viewport-ready', { detail: { trackId, generation } })
@@ -351,8 +353,10 @@ export class SpectrogramOrchestrator extends EventTarget {
       } catch (err) {
         if (this.generation !== generation || this.disposed) return;
         if (err instanceof SpectrogramAbortError) {
-          // Normal abort — generation bumped mid-render. Not an error.
-          return;
+          // Not an error. A changed generation returned above, and renderGroup
+          // skips a group whose computation was dropped (#928), so this is a
+          // fallback: go on with the next track.
+          continue;
         }
         const error = err instanceof Error ? err : new Error(String(err));
         console.warn(
@@ -373,25 +377,35 @@ export class SpectrogramOrchestrator extends EventTarget {
     }
   }
 
+  /** Renders the tier's groups; false when a group waits for a render already scheduled. */
   protected async renderTier(
     canvases: CanvasEntry[],
     generation: number,
     viewport: ViewportState
-  ): Promise<void> {
-    if (canvases.length === 0) return;
+  ): Promise<boolean> {
+    let drawn = true;
+    if (canvases.length === 0) return drawn;
     const groups = groupRenderableChunks(canvases);
     for (const group of groups) {
-      if (this.generation !== generation || this.disposed) return;
-      await this.renderGroup(group, generation, viewport);
+      if (this.generation !== generation || this.disposed) return drawn;
+      if (!(await this.renderGroup(group, generation, viewport))) drawn = false;
     }
+    return drawn;
   }
+
+  /**
+   * Renders one group. Returns false when its computation was dropped and
+   * another pass is queued (registerClip queues one for a clip registered again
+   * mid-computation that still has canvases, #928): that pass draws it. True
+   * otherwise, also when there is nothing to draw or nothing will draw it.
+   */
 
   protected async renderGroup(
     group: CanvasEntry[],
     generation: number,
     viewport: ViewportState
-  ): Promise<void> {
-    if (group.length === 0) return;
+  ): Promise<boolean> {
+    if (group.length === 0) return true;
     const first = group[0];
     const clip = this.clips.get(first.clipId);
     if (!clip) {
@@ -402,13 +416,22 @@ export class SpectrogramOrchestrator extends EventTarget {
           first.canvasId +
           ') — canvas will stay black until registerClip is called'
       );
-      return;
+      return true;
     }
 
     try {
       await this.renderGroupOnce(group, generation, viewport, clip);
+      return true;
     } catch (err) {
       if (this.generation !== generation || this.disposed) throw err;
+      if (err instanceof SpectrogramAbortError) {
+        // Same generation: the worker dropped a computation whose clip audio
+        // was replaced or removed while it ran (#928). Skip this group only;
+        // the rest of the pass still draws. Wait for the next pass only when
+        // one is queued: an unregister, or a register of a clip with no
+        // canvas left, queues none, and the track is ready in this pass.
+        return !this.renderQueued;
+      }
       // Concurrent computes can LRU-evict the FFT entry between computeFFT
       // resolving and renderChunks executing (16-entry cache). Recompute once
       // instead of surfacing a viewport-error for a transient race (#558).
@@ -417,7 +440,7 @@ export class SpectrogramOrchestrator extends EventTarget {
           '[dawcore-spectrogram] FFT cache entry evicted between compute and render — retrying group once'
         );
         await this.renderGroupOnce(group, generation, viewport, clip);
-        return;
+        return true;
       }
       throw err;
     }

@@ -237,7 +237,8 @@ export function createSpectrogramWorkerPool(
       const settled = await Promise.allSettled(promises);
       const failures = settled.filter((s): s is PromiseRejectedResult => s.status === 'rejected');
       if (failures.length > 0) {
-        // Aborts are normal control flow (generation superseded) — never
+        // Aborts are normal control flow (generation superseded, or the clip's
+        // audio replaced or removed mid-computation, #928) — never
         // warned, and never allowed to mask a real error when mixed (#562).
         const realErrors = failures.filter((f) => !(f.reason instanceof SpectrogramAbortError));
         for (let i = 1; i < realErrors.length; i++) {

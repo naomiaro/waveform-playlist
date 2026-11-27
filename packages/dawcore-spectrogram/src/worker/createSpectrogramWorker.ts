@@ -1,7 +1,8 @@
 import type { SpectrogramConfig } from '@waveform-playlist/core';
 
 /**
- * Error thrown when a spectrogram computation is aborted due to a generation change.
+ * Error thrown when a spectrogram computation is aborted: its generation was
+ * superseded, or its clip's audio was replaced or unregistered while it ran (#928).
  * Use `instanceof SpectrogramAbortError` instead of string matching on error messages.
  */
 export class SpectrogramAbortError extends Error {
