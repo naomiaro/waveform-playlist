@@ -43,7 +43,9 @@ export interface ZoomAnchorTimes {
  *    tracks and the ruler). What is under the pointer is hit-tested at the
  *    zoom, not remembered from its last move: an overlay drawn above the
  *    timeline does not count, and a ruler chunk replaced under a resting
- *    pointer (by a zoom, by wheel scrolling) does not stop it counting. A
+ *    pointer (by a zoom, by wheel scrolling) does not stop it counting. The
+ *    hit test runs on the container's root (a shadow root, where the
+ *    document's would return the host). A
  *    keyboard press on a zoom button does not move the pointer: a mouse
  *    resting over the timeline stays the anchor.
  * 2. A range selection that is at least partly on screen and does not fill
@@ -73,7 +75,7 @@ export function zoomAnchorX({
     const rect = container.getBoundingClientRect();
     const inRect =
       hover.x >= rect.left && hover.x < rect.right && hover.y >= rect.top && hover.y < rect.bottom;
-    const hit = inRect ? container.ownerDocument.elementFromPoint(hover.x, hover.y) : null;
+    const hit = inRect ? hitTest(container, hover.x, hover.y) : null;
     if (hit && container.contains(hit)) return hover.x - rect.left;
   }
 
@@ -96,6 +98,17 @@ export function zoomAnchorX({
   if (cursorTime >= viewStart && cursorTime <= viewEnd) return toX(cursorTime);
 
   return width / 2;
+}
+
+/**
+ * The topmost element at a client point, found on the container's root: in a
+ * shadow root the document's `elementFromPoint` returns the host, and
+ * `container.contains(host)` is false. A container in no document has no hit
+ * test (null).
+ */
+function hitTest(container: HTMLElement, x: number, y: number): Element | null {
+  const root = container.getRootNode() as Partial<DocumentOrShadowRoot>;
+  return typeof root.elementFromPoint === 'function' ? root.elementFromPoint(x, y) : null;
 }
 
 /**

@@ -89,6 +89,8 @@ describe('zoomAnchorX: the order', () => {
   const container = document.createElement('div');
   const inside = document.createElement('span');
   container.appendChild(inside);
+  // In the document: the hit test runs on the container's root node.
+  document.body.appendChild(container);
   fakeLayout(container);
   const anchor = (
     times: ZoomAnchorTimes,
@@ -120,6 +122,47 @@ describe('zoomAnchorX: the order', () => {
   it("1. a pointer outside the container's rectangle does not count", () => {
     hitTest.element = inside;
     expect(anchor({ ...NONE, cursorTime: 1300 }, { x: 600, y: 100 })).toBe(300);
+  });
+
+  it('1. inside a shadow root the hit test runs on the shadow root, not the document', () => {
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const shadow = host.attachShadow({ mode: 'open' });
+    const shadowContainer = document.createElement('div');
+    const shadowInside = document.createElement('span');
+    shadowContainer.appendChild(shadowInside);
+    shadow.appendChild(shadowContainer);
+    fakeLayout(shadowContainer);
+    // The document finds the host (retargeted); the shadow root finds the element.
+    hitTest.element = host;
+    shadow.elementFromPoint = () => shadowInside;
+    expect(
+      zoomAnchorX({
+        container: shadowContainer,
+        hover: { x: 150, y: 100 },
+        scrollLeft: 1000,
+        samplesPerPixel: 1000,
+        sampleRate: 1000,
+        times: { ...NONE, cursorTime: 1300 },
+      })
+    ).toBe(50);
+    host.remove();
+  });
+
+  it('1. a container in no document has no hit test: the next step is used', () => {
+    const detached = document.createElement('div');
+    fakeLayout(detached);
+    hitTest.element = detached;
+    expect(
+      zoomAnchorX({
+        container: detached,
+        hover: { x: 150, y: 100 },
+        scrollLeft: 1000,
+        samplesPerPixel: 1000,
+        sampleRate: 1000,
+        times: { ...NONE, cursorTime: 1300 },
+      })
+    ).toBe(300);
   });
 
   it('2. a range on screen: its centre', () => {
