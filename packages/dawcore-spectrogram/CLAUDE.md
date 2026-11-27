@@ -8,9 +8,13 @@
 
 **The worker module is directly testable end-to-end** — stub `self.postMessage` (capture array) BEFORE `await import('../src/worker/spectrogram.worker')`, then drive `self.onmessage({ data })` manually; mock OffscreenCanvas with a `getContext` whose `createImageData`/`putImageData` capture pixels. This exercises the real FFT → cache → render pipeline (pixel assertions caught the #554 coordinate bug). `worker-render-mapping.test.ts` is the reference. Vitest per-file isolation keeps the un-restored `self` stubs from leaking across files.
 
+**To catch the worker mid-computation:** give `compute-fft` more than 2000 frames (`FRAMES_PER_YIELD`; e.g. 200 000 samples at fft 256 / hop 64). It runs synchronously up to its first yield, so messages sent right after `handler(compute)` returns arrive while it is suspended; assert it has not answered yet (`worker-audio-reregister.test.ts`).
+
 **Shared test mocks live in `__tests__/helpers/`** (`orchestratorTestUtils.ts`: makeMockWorker/makeMockPool/makeOrchestratorWithMockPool; `poolTestUtils.ts`: trackingWorkerFactory/postedMessages/ackComputeFFTs) — extend these instead of copy-pasting mock preambles into new test files.
 
 **The real pool can drive the real worker module:** in the pool's mock-worker factory, point one worker's `postMessage` at `self.onmessage` and relay `self.postMessage` replies to that worker's `onmessage` (`pool-worker-channel-pixels.test.ts`). Render with the cache key from the module's own reply; the other workers get a hand-written reply (`ackComputeFFTs`).
+
+**The real orchestrator can too:** the same wiring inside `SpectrogramOrchestrator`'s `workerFactory` exercises render passes, `viewport-ready` and aborts against real FFTs (`orchestrator-audio-changed-mid-render.test.ts`, with mono clips so worker 0 does all the work).
 
 **To see which channels a worker got,** fill channel k with the value k + 1 and read `arr[0] - 1` from the posted message (the client sends copies, so identity checks fail; `pool-channel-audio.test.ts`).
 
