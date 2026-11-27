@@ -81,6 +81,7 @@ cleanups, passive effects; then async continuations and store notifications.
   - `setRenderMode('waveform')` on a track with no mode, also an empty step;
   - a render-mode choice that silenced playback on the native transport.
   A write that changes nothing the user can see returns the track it was given (no step), compared on what is drawn (`renderMode ?? 'waveform'`), not on the stored field.
+- **A new owner keeps the shape the old one had.** When the provider took the zoom over from the engine (#826), the engine kept an INDEX into the app's `zoomLevels` and the hook first kept only the level. With a level given twice, or unsorted levels, the two shapes step differently: two review rounds found a stopped `zoomOut` and then an unreachable level before the hook kept an index too. Before moving a value, read how the old owner stores it and which inputs make that differ from the obvious shape; and list the rules the old owner applied by itself (the engine cleared the selected track for some kinds of change and not for `setTracks`), because each one has to be carried over or asked about.
 - Ask the reviewer one question before any other: "which state here is still
   stored in two places, and which place writes back?"
 - State a consumer can see changes hands: list what each consumer tree does

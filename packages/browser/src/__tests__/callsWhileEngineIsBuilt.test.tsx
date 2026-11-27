@@ -417,7 +417,7 @@ describe('calls made while the engine is being rebuilt (#826)', () => {
     expect(volumeCalls[volumeCalls.length - 1].args).toEqual([0.4]);
   });
 
-  it('a level that occurs twice in zoomLevels is one step, in both directions', async () => {
+  it('zoom steps by place in zoomLevels: a level given twice is two places', async () => {
     renderWithArrangement([makeTrack('track-a')], {
       zoomLevels: [512, 1024, 1024, 2048],
       samplesPerPixel: 512,
@@ -426,16 +426,59 @@ describe('calls made while the engine is being rebuilt (#826)', () => {
     await waitFor(() => expect(probe.isReady).toBe(true));
     act(() => probe.zoomOut());
     await waitFor(() => expect(probe.samplesPerPixel).toBe(1024));
+    // The second place holds the same level: the step changes no level.
+    act(() => probe.zoomOut());
+    await act(() => settle());
+    expect(probe.samplesPerPixel).toBe(1024);
     expect(probe.canZoomOut).toBe(true);
     act(() => probe.zoomOut());
     await waitFor(() => expect(probe.samplesPerPixel).toBe(2048));
     expect(probe.canZoomOut).toBe(false);
     expect(probe.engine()!.getState().samplesPerPixel).toBe(2048);
     act(() => probe.zoomIn());
-    await waitFor(() => expect(probe.samplesPerPixel).toBe(1024));
+    act(() => probe.zoomIn());
     act(() => probe.zoomIn());
     await waitFor(() => expect(probe.samplesPerPixel).toBe(512));
     expect(probe.canZoomIn).toBe(false);
+  });
+
+  it('every place of unsorted, repeated zoomLevels is reached, in order', async () => {
+    renderWithArrangement([makeTrack('track-a')], {
+      zoomLevels: [1024, 512, 1024, 2048],
+      samplesPerPixel: 1024,
+      children: <ProbeChild />,
+    });
+    await waitFor(() => expect(probe.isReady).toBe(true));
+    expect([probe.canZoomIn, probe.canZoomOut]).toEqual([false, true]);
+    act(() => probe.zoomOut());
+    await waitFor(() => expect(probe.samplesPerPixel).toBe(512));
+    act(() => probe.zoomOut());
+    await waitFor(() => expect(probe.samplesPerPixel).toBe(1024));
+    expect([probe.canZoomIn, probe.canZoomOut]).toEqual([true, true]);
+    act(() => probe.zoomOut());
+    await waitFor(() => expect(probe.samplesPerPixel).toBe(2048));
+    expect([probe.canZoomIn, probe.canZoomOut]).toEqual([true, false]);
+    act(() => probe.zoomIn());
+    act(() => probe.zoomIn());
+    await waitFor(() => expect(probe.samplesPerPixel).toBe(512));
+    act(() => probe.zoomIn());
+    await waitFor(() => expect(probe.samplesPerPixel).toBe(1024));
+    expect([probe.canZoomIn, probe.canZoomOut]).toEqual([false, true]);
+  });
+
+  it('a level given twice at the end: the last place is the end', async () => {
+    renderWithArrangement([makeTrack('track-a')], {
+      zoomLevels: [512, 1024, 1024],
+      samplesPerPixel: 512,
+      children: <ProbeChild />,
+    });
+    await waitFor(() => expect(probe.isReady).toBe(true));
+    act(() => probe.zoomOut());
+    await waitFor(() => expect(probe.samplesPerPixel).toBe(1024));
+    await waitFor(() => expect(probe.canZoomOut).toBe(true));
+    act(() => probe.zoomOut());
+    await waitFor(() => expect(probe.canZoomOut).toBe(false));
+    expect(probe.samplesPerPixel).toBe(1024);
   });
 
   it('a level that is not one of zoomLevels has no step in either direction', async () => {

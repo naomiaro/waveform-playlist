@@ -549,12 +549,13 @@ describe('what a subscriber is told', () => {
 
   it('what it is told cannot be changed for the next subscriber', () => {
     const arrangement = new Arrangement({ tracks: [] });
+    const frozen: boolean[] = [];
     const seen: unknown[] = [];
-    arrangement.subscribe((change) => {
-      expect(Object.isFrozen(change)).toBe(true);
-    });
+    // Read here and asserted below: a subscriber that throws is caught.
+    arrangement.subscribe((change) => frozen.push(Object.isFrozen(change)));
     arrangement.subscribe((change) => seen.push(change.type));
     arrangement.addTrack(track('A', []));
+    expect(frozen).toEqual([true]);
     expect(seen).toEqual(['add']);
   });
 
