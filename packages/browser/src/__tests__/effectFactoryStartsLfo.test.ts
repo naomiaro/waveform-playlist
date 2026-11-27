@@ -15,12 +15,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // offline render). So "has start()" is not the rule; the four are named.
 // `toneLfoEffects.test.ts` checks the installed Tone build for which effects
 // start themselves.
-const { NEEDS_START, HAS_START, starts, disposed, failStart } = vi.hoisted(() => ({
+const { NEEDS_START, HAS_START, starts, disposed, failStart, failDispose } = vi.hoisted(() => ({
   NEEDS_START: ['Chorus', 'Tremolo', 'AutoPanner', 'AutoFilter'],
   HAS_START: ['Chorus', 'Tremolo', 'AutoPanner', 'AutoFilter', 'Phaser'],
   starts: [] as { name: string; args: unknown[] }[],
   disposed: [] as string[],
   failStart: { message: undefined as string | undefined },
+  failDispose: { message: undefined as string | undefined },
 }));
 
 vi.mock('@waveform-playlist/playout', () => ({
@@ -33,6 +34,7 @@ vi.mock('tone', () => {
       const node: Record<string, unknown> = {
         dispose: () => {
           disposed.push(name);
+          if (failDispose.message !== undefined) throw new Error(failDispose.message);
         },
         connect: vi.fn(),
         disconnect: vi.fn(),
@@ -82,6 +84,7 @@ beforeEach(() => {
   starts.length = 0;
   disposed.length = 0;
   failStart.message = undefined;
+  failDispose.message = undefined;
 });
 
 describe('createToneEffectInstance starts the four effects whose LFO is built stopped', () => {
@@ -118,5 +121,18 @@ describe('createToneEffectInstance starts the four effects whose LFO is built st
 
     expect(() => createToneEffectInstance(tremolo)).toThrow(/strictly greater than previous/);
     expect(disposed).toEqual(['Tremolo']);
+  });
+
+  it('reports the error of start() when the dispose after it throws too', () => {
+    failStart.message = 'Start time must be strictly greater than previous start time';
+    failDispose.message = 'dispose failed';
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const chorus = effectDefinitions.find((d) => d.id === 'chorus')!;
+
+    expect(() => createToneEffectInstance(chorus)).toThrow(/strictly greater than previous/);
+    expect(disposed).toEqual(['Chorus']);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toMatch(/dispose failed/);
+    warn.mockRestore();
   });
 });

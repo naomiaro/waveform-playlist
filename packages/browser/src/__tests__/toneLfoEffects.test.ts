@@ -32,12 +32,24 @@ const { version } = JSON.parse(
   readFileSync(path.join(esmDir, '..', '..', 'package.json'), 'utf8')
 ) as { version: string };
 
-/** A start() call with no time: what a constructor that starts its own LFO makes. */
-const STARTS_ITSELF = /\.start\(\)/;
+/** Every line of a file's code that calls a `start(` on something. */
+const startCalls = (source: string): string[] =>
+  source
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /\.start\(/.test(line));
+
+/** The two calls inside a stereo effect's own `start(time)` method. */
+const STEREO_START_METHOD = ['this._lfoL.start(time);', 'this._lfoR.start(time);'];
 /** The option Tone 15.5.x added for an effect that starts its own LFO. */
 const AUTOSTART = /autostart/;
 const HAS_START_METHOD = /^ {4}start\(time\) \{/m;
 
+// A constructor can start its LFO in more than one spelling: `.start()`
+// (Phaser and Vibrato on 15.1.x), `.start(now)`, or 15.5.x's
+// `this._onContextRunning(() => this.start(this.immediate()))`. So the tests
+// below do not look for one of them: they list every `.start(` call a file may
+// contain, and any other one fails.
 describe('Tone.js ' + version + ': which LFO effects start themselves', () => {
   it('is a 15.x build (the peer range)', () => {
     expect(version).toMatch(/^15\./);
@@ -46,45 +58,55 @@ describe('Tone.js ' + version + ': which LFO effects start themselves', () => {
   it('Chorus has start() and does not start itself', () => {
     const chorus = code('effect/Chorus.js');
     expect(chorus).toMatch(HAS_START_METHOD);
-    expect(chorus).not.toMatch(STARTS_ITSELF);
+    expect(startCalls(chorus)).toEqual(STEREO_START_METHOD);
     expect(chorus).not.toMatch(AUTOSTART);
   });
 
   it('AutoPanner and AutoFilter get start() from LFOEffect, and none of the three starts itself', () => {
     const base = code('effect/LFOEffect.js');
     expect(base).toMatch(HAS_START_METHOD);
-    expect(base).not.toMatch(STARTS_ITSELF);
+    expect(startCalls(base)).toEqual(['this._lfo.start(time);']);
     expect(base).not.toMatch(AUTOSTART);
     for (const file of ['effect/AutoPanner.js', 'effect/AutoFilter.js']) {
       const effect = code(file);
       expect(effect, file).toMatch(/extends LFOEffect /);
-      expect(effect, file).not.toMatch(/\.start\(/);
+      expect(startCalls(effect), file).toEqual([]);
       expect(effect, file).not.toMatch(AUTOSTART);
     }
   });
 
   it('Tremolo has start() and does not start itself', () => {
     const tremolo = code('effect/Tremolo.js');
-    expect(tremolo).not.toMatch(STARTS_ITSELF);
     expect(tremolo).not.toMatch(AUTOSTART);
     if (/extends LFOStereoEffect /.test(tremolo)) {
       // 15.5.x: start() and an `autostart` option come from the base class
-      // Phaser also extends. Tremolo must keep the default, which is off.
+      // Phaser also extends. The base may start itself only under that
+      // option, the option must default to off, and Tremolo must not set it.
+      expect(startCalls(tremolo)).toEqual([]);
       const base = code('effect/LFOStereoEffect.js');
       expect(base).toMatch(HAS_START_METHOD);
+      expect(startCalls(base)).toEqual([
+        'this._onContextRunning(() => this.start(this.immediate()));',
+        ...STEREO_START_METHOD,
+      ]);
+      expect(base).toMatch(
+        /if \(options\.autostart\) \{\s*this\._onContextRunning\(\(\) => this\.start\(this\.immediate\(\)\)\);\s*\}/
+      );
       expect(base).toMatch(/autostart: false/);
     } else {
       expect(tremolo).toMatch(HAS_START_METHOD);
+      expect(startCalls(tremolo)).toEqual(STEREO_START_METHOD);
     }
   });
 
   it('Phaser starts itself', () => {
     const phaser = code('effect/Phaser.js');
     // 15.1.x starts both LFOs in the constructor; 15.5.x asks its base class to.
-    expect(STARTS_ITSELF.test(phaser) || /autostart: true/.test(phaser)).toBe(true);
+    const inConstructor = startCalls(phaser).filter((call) => /\.start\(\);$/.test(call));
+    expect(inConstructor.length === 2 || /autostart: true/.test(phaser)).toBe(true);
   });
 
   it('Vibrato starts itself', () => {
-    expect(code('effect/Vibrato.js')).toMatch(STARTS_ITSELF);
+    expect(startCalls(code('effect/Vibrato.js'))).toHaveLength(1);
   });
 });

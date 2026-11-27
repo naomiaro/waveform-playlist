@@ -5175,14 +5175,16 @@ setMasterVolume(0.5);
 
 Tone.js builds the LFO of `Chorus`, `Tremolo`, `AutoPanner` and `AutoFilter` stopped; until `start()` is called each is a fixed delay, gain, pan and filter. The library never called it, so these four built-in effects did not move, during playback or in an exported WAV. `createToneEffectInstance` now starts them, and with it the effects hooks and the WAV export. A mix that uses one of the four sounds different.
 
-Nothing to change unless you worked around it by starting the node yourself. That second `start()` now throws in Tone.js when it lands at the same audio time as the library's ("Start time must be strictly greater than previous start time"), which is always the case while the audio context is suspended and in an offline render.
+Nothing to change unless you worked around it by starting the node yourself. That second `start()` now throws in Tone.js when it lands at the same audio time as the library's ("Start time must be strictly greater than previous start time"). A call right after the instance is created does, on a running context too; so does a call at any later moment while the audio context is suspended, and any call in an offline render.
 
-**Find:** `.start()` called on the node of an effect instance: `instance.effect.start()` (before [`effect` became `input` and `output`](#effectinstanceeffect-is-replaced-by-input-and-output)) or `instance.input.start()`.
+**Find:** `.start()` called on the node of an effect instance, which is `instance.effect` (before [`effect` became `input` and `output`](#effectinstanceeffect-is-replaced-by-input-and-output)) or `instance.input`. The node is typed `ToneAudioNode | AudioNode`, so in TypeScript the call is on a cast: search for `.effect as` and `.input as` as well as for `.start()`.
 
 **Replace with:**
 
 ```tsx
 // Before
+import type { Tremolo } from 'tone';
+
 const instance = createEffectInstance(getEffectDefinition('tremolo')!);
 (instance.effect as Tremolo).start();
 

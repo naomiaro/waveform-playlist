@@ -116,8 +116,9 @@ const generateInstanceId = (): string => {
  *
  * Chorus, tremolo, auto panner and auto filter are returned with their LFO
  * started. Do not call `start()` on the node (`instance.input`) again: a
- * second start at the same audio time (always the case while the context is
- * suspended, and in an offline render) throws in Tone.js.
+ * second start at the same audio time throws in Tone.js, and that is what a
+ * call right after this one is (also while the context is suspended, and in
+ * an offline render).
  */
 export function createToneEffectInstance(
   definition: EffectDefinition,
@@ -154,8 +155,17 @@ export function createToneEffectInstance(
       (effect as ToneAudioNode & { start: () => unknown }).start();
     } catch (err) {
       // Nobody else holds the node yet: without this it would stay built,
-      // with whichever LFO did start still running.
-      effect.dispose();
+      // with whichever LFO did start still running. The start's error is the
+      // one to report, also when the dispose fails too.
+      try {
+        effect.dispose();
+      } catch (disposeError) {
+        console.warn(
+          `[waveform-playlist] Error disposing effect "${definition.id}" after its start failed: ${
+            disposeError instanceof Error ? disposeError.message : String(disposeError)
+          }`
+        );
+      }
       throw err;
     }
   }
