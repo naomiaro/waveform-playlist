@@ -67,6 +67,44 @@ function touchCacheEntry(key: string) {
   }
 }
 
+// --- Computations running per clip id ---
+// The cache key names the request, not the audio, so an id's cache entries are
+// only right for the audio the id had when they were computed (#928). Replacing
+// or removing an id's audio evicts them and marks the id's running computations
+// superseded: they read audio the id no longer has, and must not cache it.
+interface RunningComputation {
+  superseded: boolean;
+}
+const runningComputations = new Map<string, Set<RunningComputation>>();
+
+function startComputation(clipId: string): RunningComputation {
+  const computation: RunningComputation = { superseded: false };
+  const running = runningComputations.get(clipId) ?? new Set<RunningComputation>();
+  running.add(computation);
+  runningComputations.set(clipId, running);
+  return computation;
+}
+
+function finishComputation(clipId: string, computation: RunningComputation): void {
+  const running = runningComputations.get(clipId);
+  if (!running) return;
+  running.delete(computation);
+  if (running.size === 0) runningComputations.delete(clipId);
+}
+
+/** The id's audio is replaced or removed: drop what was computed from the old audio. */
+function forgetClipAudio(clipId: string): void {
+  const prefix = `${clipId}:`;
+  for (const key of fftCache.keys()) {
+    if (key.startsWith(prefix)) {
+      fftCache.delete(key);
+    }
+  }
+  for (const computation of runningComputations.get(clipId) ?? []) {
+    computation.superseded = true;
+  }
+}
+
 function generateCacheKey(params: {
   clipId: string;
   channelIndex: number;
@@ -545,50 +583,36 @@ async function handleComputeFFT(msg: ComputeFFTRequest): Promise<void> {
     // Evict oldest cache entries if at capacity
     evictLRUCacheEntries(cacheKey);
 
-    const spectrograms: SpectrogramData[] = [];
-    if (mono || channelDataArrays.length === 1) {
-      const result = await computeMonoFromChannels(
-        channelDataArrays,
-        config,
-        sampleRate,
-        effectiveOffset,
-        effectiveDuration,
-        generation
-      );
-      if (result === null) {
-        const response: ComputeResponse = { id, type: 'aborted' };
-        (self as unknown as Worker).postMessage(response);
-        return;
-      }
-      spectrograms.push(result);
-    } else if (channelFilter !== undefined) {
-      // Pool mode: compute only the requested channel
-      const channelData = channelDataArrays[channelFilter];
-      if (!channelData) {
-        const response: ComputeResponse = {
-          id,
-          type: 'error',
-          error: `channelFilter ${channelFilter} out of range (${channelDataArrays.length} channels)`,
-        };
-        (self as unknown as Worker).postMessage(response);
-        return;
-      }
-      const result = await computeFromChannelData(
-        channelData,
-        config,
-        sampleRate,
-        effectiveOffset,
-        effectiveDuration,
-        generation
-      );
-      if (result === null) {
-        const response: ComputeResponse = { id, type: 'aborted' };
-        (self as unknown as Worker).postMessage(response);
-        return;
-      }
-      spectrograms.push(result);
-    } else {
-      for (const channelData of channelDataArrays) {
+    const computation = startComputation(clipId);
+    try {
+      const spectrograms: SpectrogramData[] = [];
+      if (mono || channelDataArrays.length === 1) {
+        const result = await computeMonoFromChannels(
+          channelDataArrays,
+          config,
+          sampleRate,
+          effectiveOffset,
+          effectiveDuration,
+          generation
+        );
+        if (result === null) {
+          const response: ComputeResponse = { id, type: 'aborted' };
+          (self as unknown as Worker).postMessage(response);
+          return;
+        }
+        spectrograms.push(result);
+      } else if (channelFilter !== undefined) {
+        // Pool mode: compute only the requested channel
+        const channelData = channelDataArrays[channelFilter];
+        if (!channelData) {
+          const response: ComputeResponse = {
+            id,
+            type: 'error',
+            error: `channelFilter ${channelFilter} out of range (${channelDataArrays.length} channels)`,
+          };
+          (self as unknown as Worker).postMessage(response);
+          return;
+        }
         const result = await computeFromChannelData(
           channelData,
           config,
@@ -603,13 +627,39 @@ async function handleComputeFFT(msg: ComputeFFTRequest): Promise<void> {
           return;
         }
         spectrograms.push(result);
+      } else {
+        for (const channelData of channelDataArrays) {
+          const result = await computeFromChannelData(
+            channelData,
+            config,
+            sampleRate,
+            effectiveOffset,
+            effectiveDuration,
+            generation
+          );
+          if (result === null) {
+            const response: ComputeResponse = { id, type: 'aborted' };
+            (self as unknown as Worker).postMessage(response);
+            return;
+          }
+          spectrograms.push(result);
+        }
       }
+      if (computation.superseded) {
+        // The id's audio was replaced or removed while this ran: what it
+        // computed is not the id's audio any more (#928).
+        const response: ComputeResponse = { id, type: 'aborted' };
+        (self as unknown as Worker).postMessage(response);
+        return;
+      }
+      fftCache.set(cacheKey, {
+        spectrograms,
+        sampleOffset: effectiveOffset,
+        clipOffsetSamples: offsetSamples,
+      });
+    } finally {
+      finishComputation(clipId, computation);
     }
-    fftCache.set(cacheKey, {
-      spectrograms,
-      sampleOffset: effectiveOffset,
-      clipOffsetSamples: offsetSamples,
-    });
   } else {
     // Bump to most-recently-used so scroll-back patterns keep hot entries alive
     touchCacheEntry(cacheKey);
@@ -650,9 +700,11 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
     return;
   }
 
-  // Register audio data for a clip (pre-transfer)
+  // Register audio data for a clip (pre-transfer). New audio under an id that
+  // has audio replaces it: what was computed from the old audio goes (#928).
   if (msg.type === 'register-audio-data') {
     try {
+      forgetClipAudio(msg.clipId);
       audioDataRegistry.set(msg.clipId, {
         channelDataArrays: msg.channelDataArrays,
         sampleRate: msg.sampleRate,
@@ -670,12 +722,7 @@ self.onmessage = (e: MessageEvent<WorkerMessage>) => {
   if (msg.type === 'unregister-audio-data') {
     try {
       audioDataRegistry.delete(msg.clipId);
-      const prefix = `${msg.clipId}:`;
-      for (const key of fftCache.keys()) {
-        if (key.startsWith(prefix)) {
-          fftCache.delete(key);
-        }
-      }
+      forgetClipAudio(msg.clipId);
     } catch (err) {
       console.warn(
         '[spectrogram-worker] unregister-audio-data failed: ' +
