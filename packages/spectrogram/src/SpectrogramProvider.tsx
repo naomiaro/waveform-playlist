@@ -590,10 +590,12 @@ export const SpectrogramProvider: React.FC<SpectrogramProviderProps> = ({
       setTrackSpectrogramOverrides((prev) => {
         const next = new Map(prev);
         const existing = next.get(trackId);
+        // No render mode of its own: the track's, or the one chosen in the
+        // menu, keeps applying (review of #926).
         next.set(trackId, {
-          renderMode: existing?.renderMode ?? 'waveform',
+          ...existing,
           config,
-          ...(colorMap !== undefined ? { colorMap } : { colorMap: existing?.colorMap }),
+          colorMap: colorMap ?? existing?.colorMap,
         });
         return next;
       });

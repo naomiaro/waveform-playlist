@@ -216,6 +216,15 @@ describe('createSpectrogramWorker', () => {
       expect(api.registeredAudioClipIds()).toEqual([]);
     });
 
+    it('register and unregister after terminate post nothing and leave the list empty (#821)', () => {
+      api.terminate();
+      const posted = vi.mocked(mockWorker.worker.postMessage).mock.calls.length;
+      api.registerAudioData('a', [new Float32Array(4)], 44100);
+      api.unregisterAudioData('a');
+      expect(vi.mocked(mockWorker.worker.postMessage).mock.calls.length).toBe(posted);
+      expect(api.registeredAudioClipIds()).toEqual([]);
+    });
+
     it('skips transfer for pre-registered clip', () => {
       // Register audio data first
       api.registerAudioData('clip1', [new Float32Array(100)], 44100);
