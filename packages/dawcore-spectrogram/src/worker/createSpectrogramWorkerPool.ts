@@ -297,6 +297,13 @@ export function createSpectrogramWorkerPool(
 
     registerAudioData(clipId: string, channelDataArrays: Float32Array[], sampleRate: number): void {
       if (terminated) return;
+      // An id registered again with fewer channels: the workers past the new
+      // count still hold the old audio's channels, and nothing else would
+      // tell them to drop it.
+      const previousCount = registeredAudio.get(clipId)?.channelDataArrays.length ?? 0;
+      for (let i = channelDataArrays.length; i < Math.min(previousCount, workers.length); i++) {
+        workers[i].unregisterAudioData(clipId);
+      }
       // Retained for replay into lazily-created workers.
       registeredAudio.set(clipId, { channelDataArrays, sampleRate });
       // Worker k computes only channel k (worker 0 additionally serves mono

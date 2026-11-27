@@ -118,6 +118,56 @@ describe('worker pool — each worker holds only the channels it computes (#925)
     await promise;
   });
 
+  it('an id registered again with fewer channels is dropped by the workers past the new count', () => {
+    const { factory, workers } = trackingWorkerFactory();
+    const pool = createSpectrogramWorkerPool(factory, 3);
+    pool.registerAudioData('clip', markedChannels(3), 48000);
+
+    pool.registerAudioData('clip', markedChannels(1), 48000);
+
+    // Worker 0 holds the new audio; workers 1 and 2 are told to drop the
+    // channels they held, which the new audio does not have.
+    const last = workers.map((w) => {
+      const forClip = postedMessages(w).filter((m) => m.clipId === 'clip');
+      return forClip[forClip.length - 1].type;
+    });
+    expect(last).toEqual(['register-audio-data', 'unregister-audio-data', 'unregister-audio-data']);
+    expect(channelsIn(workers[0], 'register-audio-data')).toEqual([[0, 1, 2], [0]]);
+  });
+
+  it('an id registered again with as many or more channels is not dropped anywhere', () => {
+    const { factory, workers } = trackingWorkerFactory();
+    const pool = createSpectrogramWorkerPool(factory, 3);
+    pool.registerAudioData('clip', markedChannels(2), 48000);
+
+    pool.registerAudioData('clip', markedChannels(2), 48000);
+    pool.registerAudioData('clip', markedChannels(3), 48000);
+
+    for (const w of workers) {
+      expect(postedMessages(w).some((m) => m.type === 'unregister-audio-data')).toBe(false);
+    }
+    expect(channelsIn(workers[2], 'register-audio-data')).toEqual([[2]]);
+  });
+
+  it('an id registered again with fewer channels is not replayed into a worker added later', async () => {
+    const { factory, workers } = trackingWorkerFactory();
+    const pool = createSpectrogramWorkerPool(factory, 1);
+    pool.registerAudioData('clip', markedChannels(3), 48000);
+    pool.registerAudioData('clip', markedChannels(1), 48000);
+
+    const promise = pool.computeFFT(
+      { ...fftParams, clipId: 'other', channelDataArrays: markedChannels(3) },
+      1
+    );
+
+    expect(workers).toHaveLength(3);
+    expect(channelsIn(workers[1], 'register-audio-data')).toEqual([]);
+    expect(channelsIn(workers[2], 'register-audio-data')).toEqual([]);
+
+    for (const w of workers) ackComputeFFTs(w);
+    await promise;
+  });
+
   it('mono computeFFT still sends worker 0 every channel', async () => {
     const { factory, workers } = trackingWorkerFactory();
     const pool = createSpectrogramWorkerPool(factory, 2);
