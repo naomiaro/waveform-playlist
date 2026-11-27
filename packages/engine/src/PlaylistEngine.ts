@@ -8,7 +8,7 @@
  * the adapter call and emits `statechange`.
  */
 
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { ClipTrack, DecidedPanLaw } from '@waveform-playlist/core';
 import { AdapterSync } from './adapterSync';
 import type { TracksChange } from './adapterSync';
 import { ArrangementImpl } from './arrangement/Arrangement';
@@ -542,6 +542,17 @@ export class PlaylistEngine {
   setTrackPan(trackId: string, pan: number, options?: MixerChangeOptions): void {
     const changed = this._mixerChanged(() => this._arrangement.setTrackPan(trackId, pan, options));
     if (!changed && !this._disposed) this._adapter?.setTrackPan(trackId, pan);
+  }
+
+  /**
+   * Set a track's pan law (#684): the arrangement's `setTrackPanLaw`.
+   * Unlike the four setters above, nothing is sent to the adapter when the
+   * arrangement changed nothing (a track it does not hold, the law the
+   * track already has): for an adapter without `setTrackPanLaw` the call
+   * would be a whole-track `updateTrack`.
+   */
+  setTrackPanLaw(trackId: string, panLaw: DecidedPanLaw, options?: MixerChangeOptions): void {
+    this._arrangement.setTrackPanLaw(trackId, panLaw, options);
   }
 
   /**

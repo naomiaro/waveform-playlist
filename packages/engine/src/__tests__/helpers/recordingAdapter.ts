@@ -19,6 +19,8 @@ export interface RecordingAdapterOptions {
    * `removeTrack`, `updateTrack`), so the engine falls back to `setTracks`.
    */
   incremental?: boolean;
+  /** `false` leaves out the optional `setTrackPanLaw`, so the engine sends the track instead. */
+  panLaw?: boolean;
   /** What `setTempo` returns. `false` refuses the tempo. Left out: no `setTempo` method. */
   setTempoResult?: boolean | 'void';
 }
@@ -41,7 +43,7 @@ export function summarize(track: PlayoutTrack): TrackSummary {
  * Transport methods do nothing and are not recorded.
  */
 export function recordingAdapter(options: RecordingAdapterOptions = {}): RecordingAdapter {
-  const { incremental = true, setTempoResult } = options;
+  const { incremental = true, panLaw = true, setTempoResult } = options;
   const calls: AdapterCall[] = [];
   const rawCalls: AdapterCall[] = [];
 
@@ -95,6 +97,12 @@ export function recordingAdapter(options: RecordingAdapterOptions = {}): Recordi
     };
     adapter.updateTrack = (trackId, track) => {
       record('updateTrack', [trackId, track], [trackId, summarize(track)]);
+    };
+  }
+
+  if (panLaw) {
+    adapter.setTrackPanLaw = (trackId, law) => {
+      record('setTrackPanLaw', [trackId, law]);
     };
   }
 

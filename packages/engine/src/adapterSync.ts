@@ -18,6 +18,7 @@ import type {
   ArrangementTrack,
   AudioClip,
   ClipTrack,
+  PanLaw,
   PlayoutTrack,
   TrackViewField,
 } from '@waveform-playlist/core';
@@ -142,6 +143,14 @@ export class AdapterSync {
     }
     if (values.soloed !== undefined) this._adapter?.setTrackSolo(trackId, values.soloed);
     if (values.pan !== undefined) this._adapter?.setTrackPan(trackId, values.pan);
+    if (values.panLaw !== undefined) this._sendPanLaw(trackId, values.panLaw);
+  }
+
+  /** The adapter's setter for a pan law, or, for an adapter without one, the track again (#684). */
+  private _sendPanLaw(trackId: string, panLaw: PanLaw): void {
+    if (!this._adapter) return;
+    if (this._adapter.setTrackPanLaw) this._adapter.setTrackPanLaw(trackId, panLaw);
+    else this.sendTrack(trackId);
   }
 
   /**
