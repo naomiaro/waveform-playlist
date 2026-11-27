@@ -1,4 +1,4 @@
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { PlayoutTrack } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '@waveform-playlist/engine';
 import { Transport } from './transport';
 import type { Tick, TransportOptions, CountInMode } from './types';
@@ -83,11 +83,11 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
     }
   }
 
-  setTracks(tracks: ClipTrack[]): void {
+  setTracks(tracks: readonly PlayoutTrack[]): void {
     this._transport.setTracks(tracks);
   }
 
-  addTrack(track: ClipTrack): void {
+  addTrack(track: PlayoutTrack): void {
     this._transport.addTrack(track);
   }
 
@@ -95,7 +95,7 @@ export class NativePlayoutAdapter implements PlayoutAdapter {
     this._transport.removeTrack(trackId);
   }
 
-  updateTrack(trackId: string, track: ClipTrack): void {
+  updateTrack(trackId: string, track: PlayoutTrack): void {
     this._transport.updateTrack(trackId, track);
   }
 

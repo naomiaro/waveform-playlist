@@ -1,4 +1,4 @@
-import type { ClipTrack } from '@waveform-playlist/core';
+import type { PlayoutTrack } from '@waveform-playlist/core';
 import type { PlayoutAdapter } from '../../types';
 
 /** A track as an adapter call names it: its id and the ids of its clips, in order. */
@@ -32,7 +32,7 @@ export interface RecordingAdapter extends PlayoutAdapter {
   reset(): void;
 }
 
-export function summarize(track: ClipTrack): TrackSummary {
+export function summarize(track: PlayoutTrack): TrackSummary {
   return { id: track.id, clips: track.clips.map((clip) => clip.id) };
 }
 

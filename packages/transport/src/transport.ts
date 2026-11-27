@@ -1,4 +1,4 @@
-import { trackChannelCount, type ClipTrack } from '@waveform-playlist/core';
+import { trackChannelCount, type PlayoutTrack } from '@waveform-playlist/core';
 import type {
   Tick,
   Sample,
@@ -91,7 +91,7 @@ export class Transport {
   private _metronomePlayer!: MetronomePlayer;
   private _masterNode!: MasterNode;
   private _trackNodes: Map<string, TrackNode> = new Map();
-  private _tracks: ClipTrack[] = [];
+  private _tracks: readonly PlayoutTrack[] = [];
   private _soloedTrackIds: Set<string> = new Set();
   private _mutedTrackIds: Set<string> = new Set();
   private _playing = false;
@@ -469,7 +469,7 @@ export class Transport {
 
   // --- Tracks ---
 
-  setTracks(tracks: ClipTrack[]): void {
+  setTracks(tracks: readonly PlayoutTrack[]): void {
     // Dispose existing track nodes
     for (const node of this._trackNodes.values()) {
       node.dispose();
@@ -500,7 +500,7 @@ export class Transport {
     this._clipPlayer.setTracks(tracks, this._trackNodes);
   }
 
-  addTrack(track: ClipTrack): void {
+  addTrack(track: PlayoutTrack): void {
     const trackNode = new TrackNode(track.id, this._audioContext, trackChannelCount(track));
     trackNode.setVolume(track.volume);
     trackNode.setPan(track.pan);
@@ -532,7 +532,7 @@ export class Transport {
     this._clipPlayer.setTracks(this._tracks, this._trackNodes);
   }
 
-  updateTrack(trackId: string, track: ClipTrack): void {
+  updateTrack(trackId: string, track: PlayoutTrack): void {
     this._tracks = this._tracks.map((t) => (t.id === trackId ? track : t));
 
     const node = this._trackNodes.get(trackId);

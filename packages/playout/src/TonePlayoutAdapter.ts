@@ -1,4 +1,4 @@
-import type { ClipTrack, Track } from '@waveform-playlist/core';
+import type { PlayoutTrack, Track } from '@waveform-playlist/core';
 import {
   clipStartTime,
   clipEndTime,
@@ -96,7 +96,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
   // Snapshot of the adapter's tracks, kept fresh by setTracks/addTrack/
   // updateTrack/removeTrack and the per-track control setters. Used by
   // setSoundFontCache to rebuild MIDI tracks without an engine round-trip.
-  const _currentTracks = new Map<string, ClipTrack>();
+  const _currentTracks = new Map<string, PlayoutTrack>();
   // What each MIDI track was built with (null = PolySynth), by track id. The
   // rebuild guard compares effective routing against this build record —
   // not against the previous setSoundFontCache argument — because the same
@@ -107,11 +107,11 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
   // (#756): audio clips for an audio track, MIDI clips for a MIDI track. The
   // engine rejects a track whose clips do not match its kind, so the filters
   // below only drop what cannot play yet (an undecoded clip, an empty note list).
-  function playableAudioClips(track: ClipTrack) {
+  function playableAudioClips(track: PlayoutTrack) {
     return track.clips.filter((c) => c.audioBuffer && !c.midiNotes);
   }
 
-  function addAudioTrackToPlayout(p: TonePlayout, track: ClipTrack): void {
+  function addAudioTrackToPlayout(p: TonePlayout, track: PlayoutTrack): void {
     const audioClips = playableAudioClips(track);
     if (audioClips.length === 0) return;
 
@@ -120,7 +120,9 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
 
     const trackObj: Track = {
       id: track.id,
-      name: track.name,
+      // The adapter is not given the track's name (a view field, core's
+      // TRACK_VIEW_FIELDS); nothing in TonePlayout reads this one.
+      name: track.id,
       gain: track.volume,
       muted: track.muted,
       soloed: track.soloed,
@@ -147,7 +149,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
     });
   }
 
-  function addMidiTrackToPlayout(p: TonePlayout, track: ClipTrack): void {
+  function addMidiTrackToPlayout(p: TonePlayout, track: PlayoutTrack): void {
     const midiClips = track.clips.filter((c) => c.midiNotes && c.midiNotes.length > 0);
     if (midiClips.length === 0) return;
 
@@ -158,7 +160,9 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
 
     const trackObj: Track = {
       id: trackId,
-      name: track.name,
+      // The adapter is not given the track's name (a view field, core's
+      // TRACK_VIEW_FIELDS); nothing in TonePlayout reads this one.
+      name: track.id,
       gain: track.volume,
       muted: track.muted,
       soloed: track.soloed,
@@ -194,7 +198,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
     } else {
       if (_soundFontCache) {
         console.warn(
-          `[waveform-playlist] SoundFont not loaded for track "${track.name}" — falling back to PolySynth.`
+          `[waveform-playlist] SoundFont not loaded for track "${track.id}" — falling back to PolySynth.`
         );
       }
       p.addMidiTrack({
@@ -206,8 +210,8 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
     }
   }
 
-  // Add a single ClipTrack to the playout (shared by buildPlayout and addTrack)
-  function addTrackToPlayout(p: TonePlayout, track: ClipTrack): void {
+  // Add a single PlayoutTrack to the playout (shared by buildPlayout and addTrack)
+  function addTrackToPlayout(p: TonePlayout, track: PlayoutTrack): void {
     if (trackKind(track) === 'midi') {
       addMidiTrackToPlayout(p, track);
     } else {
@@ -217,7 +221,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
 
   // Recreates TonePlayout after dispose. The initial playout is created eagerly
   // above. setTracks() uses the incremental path when playout exists.
-  function buildPlayout(tracks: ClipTrack[]): void {
+  function buildPlayout(tracks: readonly PlayoutTrack[]): void {
     if (playout) {
       try {
         playout.dispose();
@@ -301,7 +305,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       }
     },
 
-    setTracks(tracks: ClipTrack[]): void {
+    setTracks(tracks: readonly PlayoutTrack[]): void {
       _currentTracks.clear();
       _midiTrackBuild.clear();
       for (const track of tracks) {
@@ -338,7 +342,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       }
     },
 
-    updateTrack(trackId: string, track: ClipTrack): void {
+    updateTrack(trackId: string, track: PlayoutTrack): void {
       _currentTracks.set(trackId, track);
 
       if (!playout) return;
@@ -383,7 +387,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
       }
     },
 
-    addTrack(track: ClipTrack): void {
+    addTrack(track: PlayoutTrack): void {
       _currentTracks.set(track.id, track);
 
       if (!playout) {
@@ -595,7 +599,7 @@ export function createToneAdapter(options?: ToneAdapterOptions): ToneAdapter {
           changed = true;
         } catch (err) {
           console.warn(
-            `[waveform-playlist] SoundFont swap failed for track "${track.name}": ` + String(err)
+            `[waveform-playlist] SoundFont swap failed for track "${track.id}": ` + String(err)
           );
         }
       }

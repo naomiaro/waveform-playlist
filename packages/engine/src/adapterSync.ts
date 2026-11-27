@@ -5,13 +5,22 @@
  * makes the adapter call for it. It also holds the projection the adapter
  * and `getState()` are given: the arrangement's tracks without the clips
  * that are still loading and with the current mixer values in their fields
- * (the track a take is recording onto muted, #843). Everything here is derived from the
+ * (the track a take is recording onto muted, #843). The adapter is given
+ * that projection without the fields that say how a track is drawn (core's
+ * `TRACK_VIEW_FIELDS`), and a change of those fields alone makes no adapter
+ * call. Everything here is derived from the
  * arrangement or is bookkeeping about what the adapter was sent; nothing is
  * written back.
  */
 
-import { isLoadingClip } from '@waveform-playlist/core';
-import type { ArrangementTrack, AudioClip, ClipTrack } from '@waveform-playlist/core';
+import { isLoadingClip, TRACK_VIEW_FIELDS } from '@waveform-playlist/core';
+import type {
+  ArrangementTrack,
+  AudioClip,
+  ClipTrack,
+  PlayoutTrack,
+  TrackViewField,
+} from '@waveform-playlist/core';
 import type {
   ArrangementChange,
   ArrangementImpl,
@@ -83,6 +92,15 @@ export class AdapterSync {
     return tracks;
   }
 
+  /**
+   * `tracks()` as the adapter is given them: without the view fields. Made
+   * for each send; nothing depends on the adapter's tracks keeping their
+   * identity between sends.
+   */
+  private _playoutTracks(): readonly PlayoutTrack[] {
+    return freezeTracksInDevelopment(this.tracks().map((track) => this._playout(track)));
+  }
+
   /** When an engine attaches: send the tracks that are there. With none, the adapter is in step as it is. */
   sendInitialTracks(): void {
     if (this._arrangement.getTracks().length > 0) {
@@ -95,7 +113,7 @@ export class AdapterSync {
   /** Send the adapter every track, and remember up to which change that covers. */
   sendAllTracks(): void {
     const version = this._arrangement.tracksVersion;
-    this._adapter?.setTracks(this.tracks());
+    this._adapter?.setTracks(this._playoutTracks());
     // Only now: a send that threw has covered nothing.
     this._syncedTracksVersion = version;
   }
@@ -105,7 +123,7 @@ export class AdapterSync {
     const track = this._arrangement.getTracks().find((t) => t.id === trackId);
     if (!track) return false;
     if (this._adapter?.updateTrack) {
-      this._adapter.updateTrack(trackId, this._project(track));
+      this._adapter.updateTrack(trackId, this._playout(this._project(track)));
     } else {
       this.sendAllTracks();
     }
@@ -219,7 +237,7 @@ export class AdapterSync {
   private _addTrack(trackId: string): void {
     const track = this._arrangement.getTracks().find((t) => t.id === trackId);
     if (track && this._adapter?.addTrack) {
-      this._adapter.addTrack(this._project(track));
+      this._adapter.addTrack(this._playout(this._project(track)));
     } else {
       this.sendAllTracks();
     }
@@ -262,10 +280,12 @@ export class AdapterSync {
     if (before.clips.some((clip, i) => clip !== now.clips[i])) return false;
     const keys = new Set([...Object.keys(before), ...Object.keys(now)]) as Set<keyof ClipTrack>;
     keys.delete('clips');
+    // How a track is drawn is not what the adapter plays (TRACK_VIEW_FIELDS).
+    for (const field of TRACK_VIEW_FIELDS) keys.delete(field);
     return [...keys].every((key) => Object.is(before[key], now[key]));
   }
 
-  /** What an adapter and `getState()` are given for one of the arrangement's tracks. */
+  /** What `getState()` is given for one of the arrangement's tracks (an adapter: `_playout` of it). */
   private _project(track: ArrangementTrack): ClipTrack {
     return this._withMix(this._loaded(track));
   }
@@ -294,6 +314,13 @@ export class AdapterSync {
     return (
       this._arrangement.recordingTrackIds.has(trackId) && this._arrangement.getMixer().has(trackId)
     );
+  }
+
+  /** A projected track without its view fields: a copy that shares its clips. */
+  private _playout(track: ClipTrack): PlayoutTrack {
+    const copy: Partial<Pick<ClipTrack, TrackViewField>> & PlayoutTrack = { ...track };
+    for (const field of TRACK_VIEW_FIELDS) delete copy[field];
+    return freezeTrackInDevelopment(copy);
   }
 
   /**

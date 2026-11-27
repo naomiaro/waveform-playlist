@@ -523,8 +523,13 @@ describe('a change to loading clips only is not sent to the adapter', () => {
       { method: 'updateTrack', args: ['A', { id: 'A', clips: ['a1'] }] },
     ]);
 
+    // Rule (review of #930, view fields): a rename alone is not sent, the name
+    // being one of core's TRACK_VIEW_FIELDS; a field the adapter plays is.
+    // (Before: the rename was sent.)
     adapter.reset();
     arrangement.updateTrack('A', (current) => ({ ...current, name: 'renamed' }));
+    expect(adapter.calls).toEqual([]);
+    arrangement.updateTrack('A', (current) => ({ ...current, volume: 0.5 }));
     expect(adapter.calls.map((call) => call.method)).toEqual(['updateTrack']);
 
     // The order of the loaded clips is theirs too.
