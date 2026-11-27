@@ -710,7 +710,7 @@ A clip of the other kind still plays, under the track's law. The law converts no
 - a stereo clip on a mono-law track stays stereo, plays 3 dB lower at centre than it would on a stereo-law track, and a hard pan mutes one side instead of folding it in;
 - a mono clip on a stereo-law track plays 3 dB louder at centre than it would on a mono-law track.
 
-To choose the law yourself, set it when you make the track, or change it later. A change is an undo step, and it takes effect during playback without restarting the track's clips:
+To choose the law yourself, set it when you make the track, or change it later. The built-in track controls do not offer it: the [track management guide](./track-management.md#pan-law) has a small control you can add. A change is an undo step, and it takes effect during playback without restarting the track's clips:
 
 ```tsx
 // When the track is made

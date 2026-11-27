@@ -133,7 +133,7 @@ Every audio track now has a pan law of its own, `'mono'` or `'stereo'`. It is de
 - A track that was emptied keeps its law for the next audio it is given. So does a track id you reuse: `setTracks` or `updateTrack` with an id the arrangement already holds keeps that id's law, as it keeps its volume and pan. Use a new id for new material (the default: `audioTrack()` and `createTrack()` generate one), or set the law.
 - A new track whose first clips are a mono file and a stereo file, both loading, takes the law of whichever finishes first. Previously it had the stereo law once both were in.
 
-**Find:** nothing to search for in most apps. If you want a particular law on a track that mixes mono and stereo clips, say so:
+**Find:** nothing to search for in most apps. If you want a particular law on a track that mixes mono and stereo clips, say so (the built-in track controls have no pan-law control, so a person using your app can change it only through one you draw):
 
 ```tsx
 // When the track is made

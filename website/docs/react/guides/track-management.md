@@ -363,7 +363,7 @@ setTrackPan(trackId, -1);
 
 ### Pan law
 
-How a track is panned depends on its pan law: `'mono'` (equal power, 3 dB down per side at centre) or `'stereo'` (unity at centre). A track takes the law of the first audio it holds and keeps it, whatever clips follow; `useTrack().panLaw` reads `'auto'` until then. To let a user choose:
+How a track is panned depends on its pan law: `'mono'` (equal power, 3 dB down per side at centre) or `'stereo'` (unity at centre). A track takes the law of the first audio it holds and keeps it, whatever clips follow; `useTrack().panLaw` reads `'auto'` until then. The built-in panel (`DefaultTrackControls`) has no control for it, so the law can only be changed by a control your app draws. To let a user choose:
 
 ```tsx
 // In a track's panel (among the children of <WaveformTrackControls>)
