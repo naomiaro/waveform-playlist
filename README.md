@@ -47,9 +47,9 @@ Next:
 npm install @waveform-playlist/browser@next @waveform-playlist/playout@next @waveform-playlist/core@next tone @dnd-kit/react
 ```
 
-`tone`, `@waveform-playlist/playout` (the Tone.js engine) and `@dnd-kit/react` are peer dependencies of `browser`. `@waveform-playlist/core` is listed because your own code imports from it.
+`tone`, `@waveform-playlist/playout` (the Tone.js engine) and `@dnd-kit/react` are peer dependencies of `browser`. So are `react`, `react-dom`, `styled-components`, `@dnd-kit/dom` and `@dnd-kit/abstract`, which npm 7 and later installs for you (Yarn does not). `@waveform-playlist/core` is listed because your own code imports from it.
 
-**On next, add `@next` to every `@waveform-playlist/*` and `@dawcore/*` package you install,** not only the ones above. A `latest` package beside `@next` ones can fail their peer ranges (`annotations@latest` peers on `browser ^16`). The commands in the next docs carry the tag already.
+**On next, add `@next` to every `@waveform-playlist/*` and `@dawcore/*` package you install,** not only the ones above. A `latest` package beside `@next` ones can fail its own peer ranges (`annotations@latest` peers on `browser ^16`). The commands in the next docs carry the tag already.
 
 **React:** next requires React 19.
 
@@ -204,7 +204,7 @@ const { startRecording, stopRecording, isRecording } = useIntegratedRecording(
 
 `@dawcore/components` provides framework-agnostic Web Components for multi-track audio editing — no React required. Built with Lit, adapter-pluggable: choose between `@dawcore/transport` (native Web Audio) or `@waveform-playlist/playout` (Tone.js).
 
-On next, add `@next` to each of these packages, as above.
+On next, add `@next` to each `@waveform-playlist/*` and `@dawcore/*` package below (not to `tone`), as above.
 
 ```bash
 npm install @dawcore/components @waveform-playlist/core @waveform-playlist/engine
