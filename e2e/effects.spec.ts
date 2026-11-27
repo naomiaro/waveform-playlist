@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+import { readFileSync } from 'fs';
 
 /**
  * Effects example tests
@@ -32,6 +33,73 @@ function sineWav(seconds: number, sampleRate = 48000): Buffer {
     buffer.writeInt16LE(Math.round(sample * 32767), 44 + i * 2);
   }
   return buffer;
+}
+
+/** A stereo 16-bit PCM WAV holding the same 220 Hz sine on both channels. */
+function stereoSineWav(seconds: number, sampleRate = 48000): Buffer {
+  const frames = Math.round(seconds * sampleRate);
+  const buffer = Buffer.alloc(44 + frames * 4);
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + frames * 4, 4);
+  buffer.write('WAVEfmt ', 8);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20); // PCM
+  buffer.writeUInt16LE(2, 22); // stereo
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * 4, 28);
+  buffer.writeUInt16LE(4, 32);
+  buffer.writeUInt16LE(16, 34);
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(frames * 4, 40);
+  for (let i = 0; i < frames; i++) {
+    const sample = Math.round(Math.sin((2 * Math.PI * 220 * i) / sampleRate) * 0.3 * 32767);
+    buffer.writeInt16LE(sample, 44 + i * 4);
+    buffer.writeInt16LE(sample, 44 + i * 4 + 2);
+  }
+  return buffer;
+}
+
+/**
+ * How much a 16-bit PCM WAV of a steady 220 Hz sine differs from itself a
+ * tenth of a second later, as an RMS over 1 s to 2.8 s, the larger of the
+ * channels. A tenth of a second is 22 whole periods of the sine at any sample
+ * rate that is a multiple of 10, so whatever the effect does to it, an effect
+ * that does not change over time gives the same samples again: about 0, up
+ * to the 16-bit rounding. Only something that moves gives more.
+ */
+function changeOverATenthOfASecond(wav: Buffer): { channels: number; change: number } {
+  const channels = wav.readUInt16LE(22);
+  const sampleRate = wav.readUInt32LE(24);
+  expect(wav.readUInt16LE(34)).toBe(16);
+  expect(sampleRate % 10).toBe(0);
+  const lag = sampleRate / 10;
+  const sample = (frame: number, channel: number) =>
+    wav.readInt16LE(44 + (frame * channels + channel) * 2) / 32768;
+  let change = 0;
+  for (let channel = 0; channel < channels; channel++) {
+    let sum = 0;
+    let level = 0;
+    let count = 0;
+    for (let frame = sampleRate; frame < 2.8 * sampleRate; frame++) {
+      const now = sample(frame, channel);
+      const d = now - sample(frame + lag, channel);
+      sum += d * d;
+      level += now * now;
+      count++;
+    }
+    // The sine reaches the file: a silent export would also read "no change".
+    expect(Math.sqrt(level / count)).toBeGreaterThan(0.01);
+    change = Math.max(change, Math.sqrt(sum / count));
+  }
+  return { channels, change };
+}
+
+async function exportMix(page: Page): Promise<Buffer> {
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 120_000 }),
+    page.getByRole('button', { name: 'Export Mix', exact: true }).click(),
+  ]);
+  return readFileSync(await download.path());
 }
 
 test.describe('Effects Example', () => {
@@ -251,6 +319,54 @@ test.describe('Effects Example', () => {
       // Select All Tracks (ZIP)
       await exportDropdown.selectOption('All Tracks (ZIP)');
       await expect(exportDropdown).toHaveValue('all');
+    });
+
+    // Tone's Chorus, Tremolo, AutoPanner and AutoFilter have an LFO that runs
+    // only after start(); never started, each is a fixed delay, gain, pan and
+    // filter (#820). A steady stereo sine, soloed, is exported through each
+    // on the master chain: the file has to change over time.
+    test.describe('an LFO effect modulates in an exported WAV', () => {
+      test.beforeEach(async ({ page }) => {
+        // The page starts with a reverb on the master chain. Its tail is
+        // noise that is still dying away in the measured second, so it goes.
+        await expect(page.getByRole('heading', { name: 'Reverb', exact: true })).toBeVisible();
+        await page.getByRole('button', { name: 'Clear All', exact: true }).click();
+        await expect(page.getByRole('heading', { name: 'Reverb', exact: true })).toHaveCount(0);
+
+        await page.locator('input[type="file"]').setInputFiles({
+          name: 'steady.wav',
+          mimeType: 'audio/wav',
+          buffer: stereoSineWav(3),
+        });
+        const rows = page.locator('[data-track-row]');
+        await expect(rows).toHaveCount(5, { timeout: 10000 });
+        await expect(rows.nth(4).locator('[data-clip-placeholder="true"]')).toHaveCount(0, {
+          timeout: 10000,
+        });
+        const solo = page.getByRole('button', { name: 'Solo', exact: true }).nth(4);
+        await solo.click();
+        await expect(solo).toHaveAttribute('aria-pressed', 'true');
+      });
+
+      test('control: without an effect the exported sine does not change over time', async ({
+        page,
+      }) => {
+        const { channels, change } = changeOverATenthOfASecond(await exportMix(page));
+        expect(channels).toBe(2);
+        expect(change).toBeLessThan(0.001);
+      });
+
+      for (const name of ['Chorus', 'Tremolo', 'Auto Panner', 'Auto Filter']) {
+        test(name, async ({ page }) => {
+          await page.locator('select').nth(1).selectOption(name);
+          await page.getByRole('button', { name: 'Add Effect', exact: true }).click();
+          await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+
+          const { channels, change } = changeOverATenthOfASecond(await exportMix(page));
+          expect(channels).toBe(2);
+          expect(change).toBeGreaterThan(0.01);
+        });
+      }
     });
   });
 

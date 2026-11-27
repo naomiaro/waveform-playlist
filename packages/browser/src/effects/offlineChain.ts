@@ -1,6 +1,6 @@
 /**
  * Shared offline effects chain builder for WAV export (master + per-track).
- * Natives are re-created fresh on the current (offline) context; WAM entries
+ * Tone.js built-ins are re-created fresh on the current (offline) context; WAM entries
  * are re-instantiated on the offline context from their URL-cached factories
  * with the live instance's state transferred (cloneInstanceInto — worklets
  * are context-bound); registered custom effects run their `prepare` hook on

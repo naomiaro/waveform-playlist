@@ -731,7 +731,7 @@ One case depends on order: a new track whose first clips are a mono file and a s
 
 The WAV export pans each track with the same law, and writes a stereo file when any audible track has the stereo law or a stereo clip.
 
-You can still use `Panner`, `AutoPanner` or a `StereoPannerNode` as an **effect** inside a track's chain.
+You can still use `Panner`, `AutoPanner` or a `StereoPannerNode` as an **effect** inside a track's chain. An `AutoPanner` you construct yourself does not move until you call its `start()` (the same holds for Tone's `AutoFilter`, `Chorus` and `Tremolo`); the built-in effects of that name are started for you.
 
 ## Learn More
 

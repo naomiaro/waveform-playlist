@@ -43,6 +43,8 @@ vi.mock('@waveform-playlist/playout', () => ({
 vi.mock('tone', () => {
   const toneEffectStub = () => ({
     dispose: vi.fn(),
+    // The factory starts chorus, tremolo, auto panner and auto filter (#820).
+    start: vi.fn(),
     connect: vi.fn(),
     disconnect: vi.fn(),
     set: vi.fn(),

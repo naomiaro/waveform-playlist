@@ -3,7 +3,8 @@
  * AudioWorkletNode) joins the same ordered chain as Tone effects; linking
  * goes through Tone's connect()/disconnect() helpers, which bridge
  * native↔Tone in both directions. Requires native-context mode (the caller
- * guards; see useDynamicEffects.addWamEffect).
+ * guards: `EffectsRack.addWam` in effectsRack.ts, which `addWamEffect` and
+ * `addWamEffectToTrack` of the effects hooks call).
  */
 import { connect, disconnect } from 'tone';
 import type { InputNode } from 'tone';
