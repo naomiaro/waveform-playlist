@@ -393,7 +393,9 @@ describe('<daw-editor> control gestures (#843)', () => {
   it('a mute click is one step', async () => {
     const { editor, id, engine } = await editorWithTrack();
     const muteButton = () =>
-      controlsFor(editor, id).shadowRoot.querySelector('button[title="Mute"]') as HTMLElement;
+      controlsFor(editor, id).shadowRoot.querySelector(
+        'button[aria-label="Mute, A"]'
+      ) as HTMLElement;
     muteButton().click();
     await editor.updateComplete;
     await controlsFor(editor, id).updateComplete;

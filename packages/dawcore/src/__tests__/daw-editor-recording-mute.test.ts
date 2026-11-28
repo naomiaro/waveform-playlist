@@ -135,8 +135,12 @@ describe('<daw-editor> during a take (#843)', () => {
 
   it("the take's track's mute button is disabled during the take and enabled after", async () => {
     const { editor, aId, bId } = await makeEditor();
-    const muteOf = (id: string) =>
-      controlsFor(editor, id).shadowRoot.querySelector('button[title="Mute"]') as HTMLButtonElement;
+    const muteOf = (id: string) => {
+      const controls = controlsFor(editor, id);
+      return controls.shadowRoot.querySelector(
+        `button[aria-label="Mute, ${controls.trackName}"]`
+      ) as HTMLButtonElement;
+    };
     await editor.updateComplete;
     expect(controlsFor(editor, aId).recording).toBe(false);
 

@@ -1,6 +1,7 @@
 /**
  * dawcore: a mixer move is an undo step, one per gesture (#843).
  *
+ * The native sliders are also exposed by control and track name (#910).
  * A pointer drag on a range input fires many native `input` events and one
  * `change` on release. `<daw-track-controls>` sends every `input` with its
  * slider's gesture id, so the whole drag is one step and one Undo brings the
@@ -19,17 +20,20 @@ interface EditorProbe {
   canUndo: boolean;
   shadowRoot: ShadowRoot | null;
   engine: {
-    getState(): { tracks: ReadonlyArray<{ name: string; volume: number }> };
+    getState(): { tracks: ReadonlyArray<{ name: string; volume: number; pan: number }> };
   } | null;
 }
 
-/** The engine's volume of the named track, or null before it has loaded. */
-const engineVolume = (page: Page, name: string) =>
-  page.evaluate((trackName) => {
-    const editor = document.querySelector('daw-editor') as unknown as EditorProbe;
-    const track = editor.engine?.getState().tracks.find((t) => t.name === trackName);
-    return track ? track.volume : null;
-  }, name);
+/** The engine's mixer value for the named track, or null before it has loaded. */
+const engineMixerValue = (page: Page, trackName: string, control: 'volume' | 'pan') =>
+  page.evaluate(
+    ({ trackName, control }) => {
+      const editor = document.querySelector('daw-editor') as unknown as EditorProbe;
+      const track = editor.engine?.getState().tracks.find((t) => t.name === trackName);
+      return track ? track[control] : null;
+    },
+    { trackName, control }
+  );
 
 const canUndo = (page: Page) =>
   page.evaluate(() => (document.querySelector('daw-editor') as unknown as EditorProbe).canUndo);
@@ -53,21 +57,63 @@ test.describe('dawcore mixer undo (#843)', () => {
     );
   });
 
+  test('track controls have distinct accessible names and accept arrow keys', async ({ page }) => {
+    const volume = page.getByRole('slider', { name: 'Volume, Kick', exact: true });
+    const pan = page.getByRole('slider', { name: 'Pan, Kick', exact: true });
+    await expect(volume).toHaveValue('1');
+    await expect(pan).toHaveValue('0');
+    await expect(page.getByRole('slider', { name: 'Volume, HiHat', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('slider', { name: 'Pan, HiHat', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Mute, Kick', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Solo, Kick', exact: true })).toHaveCount(1);
+
+    await volume.press('ArrowLeft');
+    await expect(volume).toHaveValue('0.99');
+    await expect.poll(() => engineMixerValue(page, TRACK_NAME, 'volume')).toBe(0.99);
+    await pan.press('ArrowRight');
+    await expect(pan).toHaveValue('0.01');
+    await expect.poll(() => engineMixerValue(page, TRACK_NAME, 'pan')).toBe(0.01);
+  });
+
+  test('the app can format accessible names for the editor mixer', async ({ page }) => {
+    await page.evaluate(() => {
+      Object.assign(document.querySelector('daw-editor')!, {
+        formatTrackControlLabel: (control: string, trackName: string) => {
+          if (control === 'volume') return `${trackName} : niveau sonore`;
+          if (control === 'pan') return `${trackName} : balance`;
+          return undefined;
+        },
+      });
+    });
+
+    await expect(
+      page.getByRole('slider', { name: 'Kick : niveau sonore', exact: true })
+    ).toHaveCount(1);
+    await expect(page.getByRole('slider', { name: 'HiHat : balance', exact: true })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Mute, Kick', exact: true })).toHaveCount(1);
+  });
+
+  test('standalone track controls without a track name use the default names', async ({ page }) => {
+    await page.evaluate(() => {
+      const controls = document.createElement('daw-track-controls');
+      controls.id = 'standalone-mixer';
+      controls.style.height = '128px';
+      document.body.prepend(controls);
+    });
+
+    const controls = page.locator('#standalone-mixer');
+    await expect(controls.getByRole('slider', { name: 'Volume', exact: true })).toHaveCount(1);
+    await expect(controls.getByRole('slider', { name: 'Pan', exact: true })).toHaveCount(1);
+  });
+
   test('a dawcore volume drag is one undo step', async ({ page }) => {
-    // One track's controls, found by the name they show.
-    const controls = page
-      .locator('daw-track-controls')
-      .filter({ has: page.locator('.name', { hasText: TRACK_NAME }) });
-    await expect(controls).toHaveCount(1);
-    // The range inputs have no accessible name; the volume row's class names
-    // the slider inside this one track's controls.
-    const volume = controls.locator('.vol-row input[type="range"]');
+    const volume = page.getByRole('slider', { name: `Volume, ${TRACK_NAME}`, exact: true });
     await volume.scrollIntoViewIfNeeded();
     await expect(volume).toBeVisible();
 
     const startValue = await volume.inputValue();
     expect(Number(startValue)).toBe(1);
-    expect(await engineVolume(page, TRACK_NAME)).toBe(1);
+    expect(await engineMixerValue(page, TRACK_NAME, 'volume')).toBe(1);
     expect(await canUndo(page)).toBe(false);
 
     // A real pointer drag from the right end (volume 1) to the left third:
@@ -85,7 +131,7 @@ test.describe('dawcore mixer undo (#843)', () => {
     await page.mouse.move(x + width * 0.3, midY, { steps: 8 });
     await page.mouse.up();
 
-    await expect.poll(() => engineVolume(page, TRACK_NAME)).toBeLessThan(0.5);
+    await expect.poll(() => engineMixerValue(page, TRACK_NAME, 'volume')).toBeLessThan(0.5);
     expect(Number(await volume.inputValue())).toBeLessThan(0.5);
     expect(await canUndo(page)).toBe(true);
 
@@ -95,7 +141,7 @@ test.describe('dawcore mixer undo (#843)', () => {
     await page.keyboard.press('ControlOrMeta+z');
 
     // One Undo takes back the whole drag, and the slider follows the engine.
-    await expect.poll(() => engineVolume(page, TRACK_NAME)).toBe(1);
+    await expect.poll(() => engineMixerValue(page, TRACK_NAME, 'volume')).toBe(1);
     await expect(volume).toHaveValue(startValue);
     expect(await canUndo(page)).toBe(false);
   });

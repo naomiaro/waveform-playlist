@@ -66,6 +66,7 @@ import {
   mixOfTrack,
 } from '../utils/track-mix';
 import '../elements/daw-track-controls';
+import type { DawTrackControlLabelFormatter } from './daw-track-controls';
 import '../elements/daw-grid';
 import { hostStyles, clipStyles } from '../styles/theme';
 import { ViewportController } from '../controllers/viewport-controller';
@@ -358,6 +359,8 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
    * track's controls. Reordering is purely organizational.
    */
   @property({ type: Boolean, attribute: 'track-reordering' }) trackReordering = false;
+  /** Format the accessible names of the built-in volume, pan, mute and solo controls. */
+  @property({ attribute: false }) formatTrackControlLabel?: DawTrackControlLabelFormatter;
   /**
    * Default spectrogram FFT/render config inherited by tracks with
    * `render-mode="spectrogram"` that do not set their own. Wired into the
@@ -4641,6 +4644,7 @@ export class DawEditorElement extends LitElement implements MidiLoaderHost {
                         style="height: ${t.trackHeight}px;"
                         .trackId=${t.trackId}
                         .trackName=${t.descriptor?.name ?? 'Untitled'}
+                        .formatTrackControlLabel=${this.formatTrackControlLabel}
                         .volume=${mix.volume}
                         .pan=${mix.pan}
                         .muted=${mix.muted}

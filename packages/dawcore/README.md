@@ -530,6 +530,15 @@ Container that resolves target editor. Children: `<daw-play-button>`, `<daw-paus
 
 Per-track UI for volume, pan, mute, solo. Draws the arrangement's mix (so it follows Undo and Redo), dispatches `daw-track-control` and `daw-track-remove` events. One slider drag or key press is one undo step, each Mute or Solo click is one. Keyboard Undo does not fire while a slider has focus.
 
+The accessible names are `Volume`, `Pan`, `Mute`, and `Solo`, followed by the track name when set (for example, `Volume, Kick`). For localization, set the JS property `editor.formatTrackControlLabel` once for the built-in mixer, or set `formatTrackControlLabel` on a standalone `<daw-track-controls>`. The formatter receives the control (`volume`, `pan`, `mute`, or `solo`) and the current track name (an empty string for an unnamed strip). Return the entire label so your app can choose the word order, or return `undefined` to use the English name.
+
+```javascript
+editor.formatTrackControlLabel = (control, trackName) => {
+  const label = { volume: 'Niveau sonore', pan: 'Balance', mute: 'Muet', solo: 'Solo' }[control];
+  return trackName ? `${trackName} : ${label}` : label;
+};
+```
+
 ### `<daw-keyboard-shortcuts>`
 
 Render-less child of `<daw-editor>`. Boolean attributes: `playback`, `splitting`, `undo`.

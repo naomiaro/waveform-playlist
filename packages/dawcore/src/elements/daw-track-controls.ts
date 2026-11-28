@@ -8,11 +8,29 @@ import type {
   DawTrackReorderGrabDetail,
 } from '../events';
 
+const defaultTrackControlLabels = {
+  volume: 'Volume',
+  pan: 'Pan',
+  mute: 'Mute',
+  solo: 'Solo',
+} as const;
+
+type TrackControl = keyof typeof defaultTrackControlLabels;
+
+/** Build a localized accessible name using the current track name (empty for an unnamed track).
+ * Return undefined to use the default English name. */
+export type DawTrackControlLabelFormatter = (
+  control: TrackControl,
+  trackName: string
+) => string | undefined;
+
 @customElement('daw-track-controls')
 export class DawTrackControlsElement extends LitElement {
   /** Track ID — set by the editor to link controls to a track row. */
   @property({ attribute: false }) trackId: string | null = null;
   @property({ attribute: false }) trackName = '';
+  /** Format the accessible mixer names. Defaults to e.g. "Volume, Kick" or "Volume". */
+  @property({ attribute: false }) formatTrackControlLabel?: DawTrackControlLabelFormatter;
   @property({ type: Number, attribute: false }) volume = 1;
   @property({ type: Number, attribute: false }) pan = 0;
   @property({ type: Boolean, attribute: false }) muted = false;
@@ -329,7 +347,17 @@ export class DawTrackControlsElement extends LitElement {
     );
   };
 
+  private _controlLabel(control: TrackControl): string {
+    const trackName = this.trackName?.trim() ?? '';
+    const formatted = this.formatTrackControlLabel?.(control, trackName);
+    if (formatted?.trim()) return formatted;
+    const label = defaultTrackControlLabels[control];
+    return trackName ? `${label}, ${trackName}` : label;
+  }
+
   render() {
+    const muteLabel = this._controlLabel('mute');
+    const soloLabel = this._controlLabel('solo');
     const volPercent = Math.round(this.volume * 100);
     const panPercent = Math.round(Math.abs(this.pan) * 100);
     const panDisplay = this.pan === 0 ? 'C' : (this.pan > 0 ? 'R' : 'L') + panPercent;
@@ -356,11 +384,17 @@ export class DawTrackControlsElement extends LitElement {
           class="btn ${this.muted ? 'muted-active' : ''}"
           @click=${this._onMuteClick}
           ?disabled=${this.recording}
-          title="Mute"
+          title=${muteLabel}
+          aria-label=${muteLabel}
         >
           M
         </button>
-        <button class="btn ${this.soloed ? 'active' : ''}" @click=${this._onSoloClick} title="Solo">
+        <button
+          class="btn ${this.soloed ? 'active' : ''}"
+          @click=${this._onSoloClick}
+          title=${soloLabel}
+          aria-label=${soloLabel}
+        >
           S
         </button>
         ${this.reorderable
@@ -391,6 +425,7 @@ export class DawTrackControlsElement extends LitElement {
         </span>
         <input
           type="range"
+          aria-label=${this._controlLabel('volume')}
           min="0"
           max="1"
           step="0.01"
@@ -405,6 +440,7 @@ export class DawTrackControlsElement extends LitElement {
         </span>
         <input
           type="range"
+          aria-label=${this._controlLabel('pan')}
           min="-1"
           max="1"
           step="0.01"

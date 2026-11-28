@@ -41,6 +41,7 @@ export { DawRulerElement } from './elements/daw-ruler';
 export { DawGridElement } from './elements/daw-grid';
 export { DawSelectionElement } from './elements/daw-selection';
 export { DawTrackControlsElement } from './elements/daw-track-controls';
+export type { DawTrackControlLabelFormatter } from './elements/daw-track-controls';
 export { DawRecordButtonElement } from './elements/daw-record-button';
 export { DawKeyboardShortcutsElement } from './elements/daw-keyboard-shortcuts';
 export { DawSpectrogramElement } from './elements/daw-spectrogram';
