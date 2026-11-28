@@ -65,6 +65,7 @@ vi.mock('@waveform-playlist/core', async (importOriginal) => {
 
 // Import AFTER mocks are declared
 const { useRecording } = await import('../hooks/useRecording');
+const { renderHookInActivity } = await import('./helpers/activity');
 
 function createMockStream(channelCount = 1): MediaStream {
   return {
@@ -439,37 +440,137 @@ describe('useRecording', () => {
 
   // A start made on mount before this hook's own effect has run: a child's
   // effects run before the parent's, and every layout effect before any
-  // passive one. A mount epoch counted in the setup refused it (#947).
+  // passive one. A mount epoch counted in the setup refused it (#947). Under
+  // StrictMode the first start is parked when the simulated cleanup runs; the
+  // second run's start replaces it.
   for (const [name, useChildEffect] of [
     ['useEffect', useEffect],
     ['useLayoutEffect', useLayoutEffect],
   ] as const) {
-    it(`a start from a child's ${name} on mount records`, async () => {
-      const stream = createMockStream(1);
-      const started: Promise<boolean>[] = [];
-      const latest: { isRecording?: boolean } = {};
-      const Child = ({ start }: { start: () => Promise<boolean> }) => {
-        useChildEffect(() => {
-          started.push(start());
-        }, [start]);
-        return null;
-      };
-      const Parent = () => {
-        const rec = useRecording(stream);
-        latest.isRecording = rec.isRecording;
-        return <Child start={rec.startRecording} />;
-      };
-      render(<Parent />);
-      let results: boolean[] = [];
-      await act(async () => {
-        results = await Promise.all(started);
-      });
+    for (const strict of [false, true]) {
+      it(`a start from a child's ${name} on mount records${strict ? ' under StrictMode' : ''}`, async () => {
+        const stream = createMockStream(1);
+        const started: Promise<boolean>[] = [];
+        const latest: { isRecording?: boolean } = {};
+        const Child = ({ start }: { start: () => Promise<boolean> }) => {
+          useChildEffect(() => {
+            started.push(start());
+          }, [start]);
+          return null;
+        };
+        const Parent = () => {
+          const rec = useRecording(stream);
+          latest.isRecording = rec.isRecording;
+          return <Child start={rec.startRecording} />;
+        };
+        render(
+          strict ? (
+            <StrictMode>
+              <Parent />
+            </StrictMode>
+          ) : (
+            <Parent />
+          )
+        );
+        let results: boolean[] = [];
+        await act(async () => {
+          results = await Promise.all(started);
+        });
 
-      expect(results).toEqual([true]);
-      expect(latest.isRecording).toBe(true);
-      expect(mockSource.connect).toHaveBeenCalled();
-    });
+        expect(results).toEqual(strict ? [false, true] : [true]);
+        expect(latest.isRecording).toBe(true);
+        expect(mockContext.createAudioWorkletNode).toHaveBeenCalledTimes(1);
+      });
+    }
   }
+
+  it('a start made after a hide and a show replaces one still parked from before (#947)', async () => {
+    const stream = createMockStream(1);
+    mockContext.state = 'suspended';
+    let releaseFirstResume!: () => void;
+    mockContext.resume.mockImplementationOnce(
+      () =>
+        new Promise<void>((r) => {
+          releaseFirstResume = r;
+        })
+    );
+    const { result, hide, show } = renderHookInActivity(() => useRecording(stream));
+
+    let first!: Promise<boolean>;
+    act(() => {
+      first = result.current.startRecording();
+    });
+    await act(async () => {
+      hide();
+    });
+    await act(async () => {
+      show();
+    });
+
+    let second = false;
+    await act(async () => {
+      second = await result.current.startRecording();
+    });
+    expect(second).toBe(true);
+    expect(result.current.isRecording).toBe(true);
+
+    let firstResult = true;
+    await act(async () => {
+      releaseFirstResume();
+      firstResult = await first;
+    });
+    expect(firstResult).toBe(false);
+    expect(mockContext.createAudioWorkletNode).toHaveBeenCalledTimes(1);
+    expect(result.current.isRecording).toBe(true);
+  });
+
+  it('a parked start from before a hide does not unblock a second start of the new mount (#947)', async () => {
+    const stream = createMockStream(1);
+    mockContext.state = 'suspended';
+    const releases: Array<() => void> = [];
+    mockContext.resume.mockImplementation(
+      () =>
+        new Promise<void>((r) => {
+          releases.push(r);
+        })
+    );
+    const { result, hide, show } = renderHookInActivity(() => useRecording(stream));
+
+    let first!: Promise<boolean>;
+    act(() => {
+      first = result.current.startRecording();
+    });
+    await act(async () => {
+      hide();
+    });
+    await act(async () => {
+      show();
+    });
+    let second!: Promise<boolean>;
+    act(() => {
+      second = result.current.startRecording();
+    });
+
+    // The first settles while the second is still parked: it must not clear
+    // the second's claim, or a third start would build a second pipeline.
+    await act(async () => {
+      releases[0]();
+      expect(await first).toBe(false);
+    });
+    let third!: Promise<boolean>;
+    act(() => {
+      third = result.current.startRecording();
+    });
+    // Release every resume still held (the second's, and the third's if it
+    // got that far), so a failure here is an assertion, not a hang.
+    await act(async () => {
+      releases.slice(1).forEach((release) => release());
+      expect(await second).toBe(true);
+      expect(await third).toBe(false);
+    });
+    expect(mockContext.createAudioWorkletNode).toHaveBeenCalledTimes(1);
+    expect(result.current.isRecording).toBe(true);
+  });
 
   it('unmount during startRecording awaits aborts the session (no leaked pipeline)', async () => {
     const worklets = await import('@waveform-playlist/worklets');

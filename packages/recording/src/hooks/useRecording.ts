@@ -87,10 +87,13 @@ export function useRecordingWithTakeEnded(
   // Assigned each render below (same pattern as stopRecordingRef) so the
   // stable stopRecording callback can invoke the handshake implementation.
   const finishStopRecordingRef = useRef<(() => Promise<AudioBuffer | null>) | null>(null);
-  // Set synchronously at startRecording entry. isRecordingRef only flips
-  // after several awaits — without this, two rapid start calls both pass
-  // the guard and build two capture pipelines feeding one chunk store.
-  const isStartingRef = useRef<boolean>(false);
+  // The mount epoch of the start in progress, null when none. Set
+  // synchronously at startRecording entry. isRecordingRef only flips after
+  // several awaits — without this, two rapid start calls both pass the guard
+  // and build two capture pipelines feeding one chunk store. A start parked
+  // from before a cleanup does not block one made after it: it returns false
+  // at its epoch check, the last step before building anything (#947).
+  const startingEpochRef = useRef<number | null>(null);
   // Set by the unmount cleanup so a startRecording continuation that was
   // parked on an await doesn't build an ownerless capture graph.
   const isUnmountedRef = useRef<boolean>(false);
@@ -156,7 +159,7 @@ export function useRecordingWithTakeEnded(
 
   // Start recording. Resolves true when the capture pipeline started.
   const startRecording = useCallback(async (): Promise<boolean> => {
-    if (isRecordingRef.current || isStartingRef.current) return false;
+    if (isRecordingRef.current || startingEpochRef.current === mountEpochRef.current) return false;
     if (!stream) {
       setError(new Error('No microphone stream available'));
       return false;
@@ -172,8 +175,8 @@ export function useRecordingWithTakeEnded(
       );
       return false;
     }
-    isStartingRef.current = true;
     const mountEpoch = mountEpochRef.current;
+    startingEpochRef.current = mountEpoch;
 
     try {
       setError(null);
@@ -324,7 +327,8 @@ export function useRecordingWithTakeEnded(
       setError(err instanceof Error ? err : new Error('Failed to start recording'));
       return false;
     } finally {
-      isStartingRef.current = false;
+      // A start made after a cleanup owns the flag now.
+      if (startingEpochRef.current === mountEpoch) startingEpochRef.current = null;
     }
   }, [
     stream,
