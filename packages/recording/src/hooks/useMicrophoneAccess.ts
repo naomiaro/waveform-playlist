@@ -26,10 +26,12 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
   // Set by unmount cleanup (plain assignment — the exhaustive-deps rule
   // rejects read-modify-writes like a generation bump in cleanup functions).
   const isUnmountedRef = useRef(false);
-  // Counts the mount effect's setups. A request saves it on entry: one that
+  // Counts the mount effect's cleanups. A request saves it on entry: one that
   // started before a hide (or Fast Refresh) is stale after the show, though
   // the setup has reset isUnmountedRef by then (#947). No microphone is
-  // opened for a hidden component; the app asks again (#822).
+  // opened for a hidden component; the app asks again (#822). Counted in the
+  // cleanup, not the setup: a request made on mount before this hook's effect
+  // runs (a child's effect, any layout effect) belongs to this mount.
   const mountEpochRef = useRef(0);
 
   // Enumerate audio input devices — delegates to the framework-agnostic core
@@ -165,8 +167,9 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
     // instance, so a flag left true by the probe-unmount's cleanup would
     // stop every future getUserMedia grant as "stale".
     isUnmountedRef.current = false;
-    // A request that began before this setup is stale (#947).
-    mountEpochRef.current += 1;
+    // The cleanup moves the epoch on from this value: a plain assignment
+    // (see isUnmountedRef), and it makes every earlier request stale (#947).
+    const epoch = mountEpochRef.current;
     // Try to enumerate devices (labels won't be available without permission)
     enumerateDevices();
 
@@ -182,6 +185,7 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
       // stopped by the isUnmounted check, one arriving after a show by the
       // mount epoch) and stop the current stream.
       isUnmountedRef.current = true;
+      mountEpochRef.current = epoch + 1;
       // The request it made stale will not clear isLoading.
       setIsLoading(false);
       if (streamRef.current) {

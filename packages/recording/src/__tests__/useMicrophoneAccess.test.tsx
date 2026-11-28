@@ -1,5 +1,5 @@
-import { StrictMode } from 'react';
-import { renderHook, act, cleanup } from '@testing-library/react';
+import { StrictMode, useEffect, useLayoutEffect } from 'react';
+import { renderHook, render, act, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useMicrophoneAccess } from '../hooks/useMicrophoneAccess';
 import { renderHookInActivity } from './helpers/activity';
@@ -199,6 +199,77 @@ describe('useMicrophoneAccess', () => {
   // #947: a request pending across a hide belongs to the hidden component. The
   // setup that runs on the show resets isUnmountedRef, so the request must be
   // told apart by the setup it started under.
+  // A request made before the hook's own mount effect has run: a child's
+  // effects run before the parent's, and every layout effect before any
+  // passive one. The review of #948 found the first epoch bump in the setup
+  // threw these grants away.
+  describe("a request made on mount, before the hook's effect runs", () => {
+    type Mic = ReturnType<typeof useMicrophoneAccess>;
+
+    const mountWithChildRequest = (useChildEffect: typeof useEffect, strict: boolean) => {
+      const latest: { mic?: Mic } = {};
+      const Child = ({ request }: { request: Mic['requestAccess'] }) => {
+        useChildEffect(() => {
+          void request();
+        }, [request]);
+        return null;
+      };
+      const Parent = () => {
+        const mic = useMicrophoneAccess();
+        latest.mic = mic;
+        return <Child request={mic.requestAccess} />;
+      };
+      render(
+        strict ? (
+          <StrictMode>
+            <Parent />
+          </StrictMode>
+        ) : (
+          <Parent />
+        )
+      );
+      return latest;
+    };
+
+    for (const [name, effect] of [
+      ['useEffect', useEffect],
+      ['useLayoutEffect', useLayoutEffect],
+    ] as const) {
+      for (const strict of [false, true]) {
+        it(`a child's ${name}${strict ? ' under StrictMode' : ''} opens the microphone`, async () => {
+          const granted: MockStream[] = [];
+          getUserMediaMock.mockImplementation(async () => {
+            const s = createMockStream(`s${granted.length + 1}`);
+            granted.push(s);
+            return s;
+          });
+          const latest = mountWithChildRequest(effect, strict);
+          await act(async () => {
+            await Promise.resolve();
+          });
+
+          const held = latest.mic!.stream as MockStream | null;
+          expect(held).toBe(granted[granted.length - 1]);
+          expect(held!._track.stop).not.toHaveBeenCalled();
+          expect(latest.mic!.isLoading).toBe(false);
+        });
+      }
+    }
+
+    it("a child's mount request that is refused sets error", async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      getUserMediaMock.mockRejectedValue(new Error('NotAllowedError'));
+      const latest = mountWithChildRequest(useEffect, false);
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(latest.mic!.error?.message).toBe('NotAllowedError');
+      expect(latest.mic!.isLoading).toBe(false);
+      warn.mockRestore();
+    });
+  });
+
   describe('a request pending across a hide (#947)', () => {
     /** A getUserMedia that answers when the test says so. */
     const holdNextGrant = () => {
@@ -308,6 +379,61 @@ describe('useMicrophoneAccess', () => {
       expect(result.current.stream).toBe(s2);
       expect(s2._track.stop).not.toHaveBeenCalled();
       expect(late._track.stop).toHaveBeenCalled();
+      expect(result.current.isLoading).toBe(false);
+    });
+  });
+
+  // A hidden component's handlers are normally out of reach; an app can still
+  // call requestAccess from a timer. That request belongs to the hidden mount.
+  describe('a request made while hidden', () => {
+    const requestWhileHidden = async () => {
+      let resolveGum!: (s: MediaStream) => void;
+      getUserMediaMock.mockImplementationOnce(
+        () =>
+          new Promise<MediaStream>((r) => {
+            resolveGum = r;
+          })
+      );
+      const view = renderHookInActivity(() => useMicrophoneAccess());
+      await act(async () => {
+        view.hide();
+      });
+      let pending!: Promise<void>;
+      act(() => {
+        pending = view.result.current.requestAccess();
+      });
+      return { ...view, pending, grant: (s: MediaStream) => resolveGum(s) };
+    };
+
+    it('granted while hidden: the stream is stopped and the loading ends', async () => {
+      const { result, show, pending, grant } = await requestWhileHidden();
+      const late = createMockStream('late');
+      grant(late);
+      await act(async () => {
+        await pending;
+      });
+      await act(async () => {
+        show();
+      });
+
+      expect(late._track.stop).toHaveBeenCalled();
+      expect(result.current.stream).toBeNull();
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    it('granted after the show: the stream is installed', async () => {
+      const { result, show, pending, grant } = await requestWhileHidden();
+      await act(async () => {
+        show();
+      });
+      const late = createMockStream('late');
+      grant(late);
+      await act(async () => {
+        await pending;
+      });
+
+      expect(result.current.stream).toBe(late);
+      expect(late._track.stop).not.toHaveBeenCalled();
       expect(result.current.isLoading).toBe(false);
     });
   });

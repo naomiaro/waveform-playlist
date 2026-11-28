@@ -5079,12 +5079,12 @@ const listed = devices.some((d) => d.deviceId === selectedDevice);
 
 **Package:** `@waveform-playlist/recording`.
 
-`useMicrophoneAccess` and `useIntegratedRecording` no longer return `hasPermission`. It was a second copy of `stream !== null`, kept by hand, and one path forgot it: a hide while a device switch was waiting left it `true` with no stream, so a Record button stayed enabled and `startRecording()` failed with "No microphone stream available". Read `stream` instead.
+`useMicrophoneAccess` and `useIntegratedRecording` no longer return `hasPermission`. It was kept by hand beside `stream` and could disagree with it. A device switch cleared `stream` and left `hasPermission` `true`, so a `stopStream()` during the switch, or a hide while its grant arrived, left it `true` with no stream: a Record button that read it stayed enabled, and `startRecording()` failed with "No microphone stream available". Read `stream` instead.
 
 Two differences from the old field:
 
-- While a request is opening a microphone (`changeDevice(id)`, or a second `requestAccess()`), `stream` is `null`: the request stops the open microphone first. `hasPermission` stayed `true` then, with nothing to record from.
-- Neither ever said whether the browser holds the microphone permission: both say whether this hook has a microphone open. `hasPermission` was already `false` after `stopStream()`, with the permission still granted. `hasLabels` says whether the browser names the devices.
+- While a request is opening a microphone (`changeDevice(id)`, or `requestAccess()` / `requestMicAccess()` while one is open), `stream` is `null`: the request stops the open microphone first. `hasPermission` stayed `true` then, with nothing to record from.
+- Neither says whether the browser holds the microphone permission. `stream` says whether this hook has a microphone open; `hasPermission` was `false` after a `stopStream()` that closed one, with the permission still granted. `hasLabels` says whether the browser names the devices.
 
 **Find:** `hasPermission`, in the values of `useMicrophoneAccess()` and `useIntegratedRecording()`.
 
