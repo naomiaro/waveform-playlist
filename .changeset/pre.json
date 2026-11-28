@@ -93,6 +93,7 @@
     "react-custom-effects",
     "react-dom-forwarded-peer",
     "recorded-clip-id",
+    "recording-take-kept",
     "remove-piano-roll-render-mode",
     "remove-playout-provider",
     "remove-render-timestamp",
