@@ -2142,13 +2142,15 @@ interface UseMicrophoneAccessReturn {
    *  opening one (a request stops the open stream first). */
   stream: MediaStream | null;
   devices: MicrophoneDevice[]; // { deviceId, label, groupId }; follows devicechange
-  /** `devices` names the real microphones (false before a first grant).
+  /** `devices` names the real microphones: false before a first grant, and
+   *  true on mount when Chromium already holds the permission (our runs).
    *  Changes only when the list is read again (mount, devicechange, a grant),
    *  not when a read fails. */
   hasLabels: boolean;
   hasPermission: boolean;
   isLoading: boolean;
-  /** Opens a microphone: `deviceId` by exact id, else the default. Recording
+  /** Opens a microphone: `deviceId` by exact id, else the one a `deviceId` in
+   *  `audioConstraints` names, else the default. Recording
    *  defaults: echoCancellation, noiseSuppression and autoGainControl off,
    *  latency 0; `audioConstraints` overrides them. Opens nothing by itself. */
   requestAccess: (deviceId?: string, audioConstraints?: MediaTrackConstraints) => Promise<void>;

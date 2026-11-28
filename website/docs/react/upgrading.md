@@ -5061,7 +5061,8 @@ When the selected microphone left the device list, `useIntegratedRecording` aske
 )}
 
 // After: the app asks, and the picker shows the open microphone or none
-// (listed = devices.some((d) => d.deviceId === selectedDevice))
+const listed = devices.some((d) => d.deviceId === selectedDevice);
+
 {!hasPermission && !hasLabels ? (
   <button onClick={requestMicAccess}>Enable microphone</button>
 ) : (

@@ -130,7 +130,7 @@ Default constraints optimize for recording quality:
 
 ### Choosing a Microphone
 
-Browsers hide the microphones until the page has been granted microphone permission: `devices` is then usually one entry with an empty `deviceId` (none on a machine with no microphone), and `hasLabels` is `false`. After a grant, `devices` names every microphone and `hasLabels` is `true`. `hasLabels` changes only when the list is read again (on mount, on a `devicechange`, after a grant), so it stays `true` after `stopStream()` or a hide.
+Browsers hide the microphones until the page has been granted microphone permission: `devices` is then usually one entry with an empty `deviceId` (none on a machine with no microphone), and `hasLabels` is `false`. After a grant, `devices` names every microphone and `hasLabels` is `true`. `hasLabels` changes only when the list is read again (on mount, on a `devicechange`, after a grant), so it stays `true` after `stopStream()`. Showing a hidden component reads the list again, with no microphone open; whether the browser names the devices then decides `hasLabels` (not run: our runs listed devices with no stream only before a first grant).
 
 What the browsers did in our runs (headless Chromium, Firefox and WebKit, Safari's engine, with fake devices; not on real hardware):
 
@@ -139,7 +139,7 @@ What the browsers did in our runs (headless Chromium, Firefox and WebKit, Safari
 
 `selectedDevice` of `useIntegratedRecording` is the microphone that is open: the id its stream reports (`getSettings().deviceId`), or `null` while none is open. That is before the first request, after an unplug or a request that failed, and while a request is opening one (a request closes the open microphone first). For the default microphone, Chromium reported `'default'`, the id of its list's "Default" entry; Firefox and WebKit reported the device's own id.
 
-A picker shows `selectedDevice` only when `devices` holds it: a `<select>` whose value matches no option shows its first option, which would name another microphone. That happens when a list read fails, and for a moment after a first grant, before the list is read again.
+A picker shows `selectedDevice` only when `devices` holds it: React gives a `<select>` whose value matches no option its first enabled option, which would name another microphone. That happens when a list read fails, and for a moment after a first grant, before the list is read again.
 
 ```tsx
 const {

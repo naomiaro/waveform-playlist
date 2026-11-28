@@ -73,6 +73,17 @@ function trackMicRequests(hideUntilGrant: boolean) {
 const micRequests = (page: Page) =>
   page.evaluate(() => (window as unknown as { __micRequests: unknown[] }).__micRequests);
 
+/**
+ * The fake microphone, then the request tracker, as ONE init script:
+ * Playwright does not define the order of separate init scripts, and the
+ * tracker wraps the functions the fake installs.
+ */
+function addFakeMicrophone(page: Page, hideUntilGrant: boolean) {
+  return page.addInitScript({
+    content: `(${fakeMicrophone.toString()})();\n(${trackMicRequests.toString()})(${hideUntilGrant});`,
+  });
+}
+
 /** Counts React commits on the page (development build). */
 function countCommits() {
   const win = window as unknown as { __commits: number; __REACT_DEVTOOLS_GLOBAL_HOOK__: unknown };
@@ -146,8 +157,7 @@ const OUTPUT_METER = 1;
 async function openRecordingPage(page: Page, baseURL: string | undefined) {
   const origin = new URL(baseURL ?? 'http://localhost:3000').origin;
   await page.context().grantPermissions(['microphone'], { origin });
-  await page.addInitScript(fakeMicrophone);
-  await page.addInitScript(trackMicRequests, false);
+  await addFakeMicrophone(page, false);
   await page.addInitScript(countCommits);
   await page.goto(`${baseURL}/examples/recording`);
   await expect(page.getByRole('button', { name: '+ New Track' })).toBeVisible({ timeout: 30000 });
@@ -179,8 +189,7 @@ test.describe('Recording example', () => {
   }) => {
     const origin = new URL(baseURL ?? 'http://localhost:3000').origin;
     await page.context().grantPermissions(['microphone'], { origin });
-    await page.addInitScript(fakeMicrophone);
-    await page.addInitScript(trackMicRequests, true);
+    await addFakeMicrophone(page, true);
     await page.goto(`${baseURL}/examples/recording`);
     await expect(page.locator('[data-playlist-state="ready"]')).toHaveCount(1, { timeout: 30000 });
 
