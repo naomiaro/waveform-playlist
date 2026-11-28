@@ -402,6 +402,9 @@ export function useIntegratedRecording(
       // corrects the selection. A selection the hook made itself is asked
       // for as the first time (the default device, or what audioConstraints
       // names).
+      // A changeDevice() still pending here has failed, or is overtaken by
+      // this request: the stream this request opens is not its device's.
+      pendingChoiceRef.current = null;
       const chosen = appChosenDeviceRef.current;
       const constraints =
         chosen !== null

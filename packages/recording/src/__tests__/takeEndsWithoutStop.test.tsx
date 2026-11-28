@@ -509,6 +509,40 @@ describe('useIntegratedRecording: asking for the microphone again', () => {
     // Asking for dev-b again would fail again, with no way out.
     expect(requestedDevice()).toBeUndefined();
     expect(result.current.stream).not.toBeNull();
+
+    // The stream that request opened is not dev-b's: it must not make dev-b
+    // the choice for the request after it.
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+    expect(requestedDevice()).toBeUndefined();
+  });
+
+  it('keeps the other audioConstraints when it asks for the chosen device', async () => {
+    const arrangement = arrangementOf('track-1');
+    const { result } = renderHook(() =>
+      useIntegratedRecording(arrangement, 'track-1', {
+        audioConstraints: { echoCancellation: true },
+      })
+    );
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+    await act(async () => {
+      changeDevices(['dev-a', 'dev-b']);
+      await settle();
+    });
+    await act(async () => {
+      await result.current.changeDevice('dev-b');
+    });
+
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+
+    const audio = env.getUserMedia.mock.lastCall![0].audio;
+    expect(audio.deviceId).toEqual({ ideal: 'dev-b' });
+    expect(audio.echoCancellation).toBe(true);
   });
 
   it('asks for the default device after a changeDevice that was refused mid-take', async () => {
@@ -617,5 +651,12 @@ describe('useRecording: a stream whose microphone track has ended', () => {
       'The microphone stream has ended (the device was disconnected or its permission revoked). Request microphone access again.'
     );
     expect(env.context.createMediaStreamSource).not.toHaveBeenCalled();
+
+    // The refusal leaves nothing behind: with a live stream the hook starts.
+    (stream.getAudioTracks()[0] as unknown as { readyState: string }).readyState = 'live';
+    await act(async () => {
+      started = await result.current.startRecording();
+    });
+    expect(started).toBe(true);
   });
 });
