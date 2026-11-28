@@ -281,7 +281,8 @@ const CustomTrackControls: React.FC = () => {
 };
 
 // A Radix text field for one time. Like the library's TimeInput, only the text
-// being typed is state; otherwise the field shows `value`. It commits on blur
+// being typed is state, with the format it was typed in (a format change
+// abandons the edit); otherwise the field shows `value`. It commits on blur
 // (or Enter), and text that is not a time (parseTime gives null) changes
 // nothing: the field shows `value` again.
 const TimeField: React.FC<{
@@ -290,19 +291,20 @@ const TimeField: React.FC<{
   placeholder: string;
   onCommit: (seconds: number) => void;
 }> = ({ value, format, placeholder, onCommit }) => {
-  const [draft, setDraft] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ text: string; format: TimeFormat } | null>(null);
+  const activeDraft = draft?.format === format ? draft : null;
 
   const commit = () => {
-    if (draft === null) return;
     setDraft(null);
-    const seconds = parseTime(draft, format);
+    if (activeDraft === null) return;
+    const seconds = parseTime(activeDraft.text, format);
     if (seconds !== null) onCommit(seconds);
   };
 
   return (
     <TextField.Root
-      value={draft ?? formatTime(value, format)}
-      onChange={(e) => setDraft(e.target.value)}
+      value={activeDraft?.text ?? formatTime(value, format)}
+      onChange={(e) => setDraft({ text: e.target.value, format })}
       onBlur={commit}
       onKeyDown={(e) => {
         if (e.key === 'Enter') e.currentTarget.blur();

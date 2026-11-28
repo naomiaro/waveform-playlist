@@ -402,6 +402,8 @@ describe('edges found in review of #951', () => {
     expect(formatTime(1.08e21, 'hh:mm:ss.uuu')).toMatch(/^\d+:\d{2}:\d{2}\.\d{3}$/);
     expect(formatTime(1e21, 'hh:mm:ss.uuu')).toMatch(/^\d+:\d{2}:\d{2}\.\d{3}$/);
     expect(formatTime(3.6e26, 'hh:mm:ss')).toMatch(/^\d+:\d{2}:\d{2}$/);
+    expect(formatTime(1e21, 'seconds')).toMatch(/^\d+$/);
+    expect(formatTime(1e21, 'thousandths')).toMatch(/^\d+\.\d{3}$/);
   });
 
   it('returns null for a number too large to be finite', () => {

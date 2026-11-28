@@ -20,6 +20,17 @@ function digits(whole: number): string {
   return whole < 1e21 ? String(whole) : whole.toLocaleString('en-US', { useGrouping: false });
 }
 
+/** `n.toFixed(decimals)` in plain digits: `toFixed` too switches to exponent notation at 1e21. */
+function fixed(n: number, decimals: number): string {
+  return n < 1e21
+    ? n.toFixed(decimals)
+    : n.toLocaleString('en-US', {
+        useGrouping: false,
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      });
+}
+
 /**
  * Format time in clock format (hh:mm:ss with optional decimals).
  *
@@ -54,9 +65,9 @@ export function formatTime(seconds: number, format: TimeFormat): string {
   const safe = printable(seconds);
   switch (format) {
     case 'seconds':
-      return safe.toFixed(0);
+      return fixed(safe, 0);
     case 'thousandths':
-      return safe.toFixed(3);
+      return fixed(safe, 3);
     case 'hh:mm:ss':
       return clockFormat(safe, 0);
     case 'hh:mm:ss.u':

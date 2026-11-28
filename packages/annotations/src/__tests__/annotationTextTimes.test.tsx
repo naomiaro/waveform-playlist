@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 //
-// #815: the list's m:ss.mmm times round once, as a whole, so a time just
-// under a minute carries into the minutes instead of printing 60 seconds.
+// #815: the list's m:ss.mmm times round the seconds as before, and a
+// rounding that reaches 60 carries into the minutes instead of printing 60
+// seconds.
 // The same formatter is handed to a custom row as `formatTime`.
 import './jsdom-polyfills'; // must be first
 import React from 'react';
