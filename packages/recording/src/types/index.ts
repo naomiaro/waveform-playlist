@@ -65,6 +65,13 @@ export interface UseRecordingReturn {
 
 export interface UseMicrophoneAccessReturn {
   // State
+  /**
+   * The open microphone, `null` while none is open: before the first grant,
+   * while a request is opening one (it stops the previous stream first),
+   * after `stopStream()`, a failed request, an unplug, or a hide. Test
+   * `stream !== null` to know whether a microphone is open (#947 removed
+   * `hasPermission`, a second copy of that).
+   */
   stream: MediaStream | null;
   devices: MicrophoneDevice[];
   /**
@@ -78,7 +85,6 @@ export interface UseMicrophoneAccessReturn {
    * `devicechange`, a grant), and not when an enumeration fails.
    */
   hasLabels: boolean;
-  hasPermission: boolean;
   isLoading: boolean;
 
   // Controls

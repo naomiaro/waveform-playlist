@@ -50,7 +50,6 @@ describe('useMicrophoneAccess', () => {
     });
 
     expect(result.current.stream).toBe(s1);
-    expect(result.current.hasPermission).toBe(true);
   });
 
   it('stops a stream granted after unmount (no hot-mic leak)', async () => {
@@ -163,7 +162,7 @@ describe('useMicrophoneAccess', () => {
   });
 
   // #822
-  it('clears the stream and the permission when the component is hidden', async () => {
+  it('clears the stream when the component is hidden', async () => {
     const s1 = createMockStream('s1');
     getUserMediaMock.mockResolvedValueOnce(s1);
     const { result, hide, show } = renderHookInActivity(() => useMicrophoneAccess());
@@ -182,7 +181,6 @@ describe('useMicrophoneAccess', () => {
     // The cleanup stopped the stream; the state must not keep offering it.
     expect(s1._track.stop).toHaveBeenCalled();
     expect(result.current.stream).toBeNull();
-    expect(result.current.hasPermission).toBe(false);
 
     // Asking again works.
     const s2 = createMockStream('s2');
@@ -191,7 +189,156 @@ describe('useMicrophoneAccess', () => {
       await result.current.requestAccess();
     });
     expect(result.current.stream).toBe(s2);
-    expect(result.current.hasPermission).toBe(true);
+  });
+
+  it('has no hasPermission field: an open microphone is `stream !== null` (#947)', () => {
+    const { result } = renderHook(() => useMicrophoneAccess());
+    expect('hasPermission' in result.current).toBe(false);
+  });
+
+  // #947: a request pending across a hide belongs to the hidden component. The
+  // setup that runs on the show resets isUnmountedRef, so the request must be
+  // told apart by the setup it started under.
+  describe('a request pending across a hide (#947)', () => {
+    /** A getUserMedia that answers when the test says so. */
+    const holdNextGrant = () => {
+      let settle!: { resolve: (s: MediaStream) => void; reject: (e: Error) => void };
+      getUserMediaMock.mockImplementationOnce(
+        () =>
+          new Promise<MediaStream>((resolve, reject) => {
+            settle = { resolve, reject };
+          })
+      );
+      return () => settle;
+    };
+
+    /** A grant, then a second request (a device switch) held back, then a hide. */
+    const switchThenHide = async () => {
+      const s1 = createMockStream('s1');
+      getUserMediaMock.mockResolvedValueOnce(s1);
+      const view = renderHookInActivity(() => useMicrophoneAccess());
+      await act(async () => {
+        await view.result.current.requestAccess();
+      });
+      const settle = holdNextGrant();
+      let pending!: Promise<void>;
+      act(() => {
+        pending = view.result.current.requestAccess('dev-b');
+      });
+      await act(async () => {
+        view.hide();
+      });
+      return { ...view, pending, settle };
+    };
+
+    it('a grant that arrives while hidden is stopped, and the hook is idle after the show', async () => {
+      const { result, show, pending, settle } = await switchThenHide();
+      const late = createMockStream('late');
+      settle().resolve(late);
+      await act(async () => {
+        await pending;
+      });
+      await act(async () => {
+        show();
+      });
+
+      expect(late._track.stop).toHaveBeenCalled();
+      expect(result.current.stream).toBeNull();
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    it('a grant that arrives after the show is stopped, not installed', async () => {
+      const { result, show, pending, settle } = await switchThenHide();
+      await act(async () => {
+        show();
+      });
+      const late = createMockStream('late');
+      settle().resolve(late);
+      await act(async () => {
+        await pending;
+      });
+
+      expect(late._track.stop).toHaveBeenCalled();
+      expect(result.current.stream).toBeNull();
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.error).toBeNull();
+    });
+
+    it('a refusal that arrives after the show sets no error', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const { result, show, pending, settle } = await switchThenHide();
+      await act(async () => {
+        show();
+      });
+      settle().reject(new Error('NotAllowedError'));
+      await act(async () => {
+        await pending;
+      });
+
+      expect(result.current.error).toBeNull();
+      expect(result.current.isLoading).toBe(false);
+      warn.mockRestore();
+    });
+
+    it('is not loading after the show while the old request is still open', async () => {
+      const { result, show } = await switchThenHide();
+      await act(async () => {
+        show();
+      });
+
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    it('a request made after the show opens its microphone', async () => {
+      const { result, show, pending, settle } = await switchThenHide();
+      await act(async () => {
+        show();
+      });
+      const s2 = createMockStream('s2');
+      getUserMediaMock.mockResolvedValueOnce(s2);
+      await act(async () => {
+        await result.current.requestAccess();
+      });
+      const late = createMockStream('late');
+      settle().resolve(late);
+      await act(async () => {
+        await pending;
+      });
+
+      expect(result.current.stream).toBe(s2);
+      expect(s2._track.stop).not.toHaveBeenCalled();
+      expect(late._track.stop).toHaveBeenCalled();
+      expect(result.current.isLoading).toBe(false);
+    });
+  });
+
+  it('stopStream while a request is pending stops its grant and ends the loading (#947)', async () => {
+    let resolveGum!: (s: MediaStream) => void;
+    getUserMediaMock.mockImplementationOnce(
+      () =>
+        new Promise<MediaStream>((r) => {
+          resolveGum = r;
+        })
+    );
+    const { result } = renderHook(() => useMicrophoneAccess());
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.requestAccess();
+    });
+    expect(result.current.isLoading).toBe(true);
+
+    act(() => {
+      result.current.stopStream();
+    });
+    const late = createMockStream('late');
+    resolveGum(late);
+    await act(async () => {
+      await pending;
+    });
+
+    expect(late._track.stop).toHaveBeenCalled();
+    expect(result.current.stream).toBeNull();
+    expect(result.current.isLoading).toBe(false);
   });
 
   describe('where navigator.mediaDevices is undefined (an http origin that is not localhost)', () => {
@@ -219,7 +366,6 @@ describe('useMicrophoneAccess', () => {
       });
 
       expect(result.current.stream).toBeNull();
-      expect(result.current.hasPermission).toBe(false);
       expect(result.current.isLoading).toBe(false);
       expect(result.current.error?.message).toMatch(/secure context \(https or localhost\)/);
       warn.mockRestore();
@@ -274,7 +420,7 @@ describe('useMicrophoneAccess', () => {
       }
     };
 
-    it('clears the stream and the permission, and says why', async () => {
+    it('clears the stream, and says why', async () => {
       const s1 = createMockStream('s1');
       getUserMediaMock.mockResolvedValueOnce(s1);
       const { result } = renderHook(() => useMicrophoneAccess());
@@ -286,7 +432,6 @@ describe('useMicrophoneAccess', () => {
       act(() => end(s1));
 
       expect(result.current.stream).toBeNull();
-      expect(result.current.hasPermission).toBe(false);
       expect(result.current.error?.message).toBe(
         'The microphone was disconnected or its permission was revoked. Request microphone access again.'
       );
@@ -309,7 +454,6 @@ describe('useMicrophoneAccess', () => {
       });
 
       expect(result.current.stream).toBe(s2);
-      expect(result.current.hasPermission).toBe(true);
       expect(result.current.error).toBeNull();
     });
 
@@ -329,7 +473,6 @@ describe('useMicrophoneAccess', () => {
       act(() => end(s1));
 
       expect(result.current.stream).toBe(s2);
-      expect(result.current.hasPermission).toBe(true);
       expect(result.current.error).toBeNull();
     });
   });

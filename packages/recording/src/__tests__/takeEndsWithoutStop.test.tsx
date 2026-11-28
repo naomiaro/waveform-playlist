@@ -110,7 +110,6 @@ describe('useIntegratedRecording: a take that ends without stopRecording()', () 
     );
     // The microphone is gone, and the state says so.
     expect(result.current.stream).toBeNull();
-    expect(result.current.hasPermission).toBe(false);
   });
 
   it('is added once when Stop is pressed while the unplug is being handled', async () => {
@@ -167,7 +166,6 @@ describe('useIntegratedRecording: a take that ends without stopRecording()', () 
     expect(result.current.recordingTrackId).toBeNull();
     // The cleanup stopped the microphone: the state does not offer a dead stream.
     expect(result.current.stream).toBeNull();
-    expect(result.current.hasPermission).toBe(false);
   });
 
   it('lands on its track when the component unmounts mid-take', async () => {
@@ -225,7 +223,6 @@ describe('useIntegratedRecording: a take that ends without stopRecording()', () 
 
     expect(env.getUserMedia).not.toHaveBeenCalled();
     expect(result.current.stream).toBeNull();
-    expect(result.current.hasPermission).toBe(false);
     expect(result.current.error?.message).toMatch(/Request microphone access again/);
     // Nothing is open, so the picker names nothing (#945).
     expect(result.current.selectedDevice).toBeNull();

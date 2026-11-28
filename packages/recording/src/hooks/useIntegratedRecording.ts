@@ -88,13 +88,14 @@ export interface UseIntegratedRecordingReturn {
   error: Error | null;
 
   // Microphone state
+  /** `useMicrophoneAccess`'s `stream`: the open microphone, `null` while none
+   *  is open. A microphone is open when `stream !== null`. */
   stream: MediaStream | null;
   devices: MicrophoneDevice[];
   /** `useMicrophoneAccess`'s `hasLabels`: `devices` names the real
    *  microphones, so a picker can offer them before one is open and open only
    *  the one chosen, with `changeDevice(id)`. */
   hasLabels: boolean;
-  hasPermission: boolean;
   /**
    * The id of the microphone that is open: the device the stream's track
    * reports (`getSettings().deviceId`), `null` while no stream is open (also
@@ -178,14 +179,7 @@ export function useIntegratedRecording(
   const finishTakeRef = useRef<(buffer: AudioBuffer | null) => void>(() => {});
 
   // Microphone access
-  const {
-    stream,
-    devices,
-    hasLabels,
-    hasPermission,
-    requestAccess,
-    error: micError,
-  } = useMicrophoneAccess();
+  const { stream, devices, hasLabels, requestAccess, error: micError } = useMicrophoneAccess();
   // The microphone that is open, read from its owner (#945). The hook keeps
   // no choice of its own: one it kept named another device than the open one
   // (the first of the list, a changeDevice that failed).
@@ -431,7 +425,6 @@ export function useIntegratedRecording(
     stream,
     devices,
     hasLabels,
-    hasPermission,
     selectedDevice,
 
     // Recording controls
