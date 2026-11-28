@@ -236,7 +236,6 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     progress: recordingProgress,
     devices,
     hasLabels,
-    hasPermission,
     selectedDevice,
     stream,
     startRecording,
@@ -252,6 +251,8 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     channelCount: 2,
     latencyOffset,
   });
+  // A microphone is open while the hook holds a stream.
+  const micOpen = stream !== null;
 
   // The take's session: while recording, the provider keeps playback running
   // and mutes what the take's track already holds. The preview part in the
@@ -381,14 +382,14 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
   // Shift+R: always create a new track and record on it
   const handleForceNewTrackRecord = useCallback(() => {
-    if (isRecording || !hasPermission) return;
+    if (isRecording || !micOpen) return;
     setShouldAutoStartRecording(true);
     onAddTrack();
-  }, [isRecording, hasPermission, onAddTrack]);
+  }, [isRecording, micOpen, onAddTrack]);
 
   // R: record on selected track (auto-create if none selected)
   const handleRecordShortcut = useCallback(() => {
-    if (isRecording || !hasPermission) return;
+    if (isRecording || !micOpen) return;
 
     if (!selectedTrackId) {
       setShouldAutoStartRecording(true);
@@ -397,7 +398,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     }
 
     startRecordingWithPlayback();
-  }, [isRecording, hasPermission, selectedTrackId, onAddTrack, startRecordingWithPlayback]);
+  }, [isRecording, micOpen, selectedTrackId, onAddTrack, startRecordingWithPlayback]);
 
   // Track whether playback was running when recording was paused, so resume
   // restarts both the worklet capture and the Transport for overdub.
@@ -603,7 +604,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
           <RecordButton
             isRecording={isRecording}
             onClick={handleRecordClick}
-            disabled={!hasPermission}
+            disabled={!micOpen}
           />
           <TransportPauseButton
             onClick={handlePauseToggle}
@@ -617,7 +618,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
           {/* Before a first grant the browser names no device: Enable Mic opens
               the default one (the browser's prompt). Once the devices are named,
               choosing one opens only that microphone. */}
-          {!hasPermission && !hasLabels ? (
+          {!micOpen && !hasLabels ? (
             <Button size="1" variant="soft" color="blue" onClick={requestMicAccess}>
               <MicrophoneIcon size={14} weight="light" /> Enable Mic
             </Button>

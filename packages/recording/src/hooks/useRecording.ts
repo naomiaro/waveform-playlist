@@ -87,17 +87,23 @@ export function useRecordingWithTakeEnded(
   // Assigned each render below (same pattern as stopRecordingRef) so the
   // stable stopRecording callback can invoke the handshake implementation.
   const finishStopRecordingRef = useRef<(() => Promise<AudioBuffer | null>) | null>(null);
-  // Set synchronously at startRecording entry. isRecordingRef only flips
-  // after several awaits — without this, two rapid start calls both pass
-  // the guard and build two capture pipelines feeding one chunk store.
-  const isStartingRef = useRef<boolean>(false);
+  // The mount epoch of the start in progress, null when none. Set
+  // synchronously at startRecording entry. isRecordingRef only flips after
+  // several awaits — without this, two rapid start calls both pass the guard
+  // and build two capture pipelines feeding one chunk store. A start parked
+  // from before a cleanup does not block one made after it: it returns false
+  // at its epoch check, the last step before building anything (#947).
+  const startingEpochRef = useRef<number | null>(null);
   // Set by the unmount cleanup so a startRecording continuation that was
   // parked on an await doesn't build an ownerless capture graph.
   const isUnmountedRef = useRef<boolean>(false);
-  // Counts the effect's setups. A startRecording that was parked on an await
+  // Counts the effect's cleanups. A startRecording that was parked on an await
   // across a cleanup and a new setup (Fast Refresh, an <Activity> hidden and
   // shown) finds isUnmountedRef reset; the count tells it the cleanup ran, and
-  // with it the cleanup of whoever owns the stream, which stops it.
+  // with it the cleanup of whoever owns the stream, which stops it. Counted in
+  // the cleanup, not the setup: a start made on mount before this hook's
+  // effect runs (a child's effect, any layout effect) belongs to this mount
+  // (#947).
   const mountEpochRef = useRef(0);
   // Elapsed seconds, and the preview peaks accumulated so far. Written by the
   // duration loop and the worklet handler; published together, at most once
@@ -153,7 +159,12 @@ export function useRecordingWithTakeEnded(
 
   // Start recording. Resolves true when the capture pipeline started.
   const startRecording = useCallback(async (): Promise<boolean> => {
-    if (isRecordingRef.current || isStartingRef.current) return false;
+    const refuseEndedStream = (message: string): boolean => {
+      if (stream?.getAudioTracks()[0]?.readyState !== 'ended') return false;
+      setError(new Error(message));
+      return true;
+    };
+    if (isRecordingRef.current || startingEpochRef.current === mountEpochRef.current) return false;
     if (!stream) {
       setError(new Error('No microphone stream available'));
       return false;
@@ -161,16 +172,14 @@ export function useRecordingWithTakeEnded(
     // An ended track delivers silence and fires no further event.
     // useMicrophoneAccess clears such a stream; one the app passes in itself
     // can still be ended. Refuse, in place of a silent take.
-    if (stream.getAudioTracks()[0]?.readyState === 'ended') {
-      setError(
-        new Error(
-          'The microphone stream has ended (the device was disconnected or its permission revoked). Request microphone access again.'
-        )
-      );
+    if (
+      refuseEndedStream(
+        'The microphone stream has ended (the device was disconnected or its permission revoked). Request microphone access again.'
+      )
+    )
       return false;
-    }
-    isStartingRef.current = true;
     const mountEpoch = mountEpochRef.current;
+    startingEpochRef.current = mountEpoch;
 
     try {
       setError(null);
@@ -193,6 +202,16 @@ export function useRecordingWithTakeEnded(
       // The same after a cleanup followed by a new setup: the take would read
       // a stream its owner stopped in that cleanup (#822).
       if (isUnmountedRef.current || mountEpoch !== mountEpochRef.current) return false;
+      // The stream can have ended during the awaits: its owner opened another
+      // microphone (a stopped track fires no `ended`), or it was unplugged
+      // before the take's own listener exists. Refuse, in place of a take
+      // that records silence and does not end by itself (#947).
+      if (
+        refuseEndedStream(
+          'The microphone changed or was disconnected while recording was starting. Start recording again.'
+        )
+      )
+        return false;
 
       // Create MediaStreamSource from Tone's context
       // Each hook creates its own source to avoid cross-context issues in Firefox
@@ -321,7 +340,8 @@ export function useRecordingWithTakeEnded(
       setError(err instanceof Error ? err : new Error('Failed to start recording'));
       return false;
     } finally {
-      isStartingRef.current = false;
+      // A start made after a cleanup owns the flag now.
+      if (startingEpochRef.current === mountEpoch) startingEpochRef.current = null;
     }
   }, [
     stream,
@@ -512,11 +532,13 @@ export function useRecordingWithTakeEnded(
     // instance, so a flag left true by the probe-unmount's cleanup would
     // make startRecording abort forever.
     isUnmountedRef.current = false;
-    mountEpochRef.current += 1;
+    // The cleanup moves the epoch on from this value (a plain assignment).
+    const epoch = mountEpochRef.current;
     return () => {
       // Abort any startRecording continuation parked on an await — it must
       // not build the capture graph after unmount.
       isUnmountedRef.current = true;
+      mountEpochRef.current = epoch + 1;
       // Remove mic-unplug listener
       if (audioTrackRef.current && onTrackEndedRef.current) {
         audioTrackRef.current.removeEventListener('ended', onTrackEndedRef.current);

@@ -5039,13 +5039,13 @@ In plain JavaScript a leftover prop is ignored (`isOverlay` aside, above); for `
 
 When the selected microphone left the device list, `useIntegratedRecording` asked for the first remaining one itself. It does not any more: the hooks open a microphone only when the app asks.
 
-- When the open microphone is unplugged (or its permission revoked), `stream` becomes `null`, `hasPermission` becomes `false` and `error` says "The microphone was disconnected or its permission was revoked. Request microphone access again." This is `useMicrophoneAccess`'s behaviour, so it holds without `useIntegratedRecording` too. Before, the ended stream stayed in `stream` when no other microphone was there.
+- When the open microphone is unplugged (or its permission revoked), `stream` becomes `null` and `error` says "The microphone was disconnected or its permission was revoked. Request microphone access again." This is `useMicrophoneAccess`'s behaviour, so it holds without `useIntegratedRecording` too. Before, the ended stream stayed in `stream` when no other microphone was there.
 - `selectedDevice` is the microphone that is open: the id its stream reports (`getSettings().deviceId`), and `null` while none is open. Before, it named the first device of the list once access was granted, until `changeDevice()` chose another, whether or not that device was the one open, and it kept naming a device after a `changeDevice()` that failed. After `requestMicAccess()` it names the microphone that was opened: the default (`'default'` in Chromium), or the one the `audioConstraints` option names. A microphone chosen earlier is opened again with `changeDevice(id)`; the hook keeps no memory of it.
 - New: `hasLabels` (also on `useMicrophoneAccess`) is `true` when `devices` names the real microphones. Chromium holding the permission named them before any microphone was open in our runs, so a picker can offer them and `changeDevice(id)` opens only the one chosen. Firefox and WebKit (Safari's engine) named them only once a microphone was open, so there the first open is still `requestMicAccess()`.
 
 **Find:** components that use `useIntegratedRecording` or `useMicrophoneAccess` and show a "enable microphone" control only before the first grant; pickers that read `selectedDevice` as always naming a device, or fall back to `devices[0]`.
 
-**Replace with:** show the control while no device is named and nothing is open (`!hasPermission && !hasLabels`); otherwise the picker, with an option for a `selectedDevice` that `devices` does not hold (`null` included): a `<select>` whose value matches no option shows its first device.
+**Replace with:** show the control while no device is named and nothing is open (`!stream && !hasLabels`; `hasPermission` is removed, see the next section); otherwise the picker, with an option for a `selectedDevice` that `devices` does not hold (`null` included): a `<select>` whose value matches no option shows its first device.
 
 ```tsx
 // Before: after an unplug the hook opened another microphone by itself, and
@@ -5063,7 +5063,7 @@ When the selected microphone left the device list, `useIntegratedRecording` aske
 // After: the app asks, and the picker shows the open microphone or none
 const listed = devices.some((d) => d.deviceId === selectedDevice);
 
-{!hasPermission && !hasLabels ? (
+{!stream && !hasLabels ? (
   <button onClick={requestMicAccess}>Enable microphone</button>
 ) : (
   <select value={(listed && selectedDevice) || ''} onChange={(e) => changeDevice(e.target.value)}>
@@ -5073,6 +5073,56 @@ const listed = devices.some((d) => d.deviceId === selectedDevice);
     ))}
   </select>
 )}
+```
+
+## `hasPermission` is removed from the recording hooks
+
+**Package:** `@waveform-playlist/recording`.
+
+`useMicrophoneAccess` and `useIntegratedRecording` no longer return `hasPermission`. It was kept by hand beside `stream` and could disagree with it. A device switch cleared `stream` and left `hasPermission` `true`, so a `stopStream()` during the switch, or a hide while its grant arrived, left it `true` with no stream: a Record button that read it stayed enabled, and `startRecording()` failed with "No microphone stream available". Read `stream` instead.
+
+Two differences from the old field:
+
+- While a request is opening a microphone (`changeDevice(id)`, or `requestAccess()` / `requestMicAccess()` while one is open), `stream` is `null`: the request stops the open microphone first. `hasPermission` stayed `true` then, with nothing to record from.
+- Neither says whether the browser holds the microphone permission. `stream` says whether this hook has a microphone open; `hasPermission` was `false` after a `stopStream()` that closed one, with the permission still granted. `hasLabels` says whether the browser names the devices.
+
+**Find:** `hasPermission`, in the values of `useMicrophoneAccess()` and `useIntegratedRecording()`.
+
+**Replace with:** `stream !== null` (destructure `stream` if the component does not already).
+
+```tsx
+// Before
+const { hasPermission, requestAccess } = useMicrophoneAccess();
+if (!hasPermission) return <button onClick={() => requestAccess()}>Enable microphone</button>;
+
+// After
+const { stream, requestAccess } = useMicrophoneAccess();
+if (stream === null) return <button onClick={() => requestAccess()}>Enable microphone</button>;
+```
+
+## Under `StrictMode`, a microphone request behind a run-once ref opens nothing
+
+**Package:** `@waveform-playlist/recording`. Development builds only.
+
+`useMicrophoneAccess` now stops a request that was still waiting for the browser when its effect was cleaned up for a hide or Fast Refresh (as it already did for an unmount), so that a hidden component reopens no microphone. In development, `<StrictMode>` runs each effect, cleans it up and runs it again; a request made in the first run is stopped by that cleanup. An effect that skips its second run with a ref therefore opens no microphone. Before, the first request's microphone was kept.
+
+**Find:** a mount effect that calls `requestAccess()` (or `requestMicAccess()` of `useIntegratedRecording`) behind a ref that makes it run once.
+
+**Replace with:** the same effect without the guard. React advises the same: [don't use refs to prevent an effect from running twice](https://react.dev/learn/synchronizing-with-effects#dont-use-refs-to-prevent-effects-from-firing). Without the guard the effect also runs when a hidden `<Activity>` is shown again, in production too, and asks again: the hide closed the microphone.
+
+```tsx
+// Before
+const asked = useRef(false);
+useEffect(() => {
+  if (asked.current) return;
+  asked.current = true;
+  requestAccess();
+}, [requestAccess]);
+
+// After
+useEffect(() => {
+  requestAccess();
+}, [requestAccess]);
 ```
 
 ## Recording types nothing read are removed

@@ -29,12 +29,14 @@ import {
 } from '@waveform-playlist/recording';
 
 function RecordButton() {
-  const { requestAccess, hasPermission, stream } = useMicrophoneAccess();
+  const { requestAccess, stream } = useMicrophoneAccess();
   const { isRecording, startRecording, stopRecording } = useRecording(stream);
 
   const handleRecord = async () => {
-    if (!hasPermission) {
+    if (!stream) {
+      // This render's startRecording has no stream yet: the next press records.
       await requestAccess();
+      return;
     }
 
     if (isRecording) {
@@ -75,7 +77,7 @@ import { useMicrophoneAccess } from '@waveform-playlist/recording';
 
 function MicrophoneSetup() {
   const {
-    hasPermission,
+    stream,
     isLoading,
     error,
     requestAccess,
@@ -92,8 +94,8 @@ function MicrophoneSetup() {
 
   return (
     <div>
-      <p>Microphone access: {hasPermission ? 'Granted' : 'Not granted'}</p>
-      {!hasPermission ? (
+      <p>Microphone: {stream ? 'Open' : 'Not open'}</p>
+      {!stream ? (
         <button onClick={() => requestAccess()}>Grant Microphone Access</button>
       ) : (
         <button onClick={stopStream}>Stop Microphone</button>
@@ -101,6 +103,15 @@ function MicrophoneSetup() {
     </div>
   );
 }
+```
+
+To ask from a mount effect, call `requestAccess()` in the effect without a run-once guard (a ref that skips the second run). In development, StrictMode runs the effect, cleans it up and runs it again. The hook stops a request that was still waiting for the browser when a cleanup ran, so a guarded effect opens no microphone; an unguarded one asks again and gets it. React's own advice is the same: [don't use refs to prevent an effect from running twice](https://react.dev/learn/synchronizing-with-effects#dont-use-refs-to-prevent-effects-from-firing).
+
+```tsx
+const { requestAccess } = useMicrophoneAccess();
+useEffect(() => {
+  requestAccess();
+}, [requestAccess]);
 ```
 
 ### Audio Constraints
@@ -145,7 +156,7 @@ A picker shows `selectedDevice` only when `devices` holds it: React gives a `<se
 const {
   devices,
   hasLabels,
-  hasPermission,
+  stream,
   selectedDevice,
   isRecording,
   requestMicAccess,
@@ -154,7 +165,7 @@ const {
 
 // Before a first grant the browser names no device: open the default one.
 // Once the devices are named, choosing one opens only that microphone.
-if (!hasPermission && !hasLabels) {
+if (!stream && !hasLabels) {
   return <button onClick={requestMicAccess}>Enable microphone</button>;
 }
 
@@ -238,6 +249,33 @@ function RecordingControls() {
 }
 ```
 
+To start a take from an effect, start it on a value of your own (`shouldRecord` below), call the latest `startRecording` through a ref, and ignore the result once the effect has been cleaned up:
+
+- `startRecording` of `useRecording` changes with the stream and the hook's options (`channelCount`, `samplesPerPixel`, `bits`). An effect that depends on it starts again on each change, also during a take, and that start resolves `false` at once.
+- A start still getting ready when the component's effects are cleaned up (an unmount, a hide, Fast Refresh, StrictMode's development cleanup) resolves `false`. Under StrictMode that is the first run's start; the second run's start records.
+
+Acting on such a `false` (releasing a session, showing a failure) can do so under a running take: StrictMode's second run, or the take a re-run was refused for. The `active` flag drops the ones a cleanup made stale. While `shouldRecord` stays `true`, the effect starts a new take when a hidden `<Activity>` is shown again (or on Fast Refresh): set it back to `false` when the take ends.
+
+```tsx
+const startRef = useRef(startRecording);
+useLayoutEffect(() => {
+  startRef.current = startRecording;
+});
+
+useEffect(() => {
+  if (!shouldRecord) return;
+  let active = true;
+  startRef.current().then((started) => {
+    if (active && !started) {
+      // the take did not start: release what was set up for it
+    }
+  });
+  return () => {
+    active = false;
+  };
+}, [shouldRecord]);
+```
+
 ### Mic Disconnect Detection
 
 `useRecording` automatically detects when the microphone is unplugged or permission is revoked during recording. When the `MediaStreamTrack` 'ended' event fires, the hook stops the take and sets an `error` state. What was recorded until then is kept: it is in `audioBuffer`.
@@ -251,16 +289,16 @@ const { error, audioBuffer } = useRecording(stream);
 
 `useIntegratedRecording` adds that take to the track it was started on, as `stopRecording()` does.
 
-`useMicrophoneAccess` follows the same event, recording or not: when the microphone's track ends, `stream` becomes `null`, `hasPermission` becomes `false` and `error` says "The microphone was disconnected or its permission was revoked. Request microphone access again." (`useIntegratedRecording` reports this one). The hooks never open another microphone by themselves, also when one is available: call `requestAccess()` / `requestMicAccess()` again, or `changeDevice(deviceId)` for a specific one. `devices` follows what is plugged in, and `selectedDevice` of `useIntegratedRecording` is `null` until a microphone is open again (see [Choosing a Microphone](#choosing-a-microphone)).
+`useMicrophoneAccess` follows the same event, recording or not: when the microphone's track ends, `stream` becomes `null` and `error` says "The microphone was disconnected or its permission was revoked. Request microphone access again." (`useIntegratedRecording` reports this one). The hooks never open another microphone by themselves, also when one is available: call `requestAccess()` / `requestMicAccess()` again, or `changeDevice(deviceId)` for a specific one. `devices` follows what is plugged in, and `selectedDevice` of `useIntegratedRecording` is `null` until a microphone is open again (see [Choosing a Microphone](#choosing-a-microphone)).
 
-`useRecording` given an ended stream of your own refuses to start: `startRecording()` resolves `false` with an `error`, in place of recording silence.
+`useRecording` given an ended stream of your own refuses to start: `startRecording()` resolves `false` with an `error`, in place of recording silence. The same when the stream ends while the start is still getting ready (the audio context, the recording worklet): another microphone was opened (`requestAccess()`, or `requestMicAccess()` / `changeDevice()` of `useIntegratedRecording`), or it was unplugged. Press Record again once a microphone is open again.
 
 ### When the Component Is Hidden or Unmounted Mid-Take
 
 React runs the hooks' effect cleanups when the component unmounts, when an `<Activity>` around it is hidden, and on Fast Refresh. The cleanups stop the recording worklet and the microphone stream, and the hooks' state says so:
 
 - `useRecording`: `isRecording` and `isPaused` are `false`, and `audioBuffer` holds what was received until then (the worklet's last partial block, about 16 ms, and anything it had sent that had not arrived yet are not in it; `progress` keeps the last duration it published). `useIntegratedRecording` adds it to the take's track, also on an unmount.
-- `useMicrophoneAccess`: `stream` is `null` and `hasPermission` is `false`, as after `stopStream()`. Call `requestAccess()` again when the component is shown (`requestMicAccess()` of `useIntegratedRecording`). That opens the default microphone (or the one the `audioConstraints` option names), which `selectedDevice` then names; a microphone chosen earlier is opened again with `changeDevice(deviceId)`. The hooks keep no memory of it: keep the id in your app to offer it again.
+- `useMicrophoneAccess`: `stream` is `null` and `isLoading` is `false`, as after `stopStream()`. A request that was waiting for the browser when the component was hidden opens nothing: the microphone the browser grants it is stopped, also when that happens after the component is shown again, and a refusal sets no `error`. Call `requestAccess()` again when the component is shown (`requestMicAccess()` of `useIntegratedRecording`). That opens the default microphone (or the one the `audioConstraints` option names), which `selectedDevice` then names; a microphone chosen earlier is opened again with `changeDevice(deviceId)`. The hooks keep no memory of it: keep the id in your app to offer it again.
 
 ### Without `navigator.mediaDevices`
 
@@ -473,13 +511,15 @@ function RecordToPlaylist({ selectedTrackId }: { selectedTrackId: string | null 
     startRecording,
     stopRecording,
     requestMicAccess,
-    hasPermission,
+    stream,
     error,
   } = useIntegratedRecording(arrangement, selectedTrackId);
 
   const handleRecord = async () => {
-    if (!hasPermission) {
+    if (!stream) {
+      // Records on the next press, once the stream is open.
       await requestMicAccess();
+      return;
     }
 
     if (isRecording) {
@@ -745,7 +785,7 @@ function RecordingControls({
     isRecording,
     meter,
     progress,
-    hasPermission,
+    stream,
     startRecording,
     stopRecording,
     requestMicAccess,
@@ -757,8 +797,10 @@ function RecordingControls({
   useRecordingSession({ isRecording, trackId: recordingTrackId });
 
   const handleRecord = async () => {
-    if (!hasPermission) {
+    if (!stream) {
+      // Records on the next press, once the stream is open.
       await requestMicAccess();
+      return;
     }
 
     if (isRecording) {
@@ -781,7 +823,7 @@ function RecordingControls({
         )}
       </button>
       <button onClick={onAddTrack}>+ Add Track</button>
-      {hasPermission && (
+      {stream && (
         <SegmentedVUMeter meter={meter} />
       )}
       {error && <span role="alert">{error.message}</span>}

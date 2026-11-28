@@ -11,7 +11,6 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
   const [devices, setDevices] = useState<MicrophoneDevice[]>([]);
   // Whether `devices` names the real microphones (core's `hasLabels`).
   const [hasLabels, setHasLabels] = useState(false);
-  const [hasPermission, setHasPermission] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -27,6 +26,13 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
   // Set by unmount cleanup (plain assignment — the exhaustive-deps rule
   // rejects read-modify-writes like a generation bump in cleanup functions).
   const isUnmountedRef = useRef(false);
+  // Counts the mount effect's cleanups. A request saves it on entry: one that
+  // started before a hide (or Fast Refresh) is stale after the show, though
+  // the setup has reset isUnmountedRef by then (#947). No microphone is
+  // opened for a hidden component; the app asks again (#822). Counted in the
+  // cleanup, not the setup: a request made on mount before this hook's effect
+  // runs (a child's effect, any layout effect) belongs to this mount.
+  const mountEpochRef = useRef(0);
 
   // Enumerate audio input devices — delegates to the framework-agnostic core
   // helper (redaction-aware fallback labels, SSR/insecure-context safe).
@@ -45,6 +51,13 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
   const requestAccess = useCallback(
     async (deviceId?: string, audioConstraints?: MediaTrackConstraints) => {
       const generation = ++requestGenerationRef.current;
+      const mountEpoch = mountEpochRef.current;
+      // Superseded by a newer request or stopStream, or begun before an
+      // unmount or a hide: its result is not this hook's state any more.
+      const isStale = () =>
+        generation !== requestGenerationRef.current ||
+        mountEpoch !== mountEpochRef.current ||
+        isUnmountedRef.current;
       setIsLoading(true);
       setError(null);
 
@@ -88,17 +101,15 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
 
         const newStream = await mediaDevices.getUserMedia(constraints);
 
-        // Superseded by a newer request, stopStream, or unmount while the
-        // permission prompt was open — stop the just-granted stream instead
-        // of installing it (a hot mic nobody owns).
-        if (generation !== requestGenerationRef.current || isUnmountedRef.current) {
+        // Stale while the permission prompt was open: stop the just-granted
+        // stream instead of installing it (a hot mic nobody owns).
+        if (isStale()) {
           newStream.getTracks().forEach((track) => track.stop());
           return;
         }
 
         streamRef.current = newStream;
         setStream(newStream);
-        setHasPermission(true);
 
         // The microphone is unplugged, or its permission revoked: the track
         // ends and delivers silence from then on. The state must not keep
@@ -109,7 +120,6 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
           if (streamRef.current !== newStream) return;
           streamRef.current = null;
           setStream(null);
-          setHasPermission(false);
           setError(
             new Error(
               'The microphone was disconnected or its permission was revoked. Request microphone access again.'
@@ -124,11 +134,12 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
         await enumerateDevices();
       } catch (err) {
         console.warn('[waveform-playlist] Failed to access microphone:', String(err));
-        if (generation === requestGenerationRef.current) {
+        if (!isStale()) {
           setError(err instanceof Error ? err : new Error('Failed to access microphone'));
-          setHasPermission(false);
         }
       } finally {
+        // A newer request owns isLoading. stopStream and the cleanup have
+        // already cleared it for the request they made stale.
         if (generation === requestGenerationRef.current) {
           setIsLoading(false);
         }
@@ -139,13 +150,14 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
 
   // Stop the stream and revoke access
   const stopStream = useCallback(() => {
-    // Invalidate any in-flight request so a pending grant can't re-arm the mic
+    // Invalidate any in-flight request so a pending grant can't re-arm the mic;
+    // its finally no longer clears isLoading, so do it here (#947).
     requestGenerationRef.current++;
+    setIsLoading(false);
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
       setStream(null);
-      setHasPermission(false);
     }
   }, []);
 
@@ -155,6 +167,9 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
     // instance, so a flag left true by the probe-unmount's cleanup would
     // stop every future getUserMedia grant as "stale".
     isUnmountedRef.current = false;
+    // The cleanup moves the epoch on from this value: a plain assignment
+    // (see isUnmountedRef), and it makes every earlier request stale (#947).
+    const epoch = mountEpochRef.current;
     // Try to enumerate devices (labels won't be available without permission)
     enumerateDevices();
 
@@ -167,8 +182,12 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
     return () => {
       mediaDevices?.removeEventListener('devicechange', enumerateDevices);
       // Invalidate any in-flight request (a grant arriving after unmount is
-      // stopped by the isUnmounted check) and stop the current stream.
+      // stopped by the isUnmounted check, one arriving after a show by the
+      // mount epoch) and stop the current stream.
       isUnmountedRef.current = true;
+      mountEpochRef.current = epoch + 1;
+      // The request it made stale will not clear isLoading.
+      setIsLoading(false);
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
@@ -176,7 +195,6 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
         // after which the hook lives on: its state must not keep offering a
         // stopped stream (#822). As after stopStream(), the app asks again.
         setStream(null);
-        setHasPermission(false);
       }
     };
   }, [enumerateDevices]);
@@ -185,7 +203,6 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
     stream,
     devices,
     hasLabels,
-    hasPermission,
     isLoading,
     requestAccess,
     stopStream,

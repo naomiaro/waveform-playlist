@@ -40,13 +40,18 @@ const clipsOf = (arrangement: Arrangement, id: string) =>
  */
 function endedListener(stream: MediaStream): () => void {
   const track = stream.getAudioTracks()[0] as unknown as {
+    readyState: MediaStreamTrackState;
     addEventListener: ReturnType<typeof vi.fn>;
   };
   const listeners = track.addEventListener.mock.calls
     .filter(([type]) => type === 'ended')
     .map(([, listener]) => listener as () => void);
   expect(listeners.length).toBeGreaterThan(0);
-  return () => listeners.forEach((listener) => listener());
+  return () => {
+    // The browser ends the track before it fires the event.
+    track.readyState = 'ended';
+    listeners.forEach((listener) => listener());
+  };
 }
 
 /** The browser reports a new device list. Call inside an async `act`. */
@@ -110,7 +115,6 @@ describe('useIntegratedRecording: a take that ends without stopRecording()', () 
     );
     // The microphone is gone, and the state says so.
     expect(result.current.stream).toBeNull();
-    expect(result.current.hasPermission).toBe(false);
   });
 
   it('is added once when Stop is pressed while the unplug is being handled', async () => {
@@ -167,7 +171,6 @@ describe('useIntegratedRecording: a take that ends without stopRecording()', () 
     expect(result.current.recordingTrackId).toBeNull();
     // The cleanup stopped the microphone: the state does not offer a dead stream.
     expect(result.current.stream).toBeNull();
-    expect(result.current.hasPermission).toBe(false);
   });
 
   it('lands on its track when the component unmounts mid-take', async () => {
@@ -225,7 +228,6 @@ describe('useIntegratedRecording: a take that ends without stopRecording()', () 
 
     expect(env.getUserMedia).not.toHaveBeenCalled();
     expect(result.current.stream).toBeNull();
-    expect(result.current.hasPermission).toBe(false);
     expect(result.current.error?.message).toMatch(/Request microphone access again/);
     // Nothing is open, so the picker names nothing (#945).
     expect(result.current.selectedDevice).toBeNull();
@@ -552,6 +554,265 @@ describe('useIntegratedRecording: asking for the microphone again', () => {
     expect(started).toBe(false);
     expect(result.current.isRecording).toBe(false);
     expect(result.current.recordingTrackId).toBeNull();
+  });
+
+  // #947: a start made after the show replaces one still parked from before
+  // the hide, wherever that one waits. The old one resolves false and leaves
+  // the new take's state alone.
+  const recordingNodesBuilt = () =>
+    env.context.createAudioWorkletNode.mock.calls.filter(([name]) => name === 'recording-processor')
+      .length;
+
+  it('a parked start whose resume fails after the show leaves the new take alone', async () => {
+    const arrangement = arrangementOf('track-1');
+    const { result, hide, show } = renderHookInActivity(() =>
+      useIntegratedRecording(arrangement, 'track-1')
+    );
+    playoutModule.resumeGlobalAudioContext.mockRejectedValueOnce(new Error('not allowed'));
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+    let fail!: (err: Error) => void;
+    playoutModule.resumeGlobalAudioContext.mockImplementationOnce(
+      () => new Promise<void>((_resolve, reject) => (fail = reject))
+    );
+    let first!: Promise<boolean>;
+    act(() => {
+      first = result.current.startRecording();
+    });
+    await act(async () => {
+      hide();
+    });
+    await act(async () => {
+      show();
+    });
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+    await act(async () => {
+      expect(await result.current.startRecording()).toBe(true);
+    });
+
+    await act(async () => {
+      fail(new Error('resume failed'));
+      expect(await first).toBe(false);
+    });
+    expect(result.current.isRecording).toBe(true);
+    expect(result.current.recordingTrackId).toBe('track-1');
+    expect(result.current.error).toBeNull();
+  });
+
+  /** A start parked in the audio context resume, then a hide, a show and the
+   *  microphone asked for again. */
+  const parkStartAcrossHide = async (useTrackId: () => string) => {
+    const arrangement = arrangementOf('track-1', 'track-2');
+    const view = renderHookInActivity(() => useIntegratedRecording(arrangement, useTrackId()));
+    playoutModule.resumeGlobalAudioContext.mockRejectedValueOnce(new Error('not allowed'));
+    await act(async () => {
+      await view.result.current.requestMicAccess();
+    });
+    let release!: () => void;
+    playoutModule.resumeGlobalAudioContext.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (release = resolve))
+    );
+    let first!: Promise<boolean>;
+    act(() => {
+      first = view.result.current.startRecording();
+    });
+    await act(async () => {
+      view.hide();
+    });
+    await act(async () => {
+      view.show();
+    });
+    await act(async () => {
+      await view.result.current.requestMicAccess();
+    });
+    return { ...view, arrangement, first, release: () => release() };
+  };
+
+  it('a parked start that resumes after the new take began does not move the take', async () => {
+    let selected = 'track-1';
+    const { result, show, arrangement, first, release } = await parkStartAcrossHide(() => selected);
+    await act(async () => {
+      expect(await result.current.startRecording()).toBe(true);
+    });
+    act(() => pushSamples(256));
+    // Another track is selected while the take runs; the old start resumes.
+    selected = 'track-2';
+    await act(async () => {
+      show();
+    });
+    await act(async () => {
+      release();
+      expect(await first).toBe(false);
+    });
+    await act(async () => {
+      await result.current.stopRecording();
+    });
+
+    expect(clipsOf(arrangement, 'track-1')).toHaveLength(1);
+    expect(clipsOf(arrangement, 'track-2')).toHaveLength(0);
+  });
+
+  it('a parked start that settles does not unblock a second start of the new mount', async () => {
+    const { result, first, release } = await parkStartAcrossHide(() => 'track-1');
+    let releaseLoad!: () => void;
+    workletsModule.addRecordingWorkletModule.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (releaseLoad = resolve))
+    );
+    let second!: Promise<boolean>;
+    act(() => {
+      second = result.current.startRecording();
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // The first settles (not awaited: a failure must be an assertion, not a
+    // hang on the held load).
+    await act(async () => {
+      release();
+      await settle();
+    });
+    let third!: Promise<boolean>;
+    act(() => {
+      third = result.current.startRecording();
+    });
+    await act(async () => {
+      releaseLoad();
+      expect(await first).toBe(false);
+      expect(await third).toBe(false);
+      expect(await second).toBe(true);
+    });
+    expect(result.current.isRecording).toBe(true);
+    expect(result.current.recordingTrackId).toBe('track-1');
+  });
+
+  for (const parkedIn of ['the audio context resume', 'the recording worklet load'] as const) {
+    it(`a start after a hide and a show replaces one parked in ${parkedIn}`, async () => {
+      const arrangement = arrangementOf('track-1');
+      const { result, hide, show } = renderHookInActivity(() =>
+        useIntegratedRecording(arrangement, 'track-1')
+      );
+      let release!: () => void;
+      const held = () => new Promise<void>((resolve) => (release = resolve));
+      if (parkedIn === 'the audio context resume') {
+        // The resume after the grant fails, so the start resumes it, and waits.
+        playoutModule.resumeGlobalAudioContext.mockRejectedValueOnce(new Error('not allowed'));
+      }
+      await act(async () => {
+        await result.current.requestMicAccess();
+      });
+      if (parkedIn === 'the audio context resume') {
+        playoutModule.resumeGlobalAudioContext.mockImplementationOnce(held);
+      } else {
+        workletsModule.addRecordingWorkletModule.mockImplementationOnce(held);
+      }
+      let first!: Promise<boolean>;
+      act(() => {
+        first = result.current.startRecording();
+      });
+      await act(async () => {
+        hide();
+      });
+      await act(async () => {
+        show();
+      });
+      // The hide closed the microphone: the app asks again, then records.
+      await act(async () => {
+        await result.current.requestMicAccess();
+      });
+      let second = false;
+      await act(async () => {
+        second = await result.current.startRecording();
+      });
+      expect(second).toBe(true);
+      expect(result.current.isRecording).toBe(true);
+
+      let firstResult = true;
+      await act(async () => {
+        release();
+        firstResult = await first;
+      });
+      expect(firstResult).toBe(false);
+      expect(result.current.isRecording).toBe(true);
+      expect(result.current.recordingTrackId).toBe('track-1');
+      expect(result.current.error).toBeNull();
+      expect(recordingNodesBuilt()).toBe(1);
+    });
+  }
+});
+
+// #947 review: the microphone changes while a start waits on the worklet load.
+// The start was given the old stream, which is ended by then; it refuses with
+// an error in place of a take that records silence and never ends by itself.
+describe('useIntegratedRecording: the microphone changes while a start is waiting', () => {
+  const ENDED_WHILE_STARTING =
+    'The microphone changed or was disconnected while recording was starting. Start recording again.';
+  const recordingNodesBuilt = () =>
+    env.context.createAudioWorkletNode.mock.calls.filter(([name]) => name === 'recording-processor')
+      .length;
+
+  const startParkedInWorkletLoad = async () => {
+    const arrangement = arrangementOf('track-1');
+    const view = renderHook(() => useIntegratedRecording(arrangement, 'track-1'));
+    await act(async () => {
+      await view.result.current.requestMicAccess();
+    });
+    const opened = view.result.current.stream!;
+    let release!: () => void;
+    workletsModule.addRecordingWorkletModule.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (release = resolve))
+    );
+    let starting!: Promise<boolean>;
+    act(() => {
+      starting = view.result.current.startRecording();
+    });
+    return { ...view, opened, starting, release: () => release() };
+  };
+
+  for (const how of ['requestMicAccess', 'changeDevice'] as const) {
+    it(`a ${how}() during the start makes it refuse`, async () => {
+      const { result, opened, starting, release } = await startParkedInWorkletLoad();
+      await act(async () => {
+        if (how === 'requestMicAccess') await result.current.requestMicAccess();
+        else await result.current.changeDevice('dev-a');
+      });
+      expect(result.current.stream).not.toBe(opened);
+
+      let started: boolean | undefined;
+      await act(async () => {
+        release();
+        started = await starting;
+      });
+
+      expect(started).toBe(false);
+      expect(result.current.isRecording).toBe(false);
+      expect(result.current.error?.message).toBe(ENDED_WHILE_STARTING);
+      expect(recordingNodesBuilt()).toBe(0);
+      // The new microphone records.
+      await act(async () => {
+        expect(await result.current.startRecording()).toBe(true);
+      });
+    });
+  }
+
+  it('an unplug during the start makes it refuse', async () => {
+    const { result, opened, starting, release } = await startParkedInWorkletLoad();
+    act(() => endedListener(opened)());
+    expect(result.current.stream).toBeNull();
+
+    let started: boolean | undefined;
+    await act(async () => {
+      release();
+      started = await starting;
+    });
+
+    expect(started).toBe(false);
+    expect(result.current.isRecording).toBe(false);
+    expect(recordingNodesBuilt()).toBe(0);
+    expect(result.current.error).not.toBeNull();
   });
 });
 

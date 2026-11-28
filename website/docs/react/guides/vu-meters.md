@@ -97,10 +97,10 @@ import {
 import { SegmentedVUMeter } from '@waveform-playlist/ui-components';
 
 function InputMeter() {
-  const { stream, hasPermission, requestAccess } = useMicrophoneAccess();
+  const { stream, requestAccess } = useMicrophoneAccess();
   const { meter } = useMicrophoneLevel(stream, { channelCount: 2 });
 
-  if (!hasPermission) {
+  if (!stream) {
     return <button onClick={() => requestAccess()}>Enable Microphone</button>;
   }
 

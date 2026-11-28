@@ -3,7 +3,7 @@
  * the take added to the arrangement that owns the tracks (#812).
  */
 
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useRecordingWithTakeEnded } from './useRecording';
 import { useMicrophoneAccess } from './useMicrophoneAccess';
 import { useMicrophoneLevel } from './useMicrophoneLevel';
@@ -88,13 +88,14 @@ export interface UseIntegratedRecordingReturn {
   error: Error | null;
 
   // Microphone state
+  /** `useMicrophoneAccess`'s `stream`: the open microphone, `null` while none
+   *  is open. A microphone is open when `stream !== null`. */
   stream: MediaStream | null;
   devices: MicrophoneDevice[];
   /** `useMicrophoneAccess`'s `hasLabels`: `devices` names the real
    *  microphones, so a picker can offer them before one is open and open only
    *  the one chosen, with `changeDevice(id)`. */
   hasLabels: boolean;
-  hasPermission: boolean;
   /**
    * The id of the microphone that is open: the device the stream's track
    * reports (`getSettings().deviceId`), `null` while no stream is open (also
@@ -156,10 +157,24 @@ export function useIntegratedRecording(
   // keyed by the track id.
   const recordingTrackIdRef = useRef<string | null>(null);
   const [recordingTrackId, setRecordingTrackId] = useState<string | null>(null);
-  // True from the moment startRecording() begins its async startup until it
-  // settles. isRecording only turns true a render after the startup succeeds,
-  // so without this a second call in that window would re-capture the track.
-  const isStartingRef = useRef(false);
+  // The mount epoch of the startRecording() in progress, null when none:
+  // set when its async startup begins, cleared when it settles. isRecording
+  // only turns true a render after the startup succeeds, so without this a
+  // second call in that window would re-capture the track. A start parked
+  // from before a cleanup (a hide, Fast Refresh, StrictMode's) does not block
+  // one made after it, and resolves false without touching its state (#947,
+  // as in useRecording).
+  const startingEpochRef = useRef<number | null>(null);
+  // Moved on by the effect cleanup below. It must move with useRecording's
+  // and useMicrophoneAccess's epochs (the same component's cleanups, in the
+  // same commit): keep this effect's dependencies empty, as theirs are stable.
+  const mountEpochRef = useRef(0);
+  useEffect(() => {
+    const epoch = mountEpochRef.current;
+    return () => {
+      mountEpochRef.current = epoch + 1;
+    };
+  }, []);
 
   // Keep selectedTrackId and currentTime in refs for use in callbacks.
   // Avoids stale closures and keeps the callbacks from being recreated when
@@ -178,14 +193,7 @@ export function useIntegratedRecording(
   const finishTakeRef = useRef<(buffer: AudioBuffer | null) => void>(() => {});
 
   // Microphone access
-  const {
-    stream,
-    devices,
-    hasLabels,
-    hasPermission,
-    requestAccess,
-    error: micError,
-  } = useMicrophoneAccess();
+  const { stream, devices, hasLabels, requestAccess, error: micError } = useMicrophoneAccess();
   // The microphone that is open, read from its owner (#945). The hook keeps
   // no choice of its own: one it kept named another device than the open one
   // (the first of the list, a changeDevice that failed).
@@ -227,7 +235,7 @@ export function useIntegratedRecording(
     // A take is running or starting: starting again must not re-capture its
     // track or its start position (useRecording would refuse further down,
     // after both had been overwritten).
-    if (isRecordingRef.current || isStartingRef.current) return false;
+    if (isRecordingRef.current || startingEpochRef.current === mountEpochRef.current) return false;
     if (!selectedTrackIdRef.current) {
       setHookError(
         new Error('Cannot start recording: no track selected. Select or create a track first.')
@@ -242,7 +250,10 @@ export function useIntegratedRecording(
       return false;
     }
 
-    isStartingRef.current = true;
+    const mountEpoch = mountEpochRef.current;
+    startingEpochRef.current = mountEpoch;
+    // A cleanup ran since this start began: it is not this mount's any more.
+    const isStale = () => mountEpoch !== mountEpochRef.current;
     try {
       setHookError(null);
       // Resume audio context if needed
@@ -250,6 +261,9 @@ export function useIntegratedRecording(
         await resumeGlobalAudioContext();
         audioResumedRef.current = true;
       }
+      // Before the track and the position are captured: they belong to a
+      // start made after the cleanup, if there is one.
+      if (isStale()) return false;
 
       // Capture timeline position NOW — before recording starts.
       // The position at stop time would be wrong: the caller may pass a new
@@ -259,14 +273,18 @@ export function useIntegratedRecording(
       setRecordingTrackId(selectedTrackIdRef.current);
 
       const started = await startRecRef.current();
-      if (!started) setRecordingTrackId(null);
+      // useRecording refuses a start that a cleanup made stale, as here.
+      if (!started && !isStale()) setRecordingTrackId(null);
       return started;
     } catch (err) {
-      setRecordingTrackId(null);
-      setHookError(err instanceof Error ? err : new Error(String(err)));
+      if (!isStale()) {
+        setRecordingTrackId(null);
+        setHookError(err instanceof Error ? err : new Error(String(err)));
+      }
       return false;
     } finally {
-      isStartingRef.current = false;
+      // A start made after a cleanup owns the claim now.
+      if (startingEpochRef.current === mountEpoch) startingEpochRef.current = null;
     }
   }, [arrangement]);
 
@@ -431,7 +449,6 @@ export function useIntegratedRecording(
     stream,
     devices,
     hasLabels,
-    hasPermission,
     selectedDevice,
 
     // Recording controls

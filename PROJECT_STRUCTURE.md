@@ -574,13 +574,13 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
     - `useMicrophoneLevel` - `meter-processor` worklet for sample-accurate peak/RMS (no transients missed)
     - `useRecording` - `recording-processor` worklet for multi-channel audio capture with live peaks
   - **AudioWorklet Processing** - Captures audio samples in worklet thread, sends to main thread
-  - **Device Hot-Plug Detection** - `useMicrophoneAccess` listens for `devicechange` events. When the open microphone is unplugged, `useMicrophoneAccess` clears `stream` and `hasPermission`; no hook opens another device by itself, the app asks again (`requestMicAccess`, `changeDevice`).
+  - **Device Hot-Plug Detection** - `useMicrophoneAccess` listens for `devicechange` events. When the open microphone is unplugged, `useMicrophoneAccess` clears `stream`; no hook opens another device by itself, the app asks again (`requestMicAccess`, `changeDevice`).
 
 - **Key Features:**
   - **Global AudioContext** - Uses shared global context via `getGlobalContext()` (same as Tone.js playback)
   - **Live waveform visualization** - Real-time peaks during recording
   - **Multi-channel support** - Auto-detects mono/stereo from mic, mirrors mono to fill requested channel count
-  - **Microphone selection** - Enumerate and switch between input devices with auto-select and hot-plug detection
+  - **Microphone selection** - Enumerate and switch between input devices, with hot-plug detection; the selected device is the one the open stream reports
   - **Recording-optimized constraints** - Default audio constraints prioritize raw quality and low latency
   - **Overdub recording** - Record over existing audio with latency compensation (`outputLatency + lookAhead`)
   - **Latency compensation** - Clip `offsetSamples` skips combined output + lookAhead latency
@@ -593,7 +593,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
     - Returns: `isRecording`, `isPaused`, `progress` (`RecordingProgressSource`: `{ duration, peaks }`), `audioBuffer`
     - Methods: `startRecording()`, `stopRecording()`, `pauseRecording()`, `resumeRecording()`
   - `useMicrophoneAccess` - Device enumeration, permission handling, hot-plug detection
-    - Returns: `stream`, `devices`, `hasPermission`, `requestAccess()`, `stopStream()`, `error`
+    - Returns: `stream` (`null` while no microphone is open), `devices`, `hasLabels`, `isLoading`, `requestAccess()`, `stopStream()`, `error`
   - `useMicrophoneLevel` - Real-time per-channel level monitoring via meter-processor worklet
     - Returns: `meter` (`MeterSource`: `{ levels, peakLevels, rmsLevels }`), `resetPeak()`, `error`
   - `useRecordingProgress` - A `RecordingProgressSource` as throttled React state (default 10 updates a second)
