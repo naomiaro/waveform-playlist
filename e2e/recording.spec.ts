@@ -26,7 +26,14 @@ function fakeMicrophone() {
     osc.start();
     const track = destination.stream.getAudioTracks()[0];
     const getSettings = track.getSettings.bind(track);
-    track.getSettings = () => ({ ...getSettings(), channelCount: 1, sampleRate: ctx.sampleRate });
+    // A real microphone track reports its device (#945); the page's picker
+    // names the device from it.
+    track.getSettings = () => ({
+      ...getSettings(),
+      deviceId: 'fake',
+      channelCount: 1,
+      sampleRate: ctx.sampleRate,
+    });
     return destination.stream;
   };
   mediaDevices.enumerateDevices = async () =>
@@ -115,10 +122,17 @@ async function openRecordingPage(page: Page, baseURL: string | undefined) {
   // The page starts with no tracks: ready as soon as an engine is attached.
   // Play does nothing before the first ready (#812).
   await expect(page.locator('[data-playlist-state="ready"]')).toHaveCount(1, { timeout: 30000 });
+  // The page opens no microphone by itself (#945). The permission is granted,
+  // so the browser names the devices and the picker offers them: choosing one
+  // opens it.
+  const picker = page.getByRole('combobox', { name: /Microphone/ });
+  await expect(picker).toHaveValue('');
+  await picker.selectOption('fake');
+  await expect(picker).toHaveValue('fake');
 }
 
 // The synthetic microphone is an oscillator on its own AudioContext, created
-// when the page asks for the microphone on load, before any click. Without
+// when the test chooses the microphone, before any click on the page. Without
 // this flag that context sometimes stays suspended (about 1 run in 30) and the
 // "microphone" is silent.
 test.use({ launchOptions: { args: ['--autoplay-policy=no-user-gesture-required'] } });

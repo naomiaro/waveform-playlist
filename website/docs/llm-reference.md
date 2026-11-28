@@ -2080,7 +2080,14 @@ interface UseIntegratedRecordingReturn {
   error: Error | null;
   stream: MediaStream | null;
   devices: MicrophoneDevice[];
+  /** `devices` names the real microphones (false before a first grant, when the
+   *  list is one entry with an empty deviceId). True before any stream when the
+   *  browser already holds the permission: offer the list, open the one chosen
+   *  with changeDevice(id). */
+  hasLabels: boolean;
   hasPermission: boolean;
+  /** The open microphone: the id its stream reports (getSettings().deviceId),
+   *  null while none is open. Chromium reports 'default' for the default one. */
   selectedDevice: string | null;
   /** Resolves true when the capture pipeline actually started — check before
    *  starting synchronized playback (overdub). Resolves false and sets `error`

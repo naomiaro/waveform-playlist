@@ -67,6 +67,17 @@ export interface UseMicrophoneAccessReturn {
   // State
   stream: MediaStream | null;
   devices: MicrophoneDevice[];
+  /**
+   * True when `devices` names the real microphones, with their ids and
+   * labels. Browsers hide them until microphone permission is granted (the
+   * list is then one entry with an empty `deviceId`). Chromium, when it
+   * already holds the permission, lists them before any stream is open, so a
+   * picker can offer them and open only the one chosen, with
+   * `requestAccess(deviceId)`; Firefox and Safari list them only once a stream
+   * is open, so the first open there is the default microphone.
+   * Unchanged when an enumeration fails.
+   */
+  hasLabels: boolean;
   hasPermission: boolean;
   isLoading: boolean;
 

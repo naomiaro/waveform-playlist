@@ -210,7 +210,8 @@ export const RecordingIndicator: React.FC<RecordingIndicatorProps> = ({
 
 export interface MicrophoneSelectorProps {
   devices: MicrophoneDevice[];
-  selectedDeviceId?: string;
+  /** The microphone that is open; `null` shows the placeholder. */
+  selectedDeviceId: string | null;
   onDeviceChange: (deviceId: string) => void;
   disabled?: boolean;
   /** Optional hint text rendered below the dropdown (e.g., sample rate info) */
@@ -242,24 +243,31 @@ export const MicrophoneSelector: React.FC<MicrophoneSelectorProps> = ({
   disabled = false,
   hint,
 }) => {
-  const currentValue = selectedDeviceId || (devices.length > 0 ? devices[0].deviceId : '');
-
   return (
     <SelectorLabel>
       Microphone
+      {/* Shows the microphone that is open, never a guess: with none open,
+          the placeholder, and choosing a device opens only that one. */}
       <MicSelect
-        value={currentValue}
+        value={selectedDeviceId ?? ''}
         onChange={(e) => onDeviceChange(e.target.value)}
         disabled={disabled || devices.length === 0}
       >
         {devices.length === 0 ? (
           <option value="">No microphones found</option>
         ) : (
-          devices.map((device) => (
-            <option key={device.deviceId} value={device.deviceId}>
-              {device.label}
-            </option>
-          ))
+          <>
+            {selectedDeviceId === null && (
+              <option value="" disabled>
+                Choose a microphone
+              </option>
+            )}
+            {devices.map((device) => (
+              <option key={device.deviceId} value={device.deviceId}>
+                {device.label}
+              </option>
+            ))}
+          </>
         )}
       </MicSelect>
       {hint && <SelectorHint>{hint}</SelectorHint>}

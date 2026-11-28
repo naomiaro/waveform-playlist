@@ -58,6 +58,8 @@ export const env = {} as {
   context: MockToneContext;
   rawAudioContext: { outputLatency: number; sampleRate: number };
   getUserMedia: ReturnType<typeof vi.fn>;
+  /** The device the fake browser opens for a request that names none. */
+  defaultDeviceId: string;
 };
 
 export const DEFAULT_SAMPLE_RATE = 48000;
@@ -81,7 +83,12 @@ export function resetRecordingEnv(sampleRate = DEFAULT_SAMPLE_RATE): void {
     },
   };
   env.rawAudioContext = { outputLatency: 0, sampleRate };
-  env.getUserMedia = vi.fn(async () => createMockStream('mic'));
+  env.defaultDeviceId = 'dev-a';
+  // As the browsers measured on #945: the stream's track reports the device it
+  // opened, the requested one or the default.
+  env.getUserMedia = vi.fn(async (constraints?: MediaStreamConstraints) =>
+    createMockStream('mic', requestedDeviceId(constraints) ?? env.defaultDeviceId)
+  );
   Object.defineProperty(navigator, 'mediaDevices', {
     configurable: true,
     value: {
@@ -129,11 +136,22 @@ export const coreOverrides = {
   ),
 };
 
-export function createMockStream(id: string): MediaStream {
+function requestedDeviceId(constraints?: MediaStreamConstraints): string | undefined {
+  const audio = constraints?.audio;
+  if (!audio || typeof audio !== 'object') return undefined;
+  const id = audio.deviceId;
+  if (typeof id === 'string') return id;
+  if (id && !Array.isArray(id) && typeof id === 'object' && typeof id.exact === 'string') {
+    return id.exact;
+  }
+  return undefined;
+}
+
+export function createMockStream(id: string, deviceId = 'dev-a'): MediaStream {
   const track = {
     stop: vi.fn(),
     kind: 'audio',
-    getSettings: () => ({ channelCount: 1 }),
+    getSettings: () => ({ channelCount: 1, deviceId }),
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
   };

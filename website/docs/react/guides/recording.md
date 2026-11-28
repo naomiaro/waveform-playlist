@@ -128,6 +128,54 @@ Default constraints optimize for recording quality:
 | `autoGainControl` | `false` | Consistent levels |
 | `latency` | `0` | Low latency monitoring |
 
+### Choosing a Microphone
+
+Browsers hide the microphones until the page has been granted microphone permission: `devices` is then one entry with an empty `deviceId`, and `hasLabels` is `false`. After a grant, `devices` names every microphone and `hasLabels` is `true`. Chromium, when it already holds the permission, names them before any microphone is open, so the app can offer the list and open only the one chosen. Firefox and Safari name them only once a microphone has been opened (measured with fake devices, Safari's engine also with the permission already granted): there the first open is `requestMicAccess()`, which opens the browser's default microphone, and a picker can be offered after it.
+
+`selectedDevice` of `useIntegratedRecording` is the microphone that is open: the id its stream reports (`getSettings().deviceId`), or `null` while none is open (before the first request, after an unplug, after a request that failed). A picker that shows it never names a microphone other than the one recording. For the default microphone (`requestMicAccess()`, no id), Chromium reports `'default'`, the id of its list's "Default" entry; Firefox and Safari report the device's own id.
+
+```tsx
+const {
+  devices,
+  hasLabels,
+  hasPermission,
+  selectedDevice,
+  isRecording,
+  requestMicAccess,
+  changeDevice,
+} = useIntegratedRecording(arrangement, selectedTrackId);
+
+// Before a first grant the browser names no device: open the default one.
+// Once the devices are named, choosing one opens only that microphone.
+if (!hasPermission && !hasLabels) {
+  return <button onClick={requestMicAccess}>Enable microphone</button>;
+}
+
+return (
+  <label>
+    Microphone
+    <select
+      value={selectedDevice ?? ''}
+      onChange={(e) => changeDevice(e.target.value)}
+      disabled={isRecording}
+    >
+      {selectedDevice === null && (
+        <option value="" disabled>
+          Choose a microphone
+        </option>
+      )}
+      {devices.map((d) => (
+        <option key={d.deviceId} value={d.deviceId}>
+          {d.label}
+        </option>
+      ))}
+    </select>
+  </label>
+);
+```
+
+With `useMicrophoneAccess` alone, `hasLabels` is the same field, `requestAccess(deviceId)` opens one microphone by its id, and the open one is `stream?.getAudioTracks()[0]?.getSettings().deviceId`.
+
 ## Recording Controls
 
 ### useRecording Hook
@@ -195,7 +243,7 @@ const { error, audioBuffer } = useRecording(stream);
 
 `useIntegratedRecording` adds that take to the track it was started on, as `stopRecording()` does.
 
-`useMicrophoneAccess` follows the same event, recording or not: when the microphone's track ends, `stream` becomes `null`, `hasPermission` becomes `false` and `error` says "The microphone was disconnected or its permission was revoked. Request microphone access again." (`useIntegratedRecording` reports this one). The hooks never open another microphone by themselves, also when one is available: call `requestAccess()` / `requestMicAccess()` again, or `changeDevice(deviceId)` for a specific one. `devices` follows what is plugged in, and `selectedDevice` of `useIntegratedRecording` names a device of that list (the first one, until `changeDevice()` chooses another).
+`useMicrophoneAccess` follows the same event, recording or not: when the microphone's track ends, `stream` becomes `null`, `hasPermission` becomes `false` and `error` says "The microphone was disconnected or its permission was revoked. Request microphone access again." (`useIntegratedRecording` reports this one). The hooks never open another microphone by themselves, also when one is available: call `requestAccess()` / `requestMicAccess()` again, or `changeDevice(deviceId)` for a specific one. `devices` follows what is plugged in, and `selectedDevice` of `useIntegratedRecording` is `null` until a microphone is open again (see [Choosing a Microphone](#choosing-a-microphone)).
 
 `useRecording` given an ended stream of your own refuses to start: `startRecording()` resolves `false` with an `error`, in place of recording silence.
 
@@ -204,7 +252,7 @@ const { error, audioBuffer } = useRecording(stream);
 React runs the hooks' effect cleanups when the component unmounts, when an `<Activity>` around it is hidden, and on Fast Refresh. The cleanups stop the recording worklet and the microphone stream, and the hooks' state says so:
 
 - `useRecording`: `isRecording` and `isPaused` are `false`, and `audioBuffer` holds what was received until then (the worklet's last partial block, about 16 ms, and anything it had sent that had not arrived yet are not in it; `progress` keeps the last duration it published). `useIntegratedRecording` adds it to the take's track, also on an unmount.
-- `useMicrophoneAccess`: `stream` is `null` and `hasPermission` is `false`, as after `stopStream()`. Call `requestAccess()` again when the component is shown (`requestMicAccess()` of `useIntegratedRecording`). That opens the default microphone and resets `selectedDevice` to the first of the list; a microphone chosen earlier is chosen again with `changeDevice(deviceId)`.
+- `useMicrophoneAccess`: `stream` is `null` and `hasPermission` is `false`, as after `stopStream()`. Call `requestAccess()` again when the component is shown (`requestMicAccess()` of `useIntegratedRecording`). That opens the default microphone, which `selectedDevice` then names; a microphone chosen earlier is opened again with `changeDevice(deviceId)`. The hooks keep no memory of it: keep the id in your app to offer it again.
 
 ### Without `navigator.mediaDevices`
 

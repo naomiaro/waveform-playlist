@@ -204,8 +204,8 @@ describe('useIntegratedRecording: a take that ends without stopRecording()', () 
     });
     // A microphone is opened when the app asks for one, never by the hook.
     expect(env.getUserMedia).not.toHaveBeenCalled();
-    // The picker names a device that is in the list.
-    expect(result.current.selectedDevice).toBe('dev-b');
+    // The picker names the microphone that is open (#945).
+    expect(result.current.selectedDevice).toBe('dev-a');
   });
 
   it('opens no other microphone when the open one is unplugged while idle', async () => {
@@ -227,8 +227,12 @@ describe('useIntegratedRecording: a take that ends without stopRecording()', () 
     expect(result.current.stream).toBeNull();
     expect(result.current.hasPermission).toBe(false);
     expect(result.current.error?.message).toMatch(/Request microphone access again/);
+    // Nothing is open, so the picker names nothing (#945).
+    expect(result.current.selectedDevice).toBeNull();
 
-    // The app asks: the microphone that is there is opened and selected.
+    // The app asks: the microphone that is there is the default now, and is
+    // opened and selected.
+    env.defaultDeviceId = 'dev-b';
     await act(async () => {
       await result.current.requestMicAccess();
       await settle();
@@ -420,7 +424,7 @@ describe('useIntegratedRecording: asking for the microphone again', () => {
     expect(result.current.selectedDevice).toBe('dev-b');
   }
 
-  it('opens the default device and resets the selection: the picker does not keep an earlier choice', async () => {
+  it('opens the default device after a hide: the picker names it, not an earlier choice', async () => {
     const arrangement = arrangementOf('track-1');
     const { result, hide, show } = renderHookInActivity(() =>
       useIntegratedRecording(arrangement, 'track-1')
@@ -434,18 +438,19 @@ describe('useIntegratedRecording: asking for the microphone again', () => {
     });
     // The stream is gone, and so is the claim that dev-b is the open microphone.
     expect(result.current.stream).toBeNull();
+    expect(result.current.selectedDevice).toBeNull();
 
     await act(async () => {
       await result.current.requestMicAccess();
     });
 
     expect(requestedDevice()).toBeUndefined();
-    // Selected again by the hook: the first of the list. The app picks dev-b
-    // again with changeDevice().
+    // The open microphone: the default. The app picks dev-b again with
+    // changeDevice().
     expect(result.current.selectedDevice).toBe('dev-a');
   });
 
-  it('resets the selection also when the stream was not lost', async () => {
+  it('opens the default device also when the stream was not lost', async () => {
     const arrangement = arrangementOf('track-1');
     const { result } = renderHook(() => useIntegratedRecording(arrangement, 'track-1'));
     await chooseDevB(result);
@@ -474,6 +479,9 @@ describe('useIntegratedRecording: asking for the microphone again', () => {
       await result.current.changeDevice('dev-b');
     });
     expect(result.current.stream).toBeNull();
+    // Nothing is open: the picker does not name dev-b (#945).
+    expect(result.current.selectedDevice).toBeNull();
+    expect(result.current.error?.message).toBe('NotReadableError');
 
     await act(async () => {
       await result.current.requestMicAccess();
