@@ -397,19 +397,23 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
 }) => {
   // Export options state
   const [exportMode, setExportMode] = useState<'master' | 'individual' | 'all'>('master');
-  const [selectedTrackIndex, setSelectedTrackIndex] = useState<number>(0);
+  const [chosenTrackId, setChosenTrackId] = useState<string | null>(null);
   const [applyEffectsToExport, setApplyEffectsToExport] = useState(true);
   const [isExportingZip, setIsExportingZip] = useState(false);
   const [zipProgress, setZipProgress] = useState(0);
   const { tracks: contextTracks } = usePlaylistTimeline();
   const { trackStates } = usePlaylistMixer();
   const { exportWav } = useExportWav();
+  // The track to export alone: the one chosen, else the first
+  const selectedTrack =
+    contextTracks.find((track) => track.id === chosenTrackId) ?? contextTracks[0];
   const arrangement = useArrangement();
   // Dropped files that could not be decoded: their tracks are removed, the list stays
   const failedDrops = useFailedDrops(arrangement);
 
-  // Get the offline effects functions when needed
-  // Both are stable: they read the chains when the export runs.
+  // The offline effects functions, left out when "Apply Effects" is off
+  // (fades are always exported). Both are stable: they read the chains when
+  // the export runs.
   const offlineEffectsFunction = applyEffectsToExport ? createOfflineMasterEffects() : undefined;
   const createOfflineTrackEffects = applyEffectsToExport
     ? trackEffectsManager.createOfflineTrackEffectsFunction
@@ -432,9 +436,7 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
         const safeFilename = trackName.replace(/[^a-z0-9_-]/gi, '_');
 
         const result = await exportWav(contextTracks, trackStates, {
-          mode: 'individual',
-          trackIndex: i,
-          applyEffects: applyEffectsToExport,
+          trackId: contextTracks[i].id,
           effectsFunction: offlineEffectsFunction,
           createOfflineTrackEffects,
           autoDownload: false,
@@ -460,7 +462,7 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
       setIsExportingZip(false);
       setZipProgress(0);
     }
-  }, [contextTracks, trackStates, exportWav, applyEffectsToExport, offlineEffectsFunction, createOfflineTrackEffects]);
+  }, [contextTracks, trackStates, exportWav, offlineEffectsFunction, createOfflineTrackEffects]);
 
   // Handle dropped/selected audio files: one track per file, named after the
   // file without its extension; the arrangement loads each one
@@ -549,12 +551,12 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
 
           {exportMode === 'individual' && (
             <ExportSelect
-              value={selectedTrackIndex}
-              onChange={(e) => setSelectedTrackIndex(parseInt(e.target.value, 10))}
+              value={selectedTrack?.id ?? ''}
+              onChange={(e) => setChosenTrackId(e.target.value)}
             >
-              {trackStates.map((state, index) => (
-                <option key={index} value={index}>
-                  {state?.name || `Track ${index + 1}`}
+              {contextTracks.map((track, index) => (
+                <option key={track.id} value={track.id}>
+                  {track.name || `Track ${index + 1}`}
                 </option>
               ))}
             </ExportSelect>
@@ -579,10 +581,8 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
           ) : (
             <ExportWavButton
               label={exportMode === 'master' ? 'Export Mix' : 'Export Track'}
-              filename={exportMode === 'master' ? 'mix' : `${trackStates[selectedTrackIndex]?.name || `track-${selectedTrackIndex + 1}`}`}
-              mode={exportMode}
-              trackIndex={exportMode === 'individual' ? selectedTrackIndex : undefined}
-              applyEffects={applyEffectsToExport}
+              filename={exportMode === 'master' ? 'mix' : 'track'}
+              trackId={exportMode === 'individual' ? selectedTrack?.id : undefined}
               effectsFunction={offlineEffectsFunction}
               createOfflineTrackEffects={createOfflineTrackEffects}
             />

@@ -705,7 +705,7 @@ function DownloadRecording() {
   const handleDownload = async () => {
     await exportWav(tracks, trackStates, {
       filename: `recording-${Date.now()}`,
-      mode: 'master',  // or 'individual' for separate stems
+      // trackId: tracks[0].id,  // one track alone, as a stem
       bitDepth: 16,
     });
   };
@@ -735,11 +735,11 @@ When exporting recordings, you can choose:
 
 | Option | Description |
 |--------|-------------|
-| `mode: 'master'` | Export all tracks as a mixdown (channel count matches source) |
-| `mode: 'individual'` | Export a single track as a stem |
+| no `trackId` | Export all audible tracks as a mixdown (two channels when any audible track is stereo, else one) |
+| `trackId: id` | Export that track alone as a stem (its mute and the other tracks' solo are ignored) |
 | `bitDepth: 16` | Standard CD quality (16-bit PCM) |
 | `bitDepth: 32` | High resolution (32-bit float) |
-| `applyEffects: true` | Include fades and effects in export |
+| `effectsFunction`, `createOfflineTrackEffects` | Include the master and track effects; fades are always included |
 
 ## Complete Example
 

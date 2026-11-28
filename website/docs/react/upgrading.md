@@ -5312,3 +5312,40 @@ const instance = createToneEffectInstance(getEffectDefinition('tremolo')!);
 ```
 
 A Tone.js effect you construct yourself (`new Tremolo()`) is not touched: start it as before.
+
+## WAV export: one track is chosen by id, and `applyEffects` is removed
+
+**Package:** `@waveform-playlist/browser` (`@waveform-playlist/browser/tone`): `ExportWavButton` and `useExportWav().exportWav()`.
+
+- **`mode` and `trackIndex` are replaced by `trackId`.** A track was chosen by its position, and nothing made you pass the position with `mode: 'individual'`. Now `trackId` names the track; left out, the mix is exported. An id that is not among the tracks rejects with `No track with id "<id>" to export` (before: `Invalid track index for individual export`).
+- **A track exported on its own ignores its mute.** Its volume, pan and effects apply; its mute and the other tracks' solo do not. Before, the solo was ignored but a muted track gave a silent file.
+- **`applyEffects` is removed.** It was `true` by default and turned off the master chain, every track chain and the clip fades together, so an export without effects lost its fades too. Fades are now always exported. The effect chains are exported when their functions (`effectsFunction`, `createOfflineTrackEffects`) are given; for an export without effects, leave them out.
+- **`isExporting` stays `true` until the last export started from the same `useExportWav()` call has finished.** Before, the first export to finish set it to `false` while another was still rendering. `progress` is the progress of the export started last.
+- **`ExportWavButton` without `onExportError` writes a failed export to the console** with `console.error`. Before, the failure was dropped. A throw from your `onExportComplete` is no longer passed to `onExportError`.
+
+**Find:** `mode=`, `trackIndex` and `applyEffects` on `<ExportWavButton>`; `mode:`, `trackIndex:` and `applyEffects:` in the options of `exportWav(`; the message `Invalid track index for individual export`.
+
+**Replace with:**
+
+```tsx
+// Before
+<ExportWavButton mode="individual" trackIndex={0} filename="stem" />
+<ExportWavButton mode="master" applyEffects effectsFunction={offlineMaster} />
+<ExportWavButton applyEffects={false} />
+await exportWav(tracks, trackStates, { mode: 'individual', trackIndex: i, applyEffects: withEffects });
+
+// After
+const { tracks } = usePlaylistTimeline();
+<ExportWavButton trackId={tracks[0]?.id} filename="stem" />
+<ExportWavButton effectsFunction={offlineMaster} />
+<ExportWavButton />
+await exportWav(tracks, trackStates, {
+  trackId: tracks[i].id,
+  effectsFunction: withEffects ? offlineMaster : undefined,
+  createOfflineTrackEffects: withEffects ? trackFx.createOfflineTrackEffectsFunction : undefined,
+});
+```
+
+`<ExportWavButton applyEffects={false} />` with no effects function given now exports the clip fades, which it left out before. To export without fades, remove them from the clips first; there is no option for it.
+
+`ExportWavButton`'s `isExporting` and `progress` stay inside the button. To show them elsewhere, call `useExportWav()` and draw your own button ([`useExportWav`](./api/hooks.md#useexportwav)).

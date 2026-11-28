@@ -3,6 +3,7 @@ import { BaseControlButton } from '@waveform-playlist/ui-components';
 import { usePlaylistTimeline, usePlaylistMixer } from '../contexts/playlistContexts';
 import {
   useExportWav,
+  type ExportResult,
   type OfflineEffectsFunction,
   type OfflineTrackEffectsFunction,
 } from '../hooks/useExportWav';
@@ -10,19 +11,24 @@ import {
 export interface ExportWavButtonProps {
   /** Button label */
   label?: string;
-  /** Filename for the downloaded file (without extension) */
+  /**
+   * Filename for the downloaded file (without extension). A single track's file
+   * is named `<filename>_<track name>`.
+   */
   filename?: string;
-  /** Export mode: 'master' for stereo mix, 'individual' for single track */
-  mode?: 'master' | 'individual';
-  /** Track index for individual export */
-  trackIndex?: number;
+  /**
+   * The id of the one track to export. Left out, the mix is exported (two
+   * channels when any audible track is stereo, else one). Given, that track
+   * alone, as it sounds on its own: its mute and the other tracks' solo are
+   * ignored.
+   */
+  trackId?: string;
   /** Bit depth: 16 or 32 */
   bitDepth?: 16 | 32;
-  /** Whether to apply effects (fades, etc.) - defaults to true */
-  applyEffects?: boolean;
   /**
    * Optional effects function for master effects. When provided, export renders
-   * through the effects chain (WAM entries included). May be async.
+   * through the effects chain (WAM entries included). May be async. Clip fades
+   * are always rendered.
    */
   effectsFunction?: OfflineEffectsFunction;
   /**
@@ -34,17 +40,18 @@ export interface ExportWavButtonProps {
   className?: string;
   /** Callback when export completes */
   onExportComplete?: (blob: Blob) => void;
-  /** Callback when export fails */
+  /**
+   * Callback when export fails. Without it, the failure is written to the
+   * console with `console.error`.
+   */
   onExportError?: (error: Error) => void;
 }
 
 export const ExportWavButton: React.FC<ExportWavButtonProps> = ({
   label = 'Export WAV',
   filename = 'export',
-  mode = 'master',
-  trackIndex,
+  trackId,
   bitDepth = 16,
-  applyEffects = true,
   effectsFunction,
   createOfflineTrackEffects,
   className,
@@ -56,21 +63,31 @@ export const ExportWavButton: React.FC<ExportWavButtonProps> = ({
   const { exportWav, isExporting, progress } = useExportWav();
 
   const handleExport = async () => {
+    let result: ExportResult;
     try {
-      const result = await exportWav(tracks, trackStates, {
+      result = await exportWav(tracks, trackStates, {
         filename,
-        mode,
-        trackIndex,
+        trackId,
         bitDepth,
-        applyEffects,
         effectsFunction,
         createOfflineTrackEffects,
         autoDownload: true,
       });
-      onExportComplete?.(result.blob);
     } catch (error) {
-      onExportError?.(error instanceof Error ? error : new Error('Export failed'));
+      const failure = error instanceof Error ? error : new Error(String(error));
+      if (onExportError) {
+        onExportError(failure);
+      } else {
+        console.error(
+          '[waveform-playlist] The WAV export failed: ' +
+            failure.message +
+            '. Pass `onExportError` to ExportWavButton to show this in your app.'
+        );
+      }
+      return;
     }
+    // Outside the try: a throw from the app's own callback is not a failed export.
+    onExportComplete?.(result.blob);
   };
 
   const buttonLabel = isExporting ? `Exporting ${Math.round(progress * 100)}%` : label;

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
   gainToDb,
   trackChannelCount,
@@ -16,13 +16,6 @@ import { getGlobalAudioContext } from '@waveform-playlist/playout';
 import type { Volume, Gain, ToneAudioNode } from 'tone';
 import { renderToneOffline } from '../utils/renderToneOffline';
 import { encodeWav, downloadBlob, type WavEncoderOptions } from '../utils/wavEncoder';
-
-/** Function type for per-track effects (same as in @waveform-playlist/core) */
-export type TrackEffectsFunction = (
-  trackInput: unknown,
-  faderInput: unknown,
-  isOffline: boolean
-) => void | (() => void);
 
 /** Cleanup returned by an offline effects function (disposes offline instances / WAM clones). */
 export type OfflineEffectsCleanup = void | (() => void);
@@ -50,20 +43,25 @@ export type OfflineTrackEffectsFunction = (
 ) => OfflineEffectsCleanup | Promise<OfflineEffectsCleanup>;
 
 export interface ExportOptions extends WavEncoderOptions {
-  /** Filename for download (without extension) */
+  /**
+   * Filename for download (without extension). A single track's file is
+   * named `<filename>_<track name>`.
+   */
   filename?: string;
-  /** Export mode: 'master' for full mixdown, 'individual' for single track */
-  mode?: 'master' | 'individual';
-  /** Track index for individual export (only used when mode is 'individual') */
-  trackIndex?: number;
+  /**
+   * The id of the one track to export. Left out, the mix of every audible track
+   * is exported. Given, that track alone is exported as it sounds on its own:
+   * with its volume, pan and effects, its mute and the other tracks' solo
+   * ignored. An id that is not among the tracks rejects the export.
+   */
+  trackId?: string;
   /** Whether to trigger automatic download */
   autoDownload?: boolean;
-  /** Whether to apply effects (fades, etc.) - defaults to true */
-  applyEffects?: boolean;
   /**
    * Optional effects function for master effects. When provided, export renders
    * through the effects chain (WAM entries included — re-instantiated on the
    * offline context). The function receives isOffline=true and may be async.
+   * Clip fades are always rendered, with or without effect chains.
    */
   effectsFunction?: OfflineEffectsFunction;
   /**
@@ -86,17 +84,24 @@ export interface ExportResult {
 }
 
 export interface UseExportWavReturn {
-  /** Export the playlist to WAV */
+  /**
+   * Export the playlist to WAV. `trackStates[i]` is the mix of `tracks[i]`; a
+   * track with no entry is rendered with its own `muted`, `soloed`, `volume`
+   * and `pan`.
+   */
   exportWav: (
     tracks: readonly ClipTrack[],
-    trackStates: readonly TrackState[],
+    trackStates: readonly (TrackState | undefined)[],
     options?: ExportOptions
   ) => Promise<ExportResult>;
-  /** Whether export is in progress */
+  /** True while any export started from this hook call is running */
   isExporting: boolean;
-  /** Export progress (0-1) */
+  /** Progress (0-1) of the export started last from this hook call */
   progress: number;
-  /** Error message if export failed */
+  /**
+   * Message of the last export from this hook call that failed; cleared when an
+   * export starts
+   */
   error: string | null;
 }
 
@@ -123,25 +128,31 @@ export function useExportWav(): UseExportWavReturn {
   const [isExporting, setIsExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  // Exports of this hook call that have not settled, and the number of the
+  // last one started: `isExporting` ends with the last of them, and only the
+  // export started last writes `progress`.
+  const runningRef = useRef(0);
+  const startedRef = useRef(0);
 
   const exportWav = useCallback(
     async (
       tracks: readonly ClipTrack[],
-      trackStates: readonly TrackState[],
+      trackStates: readonly (TrackState | undefined)[],
       options: ExportOptions = {}
     ): Promise<ExportResult> => {
       const {
         filename = 'export',
-        mode = 'master',
-        trackIndex,
+        trackId,
         autoDownload = true,
-        applyEffects = true,
         effectsFunction,
         createOfflineTrackEffects,
         bitDepth = 16,
         onProgress,
       } = options;
 
+      startedRef.current += 1;
+      const exportNumber = startedRef.current;
+      runningRef.current += 1;
       setIsExporting(true);
       setProgress(0);
       setError(null);
@@ -152,11 +163,10 @@ export function useExportWav(): UseExportWavReturn {
           throw new Error('No tracks to export');
         }
 
-        if (
-          mode === 'individual' &&
-          (trackIndex === undefined || trackIndex < 0 || trackIndex >= tracks.length)
-        ) {
-          throw new Error('Invalid track index for individual export');
+        const chosenIndex =
+          trackId === undefined ? -1 : tracks.findIndex((track) => track.id === trackId);
+        if (trackId !== undefined && chosenIndex === -1) {
+          throw new Error(`No track with id "${trackId}" to export`);
         }
 
         // Use AudioContext sample rate — the single source of truth for all audio
@@ -187,17 +197,24 @@ export function useExportWav(): UseExportWavReturn {
             volume: tracks[index].volume,
             pan: tracks[index].pan,
           };
+        // One chosen track is exported as it sounds alone: choosing it is the
+        // choice, so its own mute is ignored, as is every other track's solo.
         const tracksToRender =
-          mode === 'individual'
-            ? [{ track: tracks[trackIndex!], state: stateOf(trackIndex!), index: trackIndex! }]
-            : tracks.map((track, index) => ({ track, state: stateOf(index), index }));
+          chosenIndex === -1
+            ? tracks.map((track, index) => ({ track, state: stateOf(index), index }))
+            : [
+                {
+                  track: tracks[chosenIndex],
+                  state: { ...stateOf(chosenIndex), muted: false },
+                  index: chosenIndex,
+                },
+              ];
 
-        // Check for solo - if any track is soloed, only play soloed tracks.
-        // Skip solo logic for individual export — the user explicitly chose the track.
-        const hasSolo = mode === 'master' && tracks.some((_, index) => stateOf(index).soloed);
+        // In the mix, a soloed track silences every track that is not soloed.
+        const hasSolo = chosenIndex === -1 && tracks.some((_, index) => stateOf(index).soloed);
 
         const reportProgress = (p: number) => {
-          setProgress(p);
+          if (startedRef.current === exportNumber) setProgress(p);
           onProgress?.(p);
         };
 
@@ -206,7 +223,6 @@ export function useExportWav(): UseExportWavReturn {
           hasSolo,
           duration,
           sampleRate,
-          applyEffects,
           effectsFunction,
           createOfflineTrackEffects,
           reportProgress
@@ -222,7 +238,7 @@ export function useExportWav(): UseExportWavReturn {
         // Auto download if requested
         if (autoDownload) {
           const exportFilename =
-            mode === 'individual' ? `${filename}_${tracks[trackIndex!].name}` : filename;
+            chosenIndex === -1 ? filename : `${filename}_${tracks[chosenIndex].name}`;
           downloadBlob(blob, `${exportFilename}.wav`);
         }
 
@@ -236,7 +252,8 @@ export function useExportWav(): UseExportWavReturn {
         setError(message);
         throw err;
       } finally {
-        setIsExporting(false);
+        runningRef.current -= 1;
+        if (runningRef.current === 0) setIsExporting(false);
       }
     },
     []
@@ -257,16 +274,15 @@ export function useExportWav(): UseExportWavReturn {
  * Mirrors the live playback graph: Player → fadeGain → trackInput →
  * [track effects] → trackVolume → trackPan → trackMute → masterVolume →
  * destination. Track effects are pre-fader inserts (#660), as in live
- * playback. Effects chains (master and per-track) are conditionally
- * inserted when provided; their cleanups
- * (which destroy offline WAM clones) always run after the render.
+ * playback. Effects chains (master and per-track) are inserted when their
+ * functions are given; their cleanups (which destroy offline WAM clones)
+ * always run after the render. Clip fades are always rendered.
  */
 async function renderOffline(
   tracksToRender: { track: ClipTrack; state: TrackState; index: number }[],
   hasSolo: boolean,
   duration: number,
   sampleRate: number,
-  applyEffects: boolean,
   effectsFunction: OfflineEffectsFunction | undefined,
   createOfflineTrackEffects:
     | ((trackId: string) => OfflineTrackEffectsFunction | undefined)
@@ -297,8 +313,8 @@ async function renderOffline(
         // Master volume at unity gain
         const masterVolume = new Volume(0);
 
-        // Conditionally insert master effects chain (may be async — WAM cloning)
-        if (effectsFunction && applyEffects) {
+        // Insert the master effects chain when given (may be async — WAM cloning)
+        if (effectsFunction) {
           const cleanup = await effectsFunction(masterVolume, context.destination, true);
           if (cleanup) cleanups.push(cleanup);
         } else {
@@ -319,11 +335,11 @@ async function renderOffline(
           );
           const trackMute = new Gain(state.muted ? 0 : 1);
 
-          // Conditionally insert per-track effects chain (may be async — WAM cloning)
+          // Insert the track's effects chain when given (may be async — WAM cloning)
           // PRE-FADER: trackInput → effects → trackVolume, so volume and pan
           // never change how hard the effects work (parity with ToneTrack).
           const trackEffects = createOfflineTrackEffects?.(track.id);
-          if (trackEffects && applyEffects) {
+          if (trackEffects) {
             const cleanup = await trackEffects(trackInput, trackVolume, true);
             if (cleanup) cleanups.push(cleanup);
           } else {
@@ -373,16 +389,7 @@ async function renderOffline(
 
             // Apply fade automation on the native AudioParam. `Gain.input` is
             // the native GainNode (public Tone API) — no private field needed.
-            if (applyEffects) {
-              applyClipFades(
-                fadeGain.input.gain,
-                clipGain,
-                startTime,
-                clipDuration,
-                fadeIn,
-                fadeOut
-              );
-            }
+            applyClipFades(fadeGain.input.gain, clipGain, startTime, clipDuration, fadeIn, fadeOut);
 
             player.start(startTime, offset, clipDuration);
           }
