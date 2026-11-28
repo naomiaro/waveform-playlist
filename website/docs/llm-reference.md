@@ -840,12 +840,13 @@ interface TrackDragPreview {
 ```typescript
 type TimeFormat = 'seconds' | 'thousandths' | 'hh:mm:ss' | 'hh:mm:ss.u' | 'hh:mm:ss.uu' | 'hh:mm:ss.uuu';
 
-/** Negative, NaN or infinite → 0. Rounds once, then splits: 59.9996 'hh:mm:ss.uuu' → '00:01:00.000'.
+/** Negative, NaN or infinite → zero in the format. A rounding of the seconds that reaches 60 carries:
+ *  59.9996 'hh:mm:ss.uuu' → '00:01:00.000'.
  *  Hours do not wrap at 24. */
 function formatTime(seconds: number, format: TimeFormat): string;
 
 /** null when the text is not a time: empty, letters, a negative number, a number followed by other
- *  text, more than three ':' parts, minutes/seconds >= 60 after a larger part, decimals before the
+ *  text, a number too large to be finite, more than three ':' parts, minutes/seconds >= 60 after a larger part, decimals before the
  *  last part. Surrounding spaces ignored. 'seconds'/'thousandths': a plain number. Clock formats
  *  also read '1.5' (s) and '1:30' (m:s); the first part may be any size. */
 function parseTime(timeStr: string, format: TimeFormat): number | null;

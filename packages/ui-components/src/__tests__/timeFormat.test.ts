@@ -396,3 +396,23 @@ describe('formatTime prints what it printed before #815, except at a carry', () 
     expect(compared).toBeGreaterThan(100_000);
   });
 });
+
+describe('edges found in review of #951', () => {
+  it('prints digits, never exponent notation, for a time of 1e21 s or more', () => {
+    expect(formatTime(1.08e21, 'hh:mm:ss.uuu')).toMatch(/^\d+:\d{2}:\d{2}\.\d{3}$/);
+    expect(formatTime(1e21, 'hh:mm:ss.uuu')).toMatch(/^\d+:\d{2}:\d{2}\.\d{3}$/);
+    expect(formatTime(3.6e26, 'hh:mm:ss')).toMatch(/^\d+:\d{2}:\d{2}$/);
+  });
+
+  it('returns null for a number too large to be finite', () => {
+    const digits = '1'.repeat(400);
+    expect(parseTime(digits, 'seconds')).toBeNull();
+    expect(parseTime(digits, 'hh:mm:ss')).toBeNull();
+    expect(parseTime(`${digits}:00:00`, 'hh:mm:ss')).toBeNull();
+  });
+
+  it('returns null for a value that is not a string (plain JS)', () => {
+    expect(parseTime(undefined as unknown as string, 'seconds')).toBeNull();
+    expect(parseTime(null as unknown as string, 'hh:mm:ss')).toBeNull();
+  });
+});

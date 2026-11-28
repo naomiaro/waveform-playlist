@@ -15,26 +15,34 @@ function printable(seconds: number): number {
   return Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
 }
 
+/** A whole number in plain digits: `String()` switches to exponent notation at 1e21. */
+function digits(whole: number): string {
+  return whole < 1e21 ? String(whole) : whole.toLocaleString('en-US', { useGrouping: false });
+}
+
 /**
  * Format time in clock format (hh:mm:ss with optional decimals).
  *
- * The time is rounded once, as a whole, and then split, so a rounding that
- * reaches the next second carries into the minutes and hours (59.9996 s is
+ * The seconds are rounded as they always were, `(seconds % 60).toFixed(d)`;
+ * a rounding that reaches 60 carries into the minutes and hours (59.9996 s is
  * `00:01:00.000`, never `00:00:60.000`). Hours do not wrap at 24.
  */
 function clockFormat(seconds: number, decimals: number): string {
-  const [wholeText, fraction] = seconds.toFixed(decimals).split('.');
-  const whole = Number(wholeText);
-  const hours = Math.floor(whole / 3600);
-  const minutes = Math.floor(whole / 60) % 60;
-  const secs = String(whole % 60).padStart(2, '0');
+  const remainder = seconds % 60;
+  const rounded = remainder.toFixed(decimals);
+  const carry = Number(rounded) >= 60;
+  const totalMinutes = Math.round((seconds - remainder) / 60) + (carry ? 1 : 0);
+  const secs = (carry ? (0).toFixed(decimals) : rounded).padStart(
+    decimals > 0 ? decimals + 3 : 2,
+    '0'
+  );
 
   return (
-    String(hours).padStart(2, '0') +
+    digits(Math.floor(totalMinutes / 60)).padStart(2, '0') +
     ':' +
-    String(minutes).padStart(2, '0') +
+    String(totalMinutes % 60).padStart(2, '0') +
     ':' +
-    (fraction === undefined ? secs : `${secs}.${fraction}`)
+    secs
   );
 }
 
@@ -68,6 +76,13 @@ const DECIMAL = /^(\d+\.?\d*|\.\d+)$/;
 const WHOLE = /^\d+$/;
 const SECONDS_PER_UNIT = [3600, 60, 1];
 
+/** A plain non-negative number, or `null`. */
+function parseNumber(text: string): number | null {
+  if (!DECIMAL.test(text)) return null;
+  const value = Number(text);
+  return Number.isFinite(value) ? value : null;
+}
+
 /**
  * Read `s`, `m:s` or `h:m:s`. Only the last part (the seconds) may have
  * decimals; the first part may be any size, and each later part must be
@@ -85,24 +100,27 @@ function parseClock(text: string): number | null {
     if (i > 0 && value >= 60) return null;
     total += value * units[i];
   }
-  return total;
+  return Number.isFinite(total) ? total : null;
 }
 
 /**
  * Parse text typed for a time back to seconds, or `null` when it is not a
- * time: empty text, a negative number, letters, or a number followed by
- * anything else. Spaces around the text are ignored.
+ * time: empty text, a negative number, letters, a number followed by
+ * anything else, a number too large to be finite, or a value that is not a
+ * string. Spaces around the text are ignored.
  *
  * The numeric formats (`seconds`, `thousandths`) read a plain number. The
  * clock formats also read the shorter forms `1.5` (seconds) and `1:30`
  * (minutes and seconds) besides `01:02:03.5`.
  */
 export function parseTime(timeStr: string, format: TimeFormat): number | null {
+  // Plain-JS callers can pass anything.
+  if (typeof timeStr !== 'string') return null;
   const text = timeStr.trim();
   switch (format) {
     case 'seconds':
     case 'thousandths':
-      return DECIMAL.test(text) ? Number(text) : null;
+      return parseNumber(text);
     case 'hh:mm:ss':
     case 'hh:mm:ss.u':
     case 'hh:mm:ss.uu':

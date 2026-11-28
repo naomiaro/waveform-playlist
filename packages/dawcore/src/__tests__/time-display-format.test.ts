@@ -82,6 +82,12 @@ describe('time-display-format', () => {
     expect(parseDisplayTime('-00:00:05', 'hh:mm:ss')).toBeNull();
   });
 
+  it('returns null for a number too large to be finite, and for a value that is not a string', () => {
+    expect(parseDisplayTime('1'.repeat(400), 'seconds')).toBeNull();
+    expect(parseDisplayTime('1'.repeat(400), 'hh:mm:ss')).toBeNull();
+    expect(parseDisplayTime(undefined as unknown as string, 'seconds')).toBeNull();
+  });
+
   it('reads the shorter forms in the clock formats', () => {
     expect(parseDisplayTime('1.5', 'hh:mm:ss.sss')).toBe(1.5);
     expect(parseDisplayTime('1:30', 'hh:mm:ss')).toBe(90);

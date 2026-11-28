@@ -33,6 +33,12 @@ describe('AnnotationText times (#815)', () => {
     expect(container.textContent).toContain('0:00.000 - 0:01.000');
   });
 
+  it('prints digits, never exponent notation, for a time of 1e21 s or more', () => {
+    const { container } = render(<AnnotationText annotations={one(1.08e21, 1.08e21)} />);
+    expect(container.textContent).toMatch(/\d+:\d{2}\.\d{3} - \d+:\d{2}\.\d{3}/);
+    expect(container.textContent).not.toContain('e+');
+  });
+
   it('hands the same formatter to a custom row', () => {
     const renderItem = vi.fn(({ formatTime }) => <span>{formatTime(59.9996)}</span>);
     const { container } = render(

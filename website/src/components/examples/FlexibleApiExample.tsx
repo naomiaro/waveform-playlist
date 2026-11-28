@@ -280,6 +280,40 @@ const CustomTrackControls: React.FC = () => {
   );
 };
 
+// A Radix text field for one time. Like the library's TimeInput, only the text
+// being typed is state; otherwise the field shows `value`. It commits on blur
+// (or Enter), and text that is not a time (parseTime gives null) changes
+// nothing: the field shows `value` again.
+const TimeField: React.FC<{
+  value: number;
+  format: TimeFormat;
+  placeholder: string;
+  onCommit: (seconds: number) => void;
+}> = ({ value, format, placeholder, onCommit }) => {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const commit = () => {
+    if (draft === null) return;
+    setDraft(null);
+    const seconds = parseTime(draft, format);
+    if (seconds !== null) onCommit(seconds);
+  };
+
+  return (
+    <TextField.Root
+      value={draft ?? formatTime(value, format)}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+      }}
+      placeholder={placeholder}
+      size="2"
+      style={{ width: '140px' }}
+    />
+  );
+};
+
 // Custom Selection Time Inputs using Radix UI
 const CustomSelectionInputs: React.FC = () => {
   const { selectionStart, selectionEnd } = useSelection();
@@ -287,49 +321,20 @@ const CustomSelectionInputs: React.FC = () => {
   const { timeFormat } = usePlaylistSettings();
   const format = timeFormat as TimeFormat;
 
-  // Each field is uncontrolled while it is edited and commits on blur (or
-  // Enter), like the library's TimeInput; `key` shows the new time after the
-  // selection changes. The field always shows the formatted selection after a
-  // commit; text that is not a time (parseTime gives null) changes nothing.
-  const startText = formatTime(selectionStart, format);
-  const endText = formatTime(selectionEnd, format);
-
-  const commitStart = (e: React.FocusEvent<HTMLInputElement>) => {
-    const newStart = parseTime(e.target.value, format);
-    e.target.value = startText;
-    if (newStart !== null) setSelection(newStart, selectionEnd);
-  };
-
-  const commitEnd = (e: React.FocusEvent<HTMLInputElement>) => {
-    const newEnd = parseTime(e.target.value, format);
-    e.target.value = endText;
-    if (newEnd !== null) setSelection(selectionStart, newEnd);
-  };
-
-  const blurOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') e.currentTarget.blur();
-  };
-
   return (
     <Flex gap="2" align="center">
-      <TextField.Root
-        key={startText}
-        defaultValue={startText}
-        onBlur={commitStart}
-        onKeyDown={blurOnEnter}
+      <TimeField
+        value={selectionStart}
+        format={format}
         placeholder="Start"
-        size="2"
-        style={{ width: '140px' }}
+        onCommit={(start) => setSelection(start, selectionEnd)}
       />
       <Text size="2" color="gray">to</Text>
-      <TextField.Root
-        key={endText}
-        defaultValue={endText}
-        onBlur={commitEnd}
-        onKeyDown={blurOnEnter}
+      <TimeField
+        value={selectionEnd}
+        format={format}
         placeholder="End"
-        size="2"
-        style={{ width: '140px' }}
+        onCommit={(end) => setSelection(selectionStart, end)}
       />
     </Flex>
   );

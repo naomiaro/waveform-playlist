@@ -1218,7 +1218,7 @@ The hook keeps its own format state; it is not the provider's time format (read 
 
 ### Available Formats
 
-What `formatTime(123.456)` returns in each format. A negative, `NaN` or infinite time prints as `0`, and hours do not wrap at 24.
+What `formatTime(123.456)` returns in each format. A negative, `NaN` or infinite time prints as zero in the format (`0`, `0.000`, `00:00:00.000`), and hours do not wrap at 24.
 
 | Format | Example |
 |--------|---------|

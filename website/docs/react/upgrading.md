@@ -241,13 +241,13 @@ If you used the context on its own, without a playlist provider, to hold your ow
 
 `parseTime(text, format)` used to return `0` for text it could not read, and read only the start of a number (`'1.5abc'` was `1.5`, `'-5'` was `-5`). A `TimeInput` committed that `0`, so typing `1.5` or `1:30` in an `hh:mm:ss` field moved a selection edge to the start. Now:
 
-- `parseTime` returns `number | null`. It is `null` for empty text, letters, a negative number, a number followed by anything else, more than three `:` parts, minutes or seconds of 60 or more after a larger part (`00:75:00`), and decimals before the last part. Spaces around the text are ignored.
+- `parseTime` returns `number | null`. It is `null` for empty text, letters, a negative number, a number followed by anything else, a number too large to be finite, more than three `:` parts, minutes or seconds of 60 or more after a larger part (`00:75:00`), and decimals before the last part. Spaces around the text are ignored.
 - The clock formats also read the shorter forms: `1.5` is 1.5 seconds, `1:30` is 90 seconds, `1:02:03.5` is the full form. The first part may be any size (`90` is 90 seconds, `120:00` is two hours). `seconds` and `thousandths` read a plain number only.
 - `TimeInput` (and both `SelectionTimeInputs`) calls nothing for text that is not a time, and shows the value again.
 
-`formatTime` changed at the same time, without a type change: a rounding that reaches the next second carries into the minutes and hours (`59.9996` in `hh:mm:ss.uuu` is `00:01:00.000`; it was `00:00:60.000`), hours no longer wrap at 24 (`90061` is `25:01:01`; it was `01:01:01`), and a negative, `NaN` or infinite time prints as `0`. Every other value prints as before.
+`formatTime` changed at the same time, without a type change: a rounding that reaches the next second carries into the minutes and hours (`59.9996` in `hh:mm:ss.uuu` is `00:01:00.000`; it was `00:00:60.000`), hours no longer wrap at 24 (`90061` in `hh:mm:ss` is `25:01:01`; it was `01:01:01`), and a negative, `NaN` or infinite time prints as zero in the format (`0`, `0.000`, `00:00:00.000`). Every other non-negative value below 24 hours prints as before.
 
-**Find:** `parseTime(` from `@waveform-playlist/ui-components` and `parseTime` from `useTimeFormat()`; code that compares the result with `0` to detect bad input; code that relies on `formatTime` wrapping hours at 24.
+**Find:** `parseTime(` from `@waveform-playlist/ui-components`, `parseTime` from `useTimeFormat()`, and code that implements or annotates `TimeFormatControls` from `@waveform-playlist/browser` (its `parseTime` field); code that compares the result with `0` to detect bad input; code that relies on `formatTime` wrapping hours at 24.
 
 **Replace with:** a check for `null`:
 
@@ -350,7 +350,7 @@ const { timeFormat } = usePlaylistSettings();
 const label = formatTime(seconds, timeFormat);
 ```
 
-`useTimeFormat()` is unchanged: it is a separate hook with its own state, and it still returns `formatTime`.
+`useTimeFormat()` still returns `formatTime`: it is a separate hook with its own state. (Its `parseTime` now returns `number | null`: see [`parseTime` returns `null` for text that is not a time](#parsetime-returns-null-for-text-that-is-not-a-time).)
 
 **Find:** `minimumPlaylistHeight` read from `usePlaylistData()`.
 
