@@ -5346,6 +5346,10 @@ await exportWav(tracks, trackStates, {
 });
 ```
 
-`<ExportWavButton applyEffects={false} />` with no effects function given now exports the clip fades, which it left out before. To export without fades, remove them from the clips first; there is no option for it.
+A leftover prop or option is ignored, and nothing warns:
+
+- `mode="individual"` with `trackIndex` exports **the mix**. Pass `trackId`.
+- `applyEffects={false}` next to `effectsFunction` or `createOfflineTrackEffects` exports **with** those effects. Leave the functions out instead.
+- `<ExportWavButton applyEffects={false} />` with no effects function given now exports the clip fades, which it left out before. To export without fades, remove them from the clips first; there is no option for it.
 
 `ExportWavButton`'s `isExporting` and `progress` stay inside the button. To show them elsewhere, call `useExportWav()` and draw your own button ([`useExportWav`](./api/hooks.md#useexportwav)).
