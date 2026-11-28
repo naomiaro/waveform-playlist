@@ -574,7 +574,7 @@ audiowaveform -i audio.mp3 -o peaks-stereo.dat -z 256 --split-channels
     - `useMicrophoneLevel` - `meter-processor` worklet for sample-accurate peak/RMS (no transients missed)
     - `useRecording` - `recording-processor` worklet for multi-channel audio capture with live peaks
   - **AudioWorklet Processing** - Captures audio samples in worklet thread, sends to main thread
-  - **Device Hot-Plug Detection** - `useMicrophoneAccess` listens for `devicechange` events. `useIntegratedRecording` auto-falls back to first available device if selected device unplugged.
+  - **Device Hot-Plug Detection** - `useMicrophoneAccess` listens for `devicechange` events. When the open microphone is unplugged, `useMicrophoneAccess` clears `stream` and `hasPermission`; no hook opens another device by itself, the app asks again (`requestMicAccess`, `changeDevice`).
 
 - **Key Features:**
   - **Global AudioContext** - Uses shared global context via `getGlobalContext()` (same as Tone.js playback)

@@ -7,7 +7,7 @@ Recording hooks: a take is no longer lost when it ends without `stopRecording()`
 
 **Fixed:**
 
-- `useIntegratedRecording` adds the take to its track when the microphone is unplugged mid-take (it was stopped and dropped; `error` still says "Microphone disconnected during recording"), and when the component using the hook unmounts or is hidden by `<Activity>` mid-take.
+- `useIntegratedRecording` adds the take to its track when the microphone is unplugged mid-take (it was stopped and dropped), and when the component using the hook unmounts or is hidden by `<Activity>` mid-take. After an unplug its `error` is `useMicrophoneAccess`'s ("The microphone was disconnected or its permission was revoked. Request microphone access again."); `useRecording` used alone still reports "Microphone disconnected during recording".
 - `useRecording`: after an `<Activity>` hide or a Fast Refresh mid-take, `isRecording` and `isPaused` are `false` and `audioBuffer` holds what was received (the worklet had been stopped while `isRecording` stayed `true`).
 - `useMicrophoneAccess` no longer throws on mount where `navigator.mediaDevices` is undefined (an `http` origin that is not `localhost`); `requestAccess()` there sets an `error` that names the secure-context requirement. After an `<Activity>` hide or a Fast Refresh, `stream` is `null` and `hasPermission` is `false` (it kept returning the stopped stream).
 - `useMicrophoneAccess`: when the microphone's track ends (unplugged, permission revoked), `stream` is `null`, `hasPermission` is `false` and `error` says so (it kept offering the ended stream, and the next take recorded silence). `requestMicAccess` and `changeDevice` keep their identity when `audioConstraints` is written inline.
