@@ -264,7 +264,7 @@ const { error, audioBuffer } = useRecording(stream);
 
 `useMicrophoneAccess` follows the same event, recording or not: when the microphone's track ends, `stream` becomes `null` and `error` says "The microphone was disconnected or its permission was revoked. Request microphone access again." (`useIntegratedRecording` reports this one). The hooks never open another microphone by themselves, also when one is available: call `requestAccess()` / `requestMicAccess()` again, or `changeDevice(deviceId)` for a specific one. `devices` follows what is plugged in, and `selectedDevice` of `useIntegratedRecording` is `null` until a microphone is open again (see [Choosing a Microphone](#choosing-a-microphone)).
 
-`useRecording` given an ended stream of your own refuses to start: `startRecording()` resolves `false` with an `error`, in place of recording silence. The same when the stream ends while the start is still getting ready (the audio context, the recording worklet): another microphone was opened with `requestMicAccess()` / `changeDevice()`, or it was unplugged. Press Record again once the new microphone is open.
+`useRecording` given an ended stream of your own refuses to start: `startRecording()` resolves `false` with an `error`, in place of recording silence. The same when the stream ends while the start is still getting ready (the audio context, the recording worklet): another microphone was opened (`requestAccess()`, or `requestMicAccess()` / `changeDevice()` of `useIntegratedRecording`), or it was unplugged. Press Record again once a microphone is open again.
 
 ### When the Component Is Hidden or Unmounted Mid-Take
 
