@@ -5104,11 +5104,11 @@ if (stream === null) return <button onClick={() => requestAccess()}>Enable micro
 
 **Package:** `@waveform-playlist/recording`. Development builds only.
 
-`useMicrophoneAccess` now stops a request that was still waiting for the browser when its effect was cleaned up (a hide, Fast Refresh, an unmount), so that a hidden component reopens no microphone. In development, `<StrictMode>` runs each effect, cleans it up and runs it again; a request made in the first run is stopped by that cleanup. An effect that skips its second run with a ref therefore opens no microphone. Before, the first request's microphone was kept.
+`useMicrophoneAccess` now stops a request that was still waiting for the browser when its effect was cleaned up for a hide or Fast Refresh (as it already did for an unmount), so that a hidden component reopens no microphone. In development, `<StrictMode>` runs each effect, cleans it up and runs it again; a request made in the first run is stopped by that cleanup. An effect that skips its second run with a ref therefore opens no microphone. Before, the first request's microphone was kept.
 
 **Find:** a mount effect that calls `requestAccess()` (or `requestMicAccess()` of `useIntegratedRecording`) behind a ref that makes it run once.
 
-**Replace with:** the same effect without the guard. React advises the same: [don't use refs to prevent an effect from running twice](https://react.dev/learn/synchronizing-with-effects#dont-use-refs-to-prevent-effects-from-firing).
+**Replace with:** the same effect without the guard. React advises the same: [don't use refs to prevent an effect from running twice](https://react.dev/learn/synchronizing-with-effects#dont-use-refs-to-prevent-effects-from-firing). Without the guard the effect also runs when a hidden `<Activity>` is shown again, in production too, and asks again: the hide closed the microphone.
 
 ```tsx
 // Before

@@ -13,7 +13,7 @@ Recording hooks: a take is no longer lost when it ends without `stopRecording()`
 - `useMicrophoneAccess`: when the microphone's track ends (unplugged, permission revoked), `stream` is `null` and `error` says so (it kept offering the ended stream, and the next take recorded silence). `requestMicAccess` and `changeDevice` keep their identity when `audioConstraints` is written inline.
 - `useMicrophoneAccess` logs failures with `console.warn` and the `[waveform-playlist]` prefix, the error as text.
 
-- `useIntegratedRecording`: two `stopRecording()` calls for one take add it once (the second added it again, as a second undo step). A `startRecording()` still waiting when the component is hidden and shown again resolves `false` (it started a take on the stopped stream); the same in `useRecording`, where a `startRecording()` made after the show no longer waits for it (it resolved `false` until the old start settled). `useRecording`'s `startRecording()` refuses a stream whose microphone track has ended, with an `error` (it recorded silence).
+- `useIntegratedRecording`: two `stopRecording()` calls for one take add it once (the second added it again, as a second undo step). A `startRecording()` still waiting when the component is hidden and shown again resolves `false` (it started a take on the stopped stream); the same in `useRecording`, where a `startRecording()` made after the show is no longer refused while the old one is parked (it resolved `false` until the old start settled). `useRecording`'s `startRecording()` refuses a stream whose microphone track has ended, with an `error` (it recorded silence).
 
 **Changed:** `UseIntegratedRecordingReturn.stopRecording` is typed `() => Promise<void>` (it always returned a promise; the type said `void`).
 
