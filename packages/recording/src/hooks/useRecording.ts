@@ -94,10 +94,13 @@ export function useRecordingWithTakeEnded(
   // Set by the unmount cleanup so a startRecording continuation that was
   // parked on an await doesn't build an ownerless capture graph.
   const isUnmountedRef = useRef<boolean>(false);
-  // Counts the effect's setups. A startRecording that was parked on an await
+  // Counts the effect's cleanups. A startRecording that was parked on an await
   // across a cleanup and a new setup (Fast Refresh, an <Activity> hidden and
   // shown) finds isUnmountedRef reset; the count tells it the cleanup ran, and
-  // with it the cleanup of whoever owns the stream, which stops it.
+  // with it the cleanup of whoever owns the stream, which stops it. Counted in
+  // the cleanup, not the setup: a start made on mount before this hook's
+  // effect runs (a child's effect, any layout effect) belongs to this mount
+  // (#947).
   const mountEpochRef = useRef(0);
   // Elapsed seconds, and the preview peaks accumulated so far. Written by the
   // duration loop and the worklet handler; published together, at most once
@@ -512,11 +515,13 @@ export function useRecordingWithTakeEnded(
     // instance, so a flag left true by the probe-unmount's cleanup would
     // make startRecording abort forever.
     isUnmountedRef.current = false;
-    mountEpochRef.current += 1;
+    // The cleanup moves the epoch on from this value (a plain assignment).
+    const epoch = mountEpochRef.current;
     return () => {
       // Abort any startRecording continuation parked on an await — it must
       // not build the capture graph after unmount.
       isUnmountedRef.current = true;
+      mountEpochRef.current = epoch + 1;
       // Remove mic-unplug listener
       if (audioTrackRef.current && onTrackEndedRef.current) {
         audioTrackRef.current.removeEventListener('ended', onTrackEndedRef.current);

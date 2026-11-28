@@ -196,9 +196,6 @@ describe('useMicrophoneAccess', () => {
     expect('hasPermission' in result.current).toBe(false);
   });
 
-  // #947: a request pending across a hide belongs to the hidden component. The
-  // setup that runs on the show resets isUnmountedRef, so the request must be
-  // told apart by the setup it started under.
   // A request made before the hook's own mount effect has run: a child's
   // effects run before the parent's, and every layout effect before any
   // passive one. The review of #948 found the first epoch bump in the setup
@@ -270,6 +267,9 @@ describe('useMicrophoneAccess', () => {
     });
   });
 
+  // #947: a request pending across a hide belongs to the hidden component. The
+  // setup that runs on the show resets isUnmountedRef, so the request is told
+  // apart by the cleanups counted since it started.
   describe('a request pending across a hide (#947)', () => {
     /** A getUserMedia that answers when the test says so. */
     const holdNextGrant = () => {

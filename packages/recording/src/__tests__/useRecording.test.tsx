@@ -1,5 +1,5 @@
-import { StrictMode } from 'react';
-import { renderHook, act, cleanup } from '@testing-library/react';
+import { StrictMode, useEffect, useLayoutEffect } from 'react';
+import { renderHook, render, act, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 
 interface MockWorkletNode {
@@ -436,6 +436,40 @@ describe('useRecording', () => {
     expect(result.current.isRecording).toBe(true);
     expect(mockContext.createMediaStreamSource).toHaveBeenCalledTimes(1);
   });
+
+  // A start made on mount before this hook's own effect has run: a child's
+  // effects run before the parent's, and every layout effect before any
+  // passive one. A mount epoch counted in the setup refused it (#947).
+  for (const [name, useChildEffect] of [
+    ['useEffect', useEffect],
+    ['useLayoutEffect', useLayoutEffect],
+  ] as const) {
+    it(`a start from a child's ${name} on mount records`, async () => {
+      const stream = createMockStream(1);
+      const started: Promise<boolean>[] = [];
+      const latest: { isRecording?: boolean } = {};
+      const Child = ({ start }: { start: () => Promise<boolean> }) => {
+        useChildEffect(() => {
+          started.push(start());
+        }, [start]);
+        return null;
+      };
+      const Parent = () => {
+        const rec = useRecording(stream);
+        latest.isRecording = rec.isRecording;
+        return <Child start={rec.startRecording} />;
+      };
+      render(<Parent />);
+      let results: boolean[] = [];
+      await act(async () => {
+        results = await Promise.all(started);
+      });
+
+      expect(results).toEqual([true]);
+      expect(latest.isRecording).toBe(true);
+      expect(mockSource.connect).toHaveBeenCalled();
+    });
+  }
 
   it('unmount during startRecording awaits aborts the session (no leaked pipeline)', async () => {
     const worklets = await import('@waveform-playlist/worklets');
