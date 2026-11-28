@@ -88,6 +88,14 @@ describe('time-display-format', () => {
     expect(parseDisplayTime(undefined as unknown as string, 'seconds')).toBeNull();
   });
 
+  it('refuses a long digit string with a bad ending in linear time (CodeQL on #951)', () => {
+    const text = '9'.repeat(50_000) + 'x';
+    const started = performance.now();
+    expect(parseDisplayTime(text, 'seconds')).toBeNull();
+    expect(parseDisplayTime(text, 'hh:mm:ss')).toBeNull();
+    expect(performance.now() - started).toBeLessThan(200);
+  });
+
   it('reads the shorter forms in the clock formats', () => {
     expect(parseDisplayTime('1.5', 'hh:mm:ss.sss')).toBe(1.5);
     expect(parseDisplayTime('1:30', 'hh:mm:ss')).toBe(90);

@@ -413,6 +413,16 @@ describe('edges found in review of #951', () => {
     expect(parseTime(`${digits}:00:00`, 'hh:mm:ss')).toBeNull();
   });
 
+  // CodeQL on #951: `\d+\.?\d*` can split a run of digits in many ways, so a
+  // long digit string that fails at its end backtracked in quadratic time.
+  it('refuses a long digit string with a bad ending in linear time', () => {
+    const text = '9'.repeat(50_000) + 'x';
+    const started = performance.now();
+    expect(parseTime(text, 'seconds')).toBeNull();
+    expect(parseTime(text, 'hh:mm:ss')).toBeNull();
+    expect(performance.now() - started).toBeLessThan(200);
+  });
+
   it('returns null for a value that is not a string (plain JS)', () => {
     expect(parseTime(undefined as unknown as string, 'seconds')).toBeNull();
     expect(parseTime(null as unknown as string, 'hh:mm:ss')).toBeNull();

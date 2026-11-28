@@ -81,8 +81,12 @@ export function formatTime(seconds: number, format: TimeFormat): string {
   }
 }
 
-/** A non-negative decimal number with nothing around it: `5`, `1.5`, `1.`, `.5`. */
-const DECIMAL = /^(\d+\.?\d*|\.\d+)$/;
+/**
+ * A non-negative decimal number with nothing around it: `5`, `1.5`, `1.`, `.5`.
+ * Each string has one way to match (the point is not optional inside the
+ * digits), so a long digit string that fails is refused in linear time.
+ */
+const DECIMAL = /^(\d+(\.\d*)?|\.\d+)$/;
 /** A whole number of hours or minutes. */
 const WHOLE = /^\d+$/;
 const SECONDS_PER_UNIT = [3600, 60, 1];
