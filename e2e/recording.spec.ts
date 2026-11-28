@@ -42,6 +42,37 @@ function fakeMicrophone() {
     ] as MediaDeviceInfo[];
 }
 
+/**
+ * Records the device id of every microphone request (`null` for none), on
+ * `window.__micRequests`. With `hideUntilGrant`, the device list is one blank
+ * entry until a microphone has been opened, as Firefox and WebKit answered in
+ * the runs of #945.
+ */
+function trackMicRequests(hideUntilGrant: boolean) {
+  const win = window as unknown as { __micRequests: unknown[] };
+  const mediaDevices = navigator.mediaDevices;
+  const getUserMedia = mediaDevices.getUserMedia.bind(mediaDevices);
+  const enumerateDevices = mediaDevices.enumerateDevices.bind(mediaDevices);
+  let opened = false;
+  win.__micRequests = [];
+  mediaDevices.getUserMedia = async (constraints) => {
+    const audio = constraints?.audio;
+    win.__micRequests.push((typeof audio === 'object' && audio.deviceId) || null);
+    const stream = await getUserMedia(constraints);
+    opened = true;
+    return stream;
+  };
+  if (hideUntilGrant) {
+    mediaDevices.enumerateDevices = async () =>
+      opened
+        ? enumerateDevices()
+        : ([{ kind: 'audioinput', deviceId: '', label: '', groupId: '' }] as MediaDeviceInfo[]);
+  }
+}
+
+const micRequests = (page: Page) =>
+  page.evaluate(() => (window as unknown as { __micRequests: unknown[] }).__micRequests);
+
 /** Counts React commits on the page (development build). */
 function countCommits() {
   const win = window as unknown as { __commits: number; __REACT_DEVTOOLS_GLOBAL_HOOK__: unknown };
@@ -116,6 +147,7 @@ async function openRecordingPage(page: Page, baseURL: string | undefined) {
   const origin = new URL(baseURL ?? 'http://localhost:3000').origin;
   await page.context().grantPermissions(['microphone'], { origin });
   await page.addInitScript(fakeMicrophone);
+  await page.addInitScript(trackMicRequests, false);
   await page.addInitScript(countCommits);
   await page.goto(`${baseURL}/examples/recording`);
   await expect(page.getByRole('button', { name: '+ New Track' })).toBeVisible({ timeout: 30000 });
@@ -127,8 +159,11 @@ async function openRecordingPage(page: Page, baseURL: string | undefined) {
   // opens it.
   const picker = page.getByRole('combobox', { name: /Microphone/ });
   await expect(picker).toHaveValue('');
+  expect(await micRequests(page)).toEqual([]);
   await picker.selectOption('fake');
   await expect(picker).toHaveValue('fake');
+  // Only the chosen microphone was opened, by its id.
+  expect(await micRequests(page)).toEqual([{ exact: 'fake' }]);
 }
 
 // The synthetic microphone is an oscillator on its own AudioContext, created
@@ -138,6 +173,29 @@ async function openRecordingPage(page: Page, baseURL: string | undefined) {
 test.use({ launchOptions: { args: ['--autoplay-policy=no-user-gesture-required'] } });
 
 test.describe('Recording example', () => {
+  test('opens no microphone on load; Enable Mic opens the default when the browser names no device (#945)', async ({
+    page,
+    baseURL,
+  }) => {
+    const origin = new URL(baseURL ?? 'http://localhost:3000').origin;
+    await page.context().grantPermissions(['microphone'], { origin });
+    await page.addInitScript(fakeMicrophone);
+    await page.addInitScript(trackMicRequests, true);
+    await page.goto(`${baseURL}/examples/recording`);
+    await expect(page.locator('[data-playlist-state="ready"]')).toHaveCount(1, { timeout: 30000 });
+
+    const enable = page.getByRole('button', { name: /Enable Mic/ });
+    await expect(enable).toBeVisible();
+    await expect(page.getByRole('combobox', { name: /Microphone/ })).toHaveCount(0);
+    expect(await micRequests(page)).toEqual([]);
+
+    await enable.click();
+
+    // The default microphone (no id), named by the picker once it is open.
+    await expect(page.getByRole('combobox', { name: /Microphone/ })).toHaveValue('fake');
+    expect(await micRequests(page)).toEqual([null]);
+  });
+
   test('the input meter follows the microphone without rendering React', async ({
     page,
     baseURL,

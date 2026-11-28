@@ -243,13 +243,16 @@ export const MicrophoneSelector: React.FC<MicrophoneSelectorProps> = ({
   disabled = false,
   hint,
 }) => {
+  // The open microphone when the list has it. With none open, or one the list
+  // does not hold (yet), the placeholder: a select with no matching option
+  // would show its first device instead.
+  const listed = devices.some((device) => device.deviceId === selectedDeviceId);
   return (
     <SelectorLabel>
       Microphone
-      {/* Shows the microphone that is open, never a guess: with none open,
-          the placeholder, and choosing a device opens only that one. */}
+      {/* Choosing a device opens only that one. */}
       <MicSelect
-        value={selectedDeviceId ?? ''}
+        value={listed ? (selectedDeviceId ?? '') : ''}
         onChange={(e) => onDeviceChange(e.target.value)}
         disabled={disabled || devices.length === 0}
       >
@@ -257,7 +260,7 @@ export const MicrophoneSelector: React.FC<MicrophoneSelectorProps> = ({
           <option value="">No microphones found</option>
         ) : (
           <>
-            {selectedDeviceId === null && (
+            {!listed && (
               <option value="" disabled>
                 Choose a microphone
               </option>

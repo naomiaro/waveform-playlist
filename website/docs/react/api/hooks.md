@@ -1298,12 +1298,14 @@ interface UseIntegratedRecordingReturn {
   // Device management
   stream: MediaStream | null;
   devices: MicrophoneDevice[];
-  // devices names the real microphones (false before a first grant): a picker
-  // can offer them before one is open, and changeDevice(id) opens only that one.
+  // devices names the real microphones (false before a first grant). When it is
+  // true before one is open (Chromium holding the permission), a picker can
+  // offer them and changeDevice(id) opens only that one.
   hasLabels: boolean;
   hasPermission: boolean;
   // The open microphone, read from the stream (getSettings().deviceId);
-  // null while none is open. Chromium reports 'default' for the default one.
+  // null while none is open or opening. Chromium reported 'default' for the
+  // default one.
   selectedDevice: string | null;
 
   // Controls
@@ -1359,12 +1361,14 @@ function RecordingControls() {
   if (!hasPermission && !hasLabels) {
     return <button onClick={requestMicAccess}>Enable Microphone</button>;
   }
+  // A <select> whose value matches no option would show its first device.
+  const listed = devices.some((d) => d.deviceId === selectedDevice);
 
   return (
     <div>
-      {/* Shows the open microphone; choosing one opens only that one. */}
-      <select value={selectedDevice ?? ''} onChange={(e) => changeDevice(e.target.value)}>
-        {selectedDevice === null && <option value="" disabled>Choose a microphone</option>}
+      {/* Shows the open microphone when the list has it; choosing one opens only that one. */}
+      <select value={(listed && selectedDevice) || ''} onChange={(e) => changeDevice(e.target.value)}>
+        {!listed && <option value="" disabled>Choose a microphone</option>}
         {devices.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label}</option>)}
       </select>
       <button onClick={isRecording ? stopRecording : startRecording}>

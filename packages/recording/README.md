@@ -166,7 +166,7 @@ Manages microphone permission, device enumeration, and hot-plug detection.
 **Returns (`UseMicrophoneAccessReturn`):**
 - `stream: MediaStream | null`
 - `devices: MicrophoneDevice[]` — `{ deviceId, label, groupId }`
-- `hasLabels: boolean` — `devices` names the real microphones. Browsers hide them until microphone permission is granted (one entry with an empty `deviceId`); Chromium, when it already holds the permission, names them before any stream is open, so a picker can offer them and `requestAccess(deviceId)` opens only the one chosen; Firefox and Safari name them only once a stream is open, so the first open there is the default microphone
+- `hasLabels: boolean` — `devices` names the real microphones. Browsers hide them until microphone permission is granted (usually one entry with an empty `deviceId`). In our runs (headless, fake devices) Chromium holding the permission named them before any stream was open, so a picker can offer them and `requestAccess(deviceId)` opens only the one chosen; Firefox and WebKit named them only once a stream was open
 - `hasPermission: boolean`
 - `isLoading: boolean`
 - `requestAccess: (deviceId?: string, audioConstraints?: MediaTrackConstraints) => Promise<void>`

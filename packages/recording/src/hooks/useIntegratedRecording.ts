@@ -97,11 +97,13 @@ export interface UseIntegratedRecordingReturn {
   hasPermission: boolean;
   /**
    * The id of the microphone that is open: the device the stream's track
-   * reports (`getSettings().deviceId`), `null` while no stream is open. It is
-   * read from the stream, so a picker shows the microphone that records. For
-   * a stream opened without an id (`requestMicAccess()`), Chromium reports
-   * `'default'`, the id of its list's default entry; Firefox and Safari report
-   * the device's own id.
+   * reports (`getSettings().deviceId`), `null` while no stream is open (also
+   * while a request is opening one: it closes the open stream first). It is
+   * read from the stream, so it names the microphone that records; a picker
+   * shows it only when `devices` holds it. For a stream opened without an id
+   * (`requestMicAccess()`), Chromium reported `'default'`, the id of its list's
+   * default entry, and Firefox and WebKit the device's own id (headless runs
+   * with fake devices).
    */
   selectedDevice: string | null;
 
