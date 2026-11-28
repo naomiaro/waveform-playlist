@@ -193,14 +193,14 @@ const { error, audioBuffer } = useRecording(stream);
 {error && <p style={{ color: 'red' }}>{error.message}</p>}
 ```
 
-`useIntegratedRecording` adds that take to the track it was started on, as `stopRecording()` does, and reports the same `error`. It does not switch to another microphone while a take is running: when the selected device leaves the list mid-take, the fallback to the first remaining device happens after the take has ended.
+`useIntegratedRecording` adds that take to the track it was started on, as `stopRecording()` does, and reports the same `error`. After an unplug with no other microphone left, the stream the hooks hold has ended: `startRecording()` then resolves `false` with an `error` that says to request access again, in place of recording silence. `useIntegratedRecording` does not switch to another microphone while a take is running: when the selected device leaves the list mid-take, the fallback to the first remaining device happens after the take has ended.
 
 ### When the Component Is Hidden or Unmounted Mid-Take
 
 React runs the hooks' effect cleanups when the component unmounts, when an `<Activity>` around it is hidden, and on Fast Refresh. The cleanups stop the recording worklet and the microphone stream, and the hooks' state says so:
 
 - `useRecording`: `isRecording` and `isPaused` are `false`, and `audioBuffer` holds what was received until then (the worklet's last partial block, about 16 ms, and anything it had sent that had not arrived yet are not in it; `progress` keeps the last duration it published). `useIntegratedRecording` adds it to the take's track, also on an unmount.
-- `useMicrophoneAccess`: `stream` is `null` and `hasPermission` is `false`, as after `stopStream()`. Call `requestAccess()` again when the component is shown (`requestMicAccess()` of `useIntegratedRecording`, which asks for the device chosen with `changeDevice()` while it is still in the list).
+- `useMicrophoneAccess`: `stream` is `null` and `hasPermission` is `false`, as after `stopStream()`. Call `requestAccess()` again when the component is shown (`requestMicAccess()` of `useIntegratedRecording`, which prefers the device chosen with `changeDevice()` and gets the default one when that device is missing).
 
 ### Without `navigator.mediaDevices`
 

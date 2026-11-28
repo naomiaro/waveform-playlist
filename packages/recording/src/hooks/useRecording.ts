@@ -158,6 +158,17 @@ export function useRecordingWithTakeEnded(
       setError(new Error('No microphone stream available'));
       return false;
     }
+    // An ended track delivers silence and fires no further event: after an
+    // unplug with no other microphone to fall back to, the stream is still
+    // the one this hook is given. Refuse, in place of a silent take.
+    if (stream.getAudioTracks()[0]?.readyState === 'ended') {
+      setError(
+        new Error(
+          'The microphone stream has ended (the device was disconnected or its permission revoked). Request microphone access again.'
+        )
+      );
+      return false;
+    }
     isStartingRef.current = true;
     const mountEpoch = mountEpochRef.current;
 

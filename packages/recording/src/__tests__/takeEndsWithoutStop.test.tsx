@@ -389,11 +389,11 @@ describe('useIntegratedRecording: asking for the microphone again', () => {
       await result.current.requestMicAccess();
     });
 
-    expect(requestedDevice()).toEqual({ exact: 'dev-b' });
+    expect(requestedDevice()).toEqual({ ideal: 'dev-b' });
     expect(result.current.selectedDevice).toBe('dev-b');
   });
 
-  it('asks for the default device when the chosen one has left the list', async () => {
+  it('asks for the chosen device as a preference, so a missing one gives the default device', async () => {
     const arrangement = arrangementOf('track-1');
     const { result, hide, show } = renderHookInActivity(() =>
       useIntegratedRecording(arrangement, 'track-1')
@@ -429,8 +429,10 @@ describe('useIntegratedRecording: asking for the microphone again', () => {
       await result.current.requestMicAccess();
     });
 
-    // An exact id of a device that is gone would make getUserMedia fail.
-    expect(firstRequest).toBeUndefined();
+    // An exact id of a device that is gone makes getUserMedia fail; for an
+    // `ideal` one the browser opens the default device (not shown here: the
+    // fake getUserMedia grants anything).
+    expect(firstRequest).toEqual({ ideal: 'dev-b' });
   });
 
   it('asks as the first time when the app never chose a device: audioConstraints decides', async () => {
@@ -470,6 +472,64 @@ describe('useIntegratedRecording: asking for the microphone again', () => {
       await settle();
     });
     expect(result.current.selectedDevice).toBe('dev-a');
+    // Plugged back in: it is in the list again, and no longer the choice.
+    await act(async () => {
+      changeDevices(['dev-a', 'dev-b']);
+      await settle();
+    });
+
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+
+    expect(requestedDevice()).toBeUndefined();
+  });
+
+  it('asks for the default device after a changeDevice that failed', async () => {
+    const arrangement = arrangementOf('track-1');
+    const { result } = renderHook(() => useIntegratedRecording(arrangement, 'track-1'));
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+    await act(async () => {
+      changeDevices(['dev-a', 'dev-b']);
+      await settle();
+    });
+    // dev-b is held by another program: it stays in the list and cannot be opened.
+    env.getUserMedia.mockRejectedValueOnce(new Error('NotReadableError'));
+    await act(async () => {
+      await result.current.changeDevice('dev-b');
+    });
+    expect(result.current.stream).toBeNull();
+
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+
+    // Asking for dev-b again would fail again, with no way out.
+    expect(requestedDevice()).toBeUndefined();
+    expect(result.current.stream).not.toBeNull();
+  });
+
+  it('asks for the default device after a changeDevice that was refused mid-take', async () => {
+    const arrangement = arrangementOf('track-1');
+    const { result } = renderHook(() => useIntegratedRecording(arrangement, 'track-1'));
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+    await act(async () => {
+      changeDevices(['dev-a', 'dev-b']);
+      await settle();
+    });
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    await act(async () => {
+      await result.current.changeDevice('dev-b');
+    });
+    await act(async () => {
+      await result.current.stopRecording();
+    });
 
     await act(async () => {
       await result.current.requestMicAccess();
@@ -536,5 +596,26 @@ describe('useRecording: a take-ended listener that throws', () => {
       '[waveform-playlist] Failed to hand over the interrupted take:',
       'Error: listener failed'
     );
+  });
+});
+
+describe('useRecording: a stream whose microphone track has ended', () => {
+  it('refuses to start, with an error, in place of recording silence', async () => {
+    const stream = createMockStream('mic');
+    // What the browser reports after an unplug with no other microphone left.
+    (stream.getAudioTracks()[0] as unknown as { readyState: string }).readyState = 'ended';
+    const { result } = renderHook(() => useRecording(stream));
+
+    let started: boolean | undefined;
+    await act(async () => {
+      started = await result.current.startRecording();
+    });
+
+    expect(started).toBe(false);
+    expect(result.current.isRecording).toBe(false);
+    expect(result.current.error?.message).toBe(
+      'The microphone stream has ended (the device was disconnected or its permission revoked). Request microphone access again.'
+    );
+    expect(env.context.createMediaStreamSource).not.toHaveBeenCalled();
   });
 });

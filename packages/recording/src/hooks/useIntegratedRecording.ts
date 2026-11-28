@@ -197,10 +197,19 @@ export function useIntegratedRecording(
   startRecRef.current = startRec;
   // The device the app chose with changeDevice(), which requestMicAccess asks
   // for again; null while the selection is the hook's own (the first of the
-  // list, or a fallback). The list is read when requestMicAccess is called.
+  // list, or a fallback).
   const appChosenDeviceRef = useRef<string | null>(null);
-  const devicesRef = useRef(devices);
-  devicesRef.current = devices;
+  // A changeDevice() whose stream has not arrived. It becomes the chosen
+  // device when the stream does (the effect below): requestAccess reports a
+  // failure only in state, and a device that could not be opened must not be
+  // asked for again by requestMicAccess, or that request fails every time.
+  const pendingChoiceRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (stream && pendingChoiceRef.current !== null) {
+      appChosenDeviceRef.current = pendingChoiceRef.current;
+      pendingChoiceRef.current = null;
+    }
+  }, [stream]);
 
   // Start recording handler. Reads selectedTrackId from its ref, and the
   // tracks from the arrangement as they are now: a track the app added in the
@@ -362,6 +371,7 @@ export function useIntegratedRecording(
       if (isRecording) return;
       const fallbackId = devices[0].deviceId;
       appChosenDeviceRef.current = null;
+      pendingChoiceRef.current = null;
       setSelectedDevice(fallbackId);
       resetPeak();
       requestAccess(fallbackId, audioConstraintsRef.current);
@@ -384,19 +394,20 @@ export function useIntegratedRecording(
     }
     try {
       setHookError(null);
-      // The device the app chose with changeDevice(), while it is still
-      // there: after a hide the app asks again, and must get the microphone
-      // it had chosen. A selection the hook made itself is asked for as the
-      // first time (the default device, or what audioConstraints names). An
-      // exact id of a device that has left the list would fail the request,
-      // so that case asks the same way (the fallback effect then corrects
-      // the selection).
+      // The device the app chose with changeDevice(): after a hide the app
+      // asks again, and must get the microphone it had chosen. It is asked
+      // for as a preference (`ideal`), not by exact id: when that device is
+      // missing the browser opens the default one (maintainer, #944) where an
+      // exact id would fail the request, and the fallback effect then
+      // corrects the selection. A selection the hook made itself is asked
+      // for as the first time (the default device, or what audioConstraints
+      // names).
       const chosen = appChosenDeviceRef.current;
-      const deviceId =
-        chosen !== null && devicesRef.current.some((d) => d.deviceId === chosen)
-          ? chosen
-          : undefined;
-      await requestAccess(deviceId, audioConstraintsRef.current);
+      const constraints =
+        chosen !== null
+          ? { ...audioConstraintsRef.current, deviceId: { ideal: chosen } }
+          : audioConstraintsRef.current;
+      await requestAccess(undefined, constraints);
       await resumeGlobalAudioContext();
       audioResumedRef.current = true;
     } catch (err) {
@@ -414,7 +425,8 @@ export function useIntegratedRecording(
       }
       try {
         setHookError(null);
-        appChosenDeviceRef.current = deviceId;
+        appChosenDeviceRef.current = null;
+        pendingChoiceRef.current = deviceId;
         setSelectedDevice(deviceId);
         resetPeak();
         await requestAccess(deviceId, audioConstraintsRef.current);
