@@ -5,11 +5,11 @@ import { useMicrophoneAccess } from '../hooks/useMicrophoneAccess';
 import { renderHookInActivity } from './helpers/activity';
 
 interface MockStream extends MediaStream {
-  _track: { stop: ReturnType<typeof vi.fn> };
+  _track: { stop: ReturnType<typeof vi.fn>; addEventListener: ReturnType<typeof vi.fn> };
 }
 
 function createMockStream(id: string): MockStream {
-  const track = { stop: vi.fn(), kind: 'audio' };
+  const track = { stop: vi.fn(), kind: 'audio', addEventListener: vi.fn() };
   return {
     id,
     getTracks: () => [track],
@@ -264,5 +264,73 @@ describe('useMicrophoneAccess', () => {
     );
     warn.mockRestore();
     error.mockRestore();
+  });
+
+  describe('when the microphone track ends (unplugged, or its permission revoked)', () => {
+    /** The browser ends the stream's track: every `ended` listener runs. */
+    const end = (stream: MockStream) => {
+      for (const [type, listener] of stream._track.addEventListener.mock.calls) {
+        if (type === 'ended') listener();
+      }
+    };
+
+    it('clears the stream and the permission, and says why', async () => {
+      const s1 = createMockStream('s1');
+      getUserMediaMock.mockResolvedValueOnce(s1);
+      const { result } = renderHook(() => useMicrophoneAccess());
+      await act(async () => {
+        await result.current.requestAccess();
+      });
+      expect(result.current.stream).toBe(s1);
+
+      act(() => end(s1));
+
+      expect(result.current.stream).toBeNull();
+      expect(result.current.hasPermission).toBe(false);
+      expect(result.current.error?.message).toBe(
+        'The microphone was disconnected or its permission was revoked. Request microphone access again.'
+      );
+      // Nothing is opened in its place.
+      expect(getUserMediaMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('asking again opens a microphone and clears the error', async () => {
+      const s1 = createMockStream('s1');
+      const s2 = createMockStream('s2');
+      getUserMediaMock.mockResolvedValueOnce(s1).mockResolvedValueOnce(s2);
+      const { result } = renderHook(() => useMicrophoneAccess());
+      await act(async () => {
+        await result.current.requestAccess();
+      });
+      act(() => end(s1));
+
+      await act(async () => {
+        await result.current.requestAccess();
+      });
+
+      expect(result.current.stream).toBe(s2);
+      expect(result.current.hasPermission).toBe(true);
+      expect(result.current.error).toBeNull();
+    });
+
+    it('ignores the end of a stream it has already replaced', async () => {
+      const s1 = createMockStream('s1');
+      const s2 = createMockStream('s2');
+      getUserMediaMock.mockResolvedValueOnce(s1).mockResolvedValueOnce(s2);
+      const { result } = renderHook(() => useMicrophoneAccess());
+      await act(async () => {
+        await result.current.requestAccess();
+      });
+      await act(async () => {
+        await result.current.requestAccess('device-b');
+      });
+      expect(result.current.stream).toBe(s2);
+
+      act(() => end(s1));
+
+      expect(result.current.stream).toBe(s2);
+      expect(result.current.hasPermission).toBe(true);
+      expect(result.current.error).toBeNull();
+    });
   });
 });

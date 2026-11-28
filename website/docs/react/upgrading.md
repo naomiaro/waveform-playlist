@@ -5033,6 +5033,34 @@ In plain JavaScript a leftover prop is ignored (`isOverlay` aside, above); for `
 <SpectrogramChannel index={0} length={w} waveHeight={80} clipId={id} onCanvasRegister={reg} onCanvasUnregister={unreg} />
 ```
 
+## `useIntegratedRecording` no longer switches microphone by itself
+
+**Package:** `@waveform-playlist/recording`.
+
+When the selected microphone left the device list, `useIntegratedRecording` asked for the first remaining one itself. It does not any more: the hooks open a microphone only when the app asks.
+
+- When the open microphone is unplugged (or its permission revoked), `stream` becomes `null`, `hasPermission` becomes `false` and `error` says "The microphone was disconnected or its permission was revoked. Request microphone access again." This is `useMicrophoneAccess`'s behaviour, so it holds without `useIntegratedRecording` too. Before, the ended stream stayed in `stream` when no other microphone was there.
+- `selectedDevice` still moves to a device that is in the list, as a name for a picker; nothing is opened for it.
+- `requestMicAccess()` resets `selectedDevice` to the first device of the list (it opens the default microphone). A microphone chosen with `changeDevice()` before is chosen again with `changeDevice()`.
+
+**Find:** components that use `useIntegratedRecording` or `useMicrophoneAccess` and show a "enable microphone" control only before the first grant.
+
+**Replace with:** show it whenever `hasPermission` is `false`, which is now also the state after an unplug.
+
+```tsx
+// Before: after an unplug the hook opened another microphone by itself
+// After: the app asks
+{!hasPermission ? (
+  <button onClick={requestMicAccess}>Enable microphone</button>
+) : (
+  <select value={selectedDevice ?? ''} onChange={(e) => changeDevice(e.target.value)}>
+    {devices.map((d) => (
+      <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
+    ))}
+  </select>
+)}
+```
+
 ## Recording types nothing read are removed
 
 **Package:** `@waveform-playlist/recording`.

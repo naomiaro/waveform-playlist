@@ -341,25 +341,18 @@ export function useIntegratedRecording(
     finishTakeRef.current(buffer);
   }, [stopRec]);
 
-  // Auto-select first device when available, or fallback if selected device was unplugged
+  // What the picker shows: the first device of the list until the app chooses
+  // one, and again when the one it showed has left the list. This only names
+  // a device. The hook opens a microphone when the app asks for one
+  // (requestMicAccess, changeDevice) and never by itself (maintainer, #944):
+  // a microphone that is unplugged ends its stream, useMicrophoneAccess
+  // clears it, and the app asks again.
   useEffect(() => {
     if (!hasPermission || devices.length === 0) return;
-
-    if (selectedDevice === null) {
-      // First-time selection
+    if (selectedDevice === null || !devices.some((d) => d.deviceId === selectedDevice)) {
       setSelectedDevice(devices[0].deviceId);
-    } else if (!devices.some((d) => d.deviceId === selectedDevice)) {
-      // Selected device was removed — fall back to first available. Not
-      // during a take: requestAccess stops the stream the take is reading
-      // (the same hazard requestMicAccess and changeDevice refuse). The effect
-      // runs again when the take ends.
-      if (isRecording) return;
-      const fallbackId = devices[0].deviceId;
-      setSelectedDevice(fallbackId);
-      resetPeak();
-      requestAccess(fallbackId, audioConstraintsRef.current);
     }
-  }, [hasPermission, devices, selectedDevice, isRecording, resetPeak, requestAccess]);
+  }, [hasPermission, devices, selectedDevice]);
 
   // Mirror isRecording for the device-switch guards below — reading the
   // state directly would churn the callbacks every recording toggle.

@@ -158,9 +158,9 @@ export function useRecordingWithTakeEnded(
       setError(new Error('No microphone stream available'));
       return false;
     }
-    // An ended track delivers silence and fires no further event: after an
-    // unplug with no other microphone to fall back to, the stream is still
-    // the one this hook is given. Refuse, in place of a silent take.
+    // An ended track delivers silence and fires no further event.
+    // useMicrophoneAccess clears such a stream; one the app passes in itself
+    // can still be ended. Refuse, in place of a silent take.
     if (stream.getAudioTracks()[0]?.readyState === 'ended') {
       setError(
         new Error(

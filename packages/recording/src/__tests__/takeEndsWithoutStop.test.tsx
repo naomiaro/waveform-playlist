@@ -34,12 +34,19 @@ const arrangementOf = (...ids: string[]): Arrangement =>
 const clipsOf = (arrangement: Arrangement, id: string) =>
   arrangement.getTracks().find((t) => t.id === id)!.clips as AudioClip[];
 
-/** The listener the hook put on the microphone track for `ended`. */
+/**
+ * The browser ends the microphone track: every `ended` listener on it runs,
+ * in the order they were added (the stream's owner first, then the take).
+ */
 function endedListener(stream: MediaStream): () => void {
   const track = stream.getAudioTracks()[0] as unknown as {
     addEventListener: ReturnType<typeof vi.fn>;
   };
-  return track.addEventListener.mock.calls.find(([type]) => type === 'ended')![1];
+  const listeners = track.addEventListener.mock.calls
+    .filter(([type]) => type === 'ended')
+    .map(([, listener]) => listener as () => void);
+  expect(listeners.length).toBeGreaterThan(0);
+  return () => listeners.forEach((listener) => listener());
 }
 
 /** The browser reports a new device list. Call inside an async `act`. */
@@ -98,7 +105,12 @@ describe('useIntegratedRecording: a take that ends without stopRecording()', () 
     expect(result.current.isRecording).toBe(false);
     expect(clipsOf(arrangement, 'track-1')).toHaveLength(1);
     expect(clipsOf(arrangement, 'track-1')[0].durationSamples).toBe(1024);
-    expect(result.current.error?.message).toBe('Microphone disconnected during recording');
+    expect(result.current.error?.message).toBe(
+      'The microphone was disconnected or its permission was revoked. Request microphone access again.'
+    );
+    // The microphone is gone, and the state says so.
+    expect(result.current.stream).toBeNull();
+    expect(result.current.hasPermission).toBe(false);
   });
 
   it('is added once when Stop is pressed while the unplug is being handled', async () => {
@@ -170,28 +182,60 @@ describe('useIntegratedRecording: a take that ends without stopRecording()', () 
     expect(clipsOf(arrangement, 'track-1')).toHaveLength(1);
   });
 
-  it('does not switch to another microphone mid-take when the selected one leaves the list', async () => {
+  it('opens no other microphone when the selected one leaves the list, during a take or after it', async () => {
     const arrangement = arrangementOf('track-1');
     const { result } = renderHook(() => useIntegratedRecording(arrangement, 'track-1'));
     await startTake(result);
     expect(result.current.selectedDevice).toBe('dev-a');
+    const streamBefore = result.current.stream;
     env.getUserMedia.mockClear();
 
     await act(async () => {
       changeDevices(['dev-b']);
       await settle();
     });
-    // Asking for the other device stops the stream the take is reading.
     expect(env.getUserMedia).not.toHaveBeenCalled();
     expect(result.current.isRecording).toBe(true);
+    expect(result.current.stream).toBe(streamBefore);
 
     await act(async () => {
       await result.current.stopRecording();
       await settle();
     });
-    expect(env.getUserMedia).toHaveBeenCalledTimes(1);
-    expect(env.getUserMedia.mock.calls[0][0].audio.deviceId).toEqual({ exact: 'dev-b' });
+    // A microphone is opened when the app asks for one, never by the hook.
+    expect(env.getUserMedia).not.toHaveBeenCalled();
+    // The picker names a device that is in the list.
     expect(result.current.selectedDevice).toBe('dev-b');
+  });
+
+  it('opens no other microphone when the open one is unplugged while idle', async () => {
+    const arrangement = arrangementOf('track-1');
+    const { result } = renderHook(() => useIntegratedRecording(arrangement, 'track-1'));
+    await act(async () => {
+      await result.current.requestMicAccess();
+    });
+    const unplug = endedListener(result.current.stream!);
+    env.getUserMedia.mockClear();
+
+    await act(async () => {
+      unplug();
+      changeDevices(['dev-b']);
+      await settle();
+    });
+
+    expect(env.getUserMedia).not.toHaveBeenCalled();
+    expect(result.current.stream).toBeNull();
+    expect(result.current.hasPermission).toBe(false);
+    expect(result.current.error?.message).toMatch(/Request microphone access again/);
+
+    // The app asks: the microphone that is there is opened and selected.
+    await act(async () => {
+      await result.current.requestMicAccess();
+      await settle();
+    });
+    expect(result.current.stream).not.toBeNull();
+    expect(result.current.selectedDevice).toBe('dev-b');
+    expect(result.current.error).toBeNull();
   });
 
   it('keeps its callbacks when audioConstraints is a new object with each render', async () => {

@@ -193,7 +193,11 @@ const { error, audioBuffer } = useRecording(stream);
 {error && <p style={{ color: 'red' }}>{error.message}</p>}
 ```
 
-`useIntegratedRecording` adds that take to the track it was started on, as `stopRecording()` does, and reports the same `error`. After an unplug with no other microphone left, the stream the hooks hold has ended: `startRecording()` then resolves `false` with an `error` that says to request access again, in place of recording silence. `useIntegratedRecording` does not switch to another microphone while a take is running: when the selected device leaves the list mid-take, the fallback to the first remaining device happens after the take has ended.
+`useIntegratedRecording` adds that take to the track it was started on, as `stopRecording()` does.
+
+`useMicrophoneAccess` follows the same event, recording or not: when the microphone's track ends, `stream` becomes `null`, `hasPermission` becomes `false` and `error` says "The microphone was disconnected or its permission was revoked. Request microphone access again." (`useIntegratedRecording` reports this one). The hooks never open another microphone by themselves, also when one is available: call `requestAccess()` / `requestMicAccess()` again, or `changeDevice(deviceId)` for a specific one. `devices` follows what is plugged in, and `selectedDevice` of `useIntegratedRecording` names a device of that list (the first one, until `changeDevice()` chooses another).
+
+`useRecording` given an ended stream of your own refuses to start: `startRecording()` resolves `false` with an `error`, in place of recording silence.
 
 ### When the Component Is Hidden or Unmounted Mid-Take
 

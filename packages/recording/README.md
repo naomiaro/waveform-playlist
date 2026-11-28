@@ -9,7 +9,7 @@ Audio recording support for waveform-playlist using AudioWorklet — mic capture
 - **Sample-accurate VU metering** — a dedicated meter worklet measures peak/RMS on every sample, not just once per animation frame
 - **Multi-channel recording** — auto-detects the microphone's actual channel count from the `MediaStream`
 - **Overdub with latency compensation** — record against existing playback; the finalized clip's timeline position accounts for output latency and Tone.js scheduling lookahead, with an optional manual override
-- **Device selection & hot-plug** — enumerate microphones, switch devices between takes (refused while actively recording — a mid-recording switch would silently record silence), auto-fallback if the active device disconnects
+- **Device selection & hot-plug** — enumerate microphones, switch devices between takes (refused while actively recording — a mid-recording switch would silently record silence), no microphone is opened by the hooks themselves: when the open one is unplugged, `stream` is cleared and the app asks again
 - **Pause/resume** — pauses the worklet itself, not just the UI
 - **Hooks only** — no bundled UI components; wire the state into your own controls or `@waveform-playlist/ui-components`'s `SegmentedVUMeter`
 

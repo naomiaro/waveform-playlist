@@ -97,6 +97,26 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
         setStream(newStream);
         setHasPermission(true);
 
+        // The microphone is unplugged, or its permission revoked: the track
+        // ends and delivers silence from then on. The state must not keep
+        // offering it, and nothing is opened in its place: the app asks again
+        // (maintainer, #944). Our own track.stop() fires no `ended`, and a
+        // stream that has been replaced since is not this hook's any more.
+        const onEnded = () => {
+          if (streamRef.current !== newStream) return;
+          streamRef.current = null;
+          setStream(null);
+          setHasPermission(false);
+          setError(
+            new Error(
+              'The microphone was disconnected or its permission was revoked. Request microphone access again.'
+            )
+          );
+        };
+        newStream
+          .getTracks()
+          .forEach((track) => track.addEventListener('ended', onEnded, { once: true }));
+
         // Enumerate devices after getting permission (labels will be available)
         await enumerateDevices();
       } catch (err) {
