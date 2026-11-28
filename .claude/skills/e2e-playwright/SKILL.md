@@ -36,6 +36,7 @@ For measuring a page from an ad-hoc script or an MCP browser (render counts, aud
 
 ## Assertions that do not flake
 
+- **Making a WAV export fail in the page:** replacing `window.OfflineAudioContext` after load changed nothing (Tone keeps the constructor it took at import). `URL.createObjectURL = () => { throw … }` fails `downloadBlob` inside `exportWav` and a page's own download (`e2e/effects.spec.ts`, "a failed export…"). Only on a page without WAM: WAM hosting makes its worklets from blob URLs too (skill `browser-probes`).
 - Always `await expect(locator).toBeVisible()` before `boundingBox()` — returns null if element isn't laid out
 - Use `await expect(locator).toHaveCount(n)` (auto-retrying) instead of `expect(await locator.count()).toBe(n)` (one-shot)
 - Wrap post-interaction state checks with `await expect(async () => { ... }).toPass({ timeout: 5000 })` for timing tolerance
