@@ -93,6 +93,7 @@
     "react-custom-effects",
     "react-dom-forwarded-peer",
     "recorded-clip-id",
+    "recording-no-has-permission",
     "recording-selected-device-from-stream",
     "recording-take-kept",
     "remove-piano-roll-render-mode",
