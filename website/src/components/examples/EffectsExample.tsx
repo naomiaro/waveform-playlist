@@ -580,7 +580,11 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
           {exportMode === 'individual' && (
             <ExportSelect
               value={selectedTrack?.id ?? ''}
-              onChange={(e) => setChosenTrackId(e.target.value)}
+              onChange={(e) => {
+                setChosenTrackId(e.target.value);
+                // A failure of another track's export is not about this one
+                setExportError(null);
+              }}
             >
               {contextTracks.map((track, index) => (
                 <option key={track.id} value={track.id}>

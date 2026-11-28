@@ -278,11 +278,12 @@ export function useExportWav(): UseExportWavReturn {
 
 /**
  * The characters replaced in a track name used in a file name: control
- * characters and / \ : * ? " < > |. (Windows also refuses reserved names such
- * as `CON` and a trailing dot or space; those are left to the browser.)
+ * characters (U+0000-U+001F, U+007F-U+009F) and / \ : * ? " < > |. Windows
+ * also refuses reserved names such as `CON` and a trailing dot or space; those
+ * are not handled here.
  */
 // eslint-disable-next-line no-control-regex -- control characters are what it matches
-const UNSAFE_FILE_NAME_CHARACTERS = /[\u0000-\u001f/\\:*?"<>|]/g;
+const UNSAFE_FILE_NAME_CHARACTERS = /[\u0000-\u001f\u007f-\u009f/\\:*?"<>|]/g;
 
 /** A track name made usable in a file name: each refused character becomes `_`. */
 function fileSafe(name: string): string {
