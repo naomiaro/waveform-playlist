@@ -322,13 +322,23 @@ test.describe('Effects Example', () => {
     });
 
     // A failed export is shown on the page, in a status line that is always
-    // there, so the controls below do not move when it appears (#817).
+    // there and of one height, so nothing below it moves when it appears (#817).
     test('a failed export, by the button and as a ZIP, is shown under the export controls', async ({
       page,
     }) => {
-      const status = page.getByRole('alert').filter({ hasText: /export failed/i });
-      const statusLine = page.locator('[role="alert"]').last();
-      const heightBefore = (await statusLine.boundingBox())?.height;
+      const statusLine = page.locator('[data-export-status]');
+      const dropZone = page.getByText('Drop audio files or click to browse', { exact: true });
+      /** Top of an element in page coordinates: a click can scroll the page. */
+      const pageTop = (locator: typeof statusLine) =>
+        locator.evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
+      const height = (locator: typeof statusLine) =>
+        locator.evaluate((el) => el.getBoundingClientRect().height);
+
+      await expect(statusLine).toHaveText('');
+      const lineHeight = await height(statusLine);
+      expect(lineHeight).toBeGreaterThan(0);
+      const dropZoneTop = await pageTop(dropZone);
+
       // Every download fails from here on: the button's (inside exportWav)
       // and the ZIP's, both made with an object URL.
       await page.evaluate(() => {
@@ -338,13 +348,22 @@ test.describe('Effects Example', () => {
       });
 
       await page.getByRole('button', { name: 'Export Mix', exact: true }).click();
-      await expect(status).toHaveText(/^Export failed: /);
-      await expect(status).toBeVisible();
-      expect((await statusLine.boundingBox())?.height).toBe(heightBefore);
+      const failure = 'Export failed: downloads are unavailable';
+      await expect(statusLine).toHaveText(failure);
+      await expect(statusLine).toBeVisible();
+      await expect(statusLine).toHaveAttribute('role', 'alert');
+      // The whole message is in the tooltip when the line cuts it off.
+      await expect(statusLine).toHaveAttribute('title', failure);
+      expect(await height(statusLine)).toBe(lineHeight);
+      expect(await pageTop(dropZone)).toBe(dropZoneTop);
 
+      // Another mode clears the message of the last one.
       await page.locator('select:has-text("Full Mix")').selectOption('All Tracks (ZIP)');
+      await expect(statusLine).toHaveText('');
+
       await page.getByRole('button', { name: 'Export ZIP', exact: true }).click();
-      await expect(status).toHaveText(/^ZIP export failed: /);
+      await expect(statusLine).toHaveText('ZIP export failed: downloads are unavailable');
+      expect(await pageTop(dropZone)).toBe(dropZoneTop);
     });
 
     // One track chosen by id is exported as it sounds alone (#817): its mute

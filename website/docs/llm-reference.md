@@ -2327,7 +2327,7 @@ type OfflineTrackEffectsFunction = (
 ) => OfflineEffectsCleanup | Promise<OfflineEffectsCleanup>;
 
 interface ExportOptions {
-  /** One track's file is named `<filename>_<track name>`; / \ : * ? " < > | in the name become _ */
+  /** One track's file is named `<filename>_<track name>`; control characters and / \ : * ? " < > | in the name become _ */
   filename?: string;
   /** The one track to export, as it sounds alone (its mute and the others' solo
    *  ignored; the master chain applies when effectsFunction is given). Left out

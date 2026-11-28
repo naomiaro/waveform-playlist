@@ -45,8 +45,8 @@ export type OfflineTrackEffectsFunction = (
 export interface ExportOptions extends WavEncoderOptions {
   /**
    * Filename for download (without extension). A single track's file is
-   * named `<filename>_<track name>`, with `/ \ : * ? " < > |` in the track
-   * name replaced by `_`.
+   * named `<filename>_<track name>`, with control characters and
+   * `/ \ : * ? " < > |` in the track name replaced by `_`.
    */
   filename?: string;
   /**
@@ -276,8 +276,13 @@ export function useExportWav(): UseExportWavReturn {
   };
 }
 
-/** Characters that Windows, macOS or Linux refuse in a file name. */
-const UNSAFE_FILE_NAME_CHARACTERS = /[/\\:*?"<>|]/g;
+/**
+ * The characters replaced in a track name used in a file name: control
+ * characters and / \ : * ? " < > |. (Windows also refuses reserved names such
+ * as `CON` and a trailing dot or space; those are left to the browser.)
+ */
+// eslint-disable-next-line no-control-regex -- control characters are what it matches
+const UNSAFE_FILE_NAME_CHARACTERS = /[\u0000-\u001f/\\:*?"<>|]/g;
 
 /** A track name made usable in a file name: each refused character becomes `_`. */
 function fileSafe(name: string): string {

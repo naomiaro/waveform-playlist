@@ -192,14 +192,14 @@ describe('one track chosen by id', () => {
     expect(built.downloads).toEqual(['take_name-B.wav']);
   });
 
-  it('the characters file systems refuse in a track name become underscores in the file name', async () => {
+  it('control characters and / \\ : * ? " < > | in a track name become underscores in the file name', async () => {
     const { result } = renderHook(() => useExportWav());
-    const named = { ...track('A'), name: 'Drums / Kit: "Take" <1>|2*?\\' } as ClipTrack;
+    const named = { ...track('A'), name: 'Drums / Kit: "Take" <1>|2*?\\\t\u0007' } as ClipTrack;
     await act(async () => {
       await result.current.exportWav([named], [state()], { trackId: 'A', filename: 'take' });
     });
-    // Spaces stay; / \ : * ? " < > | become _.
-    expect(built.downloads).toEqual(['take_Drums _ Kit_ _Take_ _1__2___.wav']);
+    // Spaces stay; / \ : * ? " < > | and control characters (a tab, a bell) become _.
+    expect(built.downloads).toEqual(['take_Drums _ Kit_ _Take_ _1__2_____.wav']);
   });
 
   it('without a track id the mix is exported; muted tracks, soloed or not, are left out', async () => {

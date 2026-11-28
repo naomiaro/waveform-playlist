@@ -2156,7 +2156,7 @@ function useExportWav(): {
 
 ```typescript
 interface ExportOptions {
-  filename?: string;      // Filename for download (default: 'export'); one track: '<filename>_<track name>', / \ : * ? " < > | in the name made _
+  filename?: string;      // Filename for download (default: 'export'); one track: '<filename>_<track name>', control characters and / \ : * ? " < > | in the name replaced by _
   trackId?: string;       // The one track to export; left out or undefined, the mix
   bitDepth?: 16 | 32;     // WAV bit depth (default: 16)
   effectsFunction?: OfflineEffectsFunction;  // Master effects chain for export (native + WAM)
@@ -2167,7 +2167,7 @@ interface ExportOptions {
 ```
 
 - **The mix** (no `trackId`): every audible track. A muted track is left out, soloed or not; when a track is soloed, only soloed tracks are audible. Two channels when any audible track is stereo (a stereo clip or the stereo pan law), else one.
-- **One track** (`trackId`): that track as it sounds on its own, with its volume, pan and track effects, through the master chain when `effectsFunction` is given; its mute and the other tracks' solo are ignored. The file lasts as long as the mix (to the end of the last clip on any track, plus 0.1 s), so stems exported one by one line up. Any value that is not the id of one of `tracks` (`null` included; only a left-out or `undefined` `trackId` means the mix) rejects with `No track with id "<id>" to export`.
+- **One track** (`trackId`): that track as it sounds on its own, with its volume, pan and track effects, through the master chain when `effectsFunction` is given; its mute and the other tracks' solo are ignored. The file lasts as long as the mix (to the end of the last clip on any track, plus 0.1 s), so stems exported one by one line up (when each is exported after loading has finished: `tracks` hold loaded clips only). Any value that is not the id of one of `tracks` (`null` included; only a left-out or `undefined` `trackId` means the mix) rejects with `No track with id "<id>" to export`.
 - **Fades** are always rendered. **Effects** are rendered when their functions are given: leave out `effectsFunction` and `createOfflineTrackEffects` for an export without effects.
 
 ### Effects Function

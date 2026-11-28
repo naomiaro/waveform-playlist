@@ -566,7 +566,11 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
         <ExportOptionsWrapper>
           <ExportSelect
             value={exportMode}
-            onChange={(e) => setExportMode(e.target.value as 'master' | 'individual' | 'all')}
+            onChange={(e) => {
+              setExportMode(e.target.value as 'master' | 'individual' | 'all');
+              // A failure of the other mode's export is no longer about what is chosen
+              setExportError(null);
+            }}
           >
             <option value="master">Full Mix</option>
             <option value="individual">Individual Track</option>
@@ -614,7 +618,9 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
             />
           )}
         </ExportOptionsWrapper>
-        <ExportStatus role="alert">{exportError}</ExportStatus>
+        <ExportStatus role="alert" data-export-status title={exportError ?? undefined}>
+          {exportError}
+        </ExportStatus>
       </TimeControlsBar>
 
       <StyledDropZone
