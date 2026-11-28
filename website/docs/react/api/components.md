@@ -817,51 +817,57 @@ Export the playlist to a WAV file.
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `label` | `string` | `'Export WAV'` | Button label |
-| `filename` | `string` | `'export'` | Downloaded file name (without extension) |
-| `mode` | `'master' \| 'individual'` | `'master'` | Export all tracks mixed or single track |
-| `trackIndex` | `number` | - | Track index for individual export |
+| `filename` | `string` | `'export'` | Downloaded file name (without extension). A single track's file is `<filename>_<track name>.wav`, with control characters and `/ \ : * ? " < > \|` in the track name replaced by `_` |
+| `trackId` | `string` | - | The one track to export. Left out, the mix is exported |
 | `bitDepth` | `16 \| 32` | `16` | WAV bit depth (16-bit PCM or 32-bit float) |
-| `applyEffects` | `boolean` | `true` | Apply fades and other clip effects |
-| `effectsFunction` | `OfflineEffectsFunction` | - | Effects chain for the offline render, e.g. `createOfflineEffectsFunction()` of `useDynamicEffects()` |
+| `effectsFunction` | `OfflineEffectsFunction` | - | Master effects chain for the offline render, e.g. `createOfflineEffectsFunction()` of `useDynamicEffects()` |
+| `createOfflineTrackEffects` | `(trackId: string) => OfflineTrackEffectsFunction \| undefined` | - | Each track's effects chain for the offline render, e.g. `createOfflineTrackEffectsFunction` of `useTrackDynamicEffects()` |
 | `className` | `string` | - | CSS class name |
 | `onExportComplete` | `(blob: Blob) => void` | - | Callback when export succeeds |
-| `onExportError` | `(error: Error) => void` | - | Callback when export fails |
+| `onExportError` | `(error: Error) => void` | - | Callback when export fails. Without it, the failure is written to the console (`console.error`, the error as the second argument). A throw from `onExportComplete` is not passed here |
 
 **Behavior:**
 - Shows progress percentage during export
-- Disabled when no tracks loaded
+- Disabled while it exports, and when the playlist has no tracks. A track whose audio is still loading counts as a track: the export then renders the clips that have loaded
 - Automatically triggers download when complete
+- Clip fades are always exported. Effects are exported when their functions are given: leave out `effectsFunction` and `createOfflineTrackEffects` for an export without effects.
+- The mix is every audible track: a muted track is left out, soloed or not, and when a track is soloed only soloed tracks are heard. It has two channels when any audible track is stereo (a stereo clip or the stereo pan law), else one.
+- The button keeps its export state to itself. To show `isExporting` or `progress` elsewhere on the page, call [`useExportWav()`](./hooks.md#useexportwav) and draw your own button.
 
 **Example:**
 
 ```tsx
-<ExportWavButton
-  filename="my-mix"
-  mode="master"
-  bitDepth={16}
-  onExportComplete={(blob) => console.log('Exported:', blob.size, 'bytes')}
-/>
+import { useState } from 'react';
+import { ExportWavButton } from '@waveform-playlist/browser/tone';
+
+function ExportMix() {
+  const [exportError, setExportError] = useState<string | null>(null);
+  return (
+    <>
+      <ExportWavButton
+        filename="my-mix"
+        bitDepth={16}
+        onExportComplete={(blob) => console.log('Exported:', blob.size, 'bytes')}
+        onExportError={(error) => setExportError(error.message)}
+      />
+      {exportError && <p role="alert">{exportError}</p>}
+    </>
+  );
+}
 ```
 
-**Individual Track Export:**
+**Single Track Export:**
+
+The track named by `trackId` is exported as it sounds on its own: with its volume, pan and track effects, and through the master chain when `effectsFunction` is given; its mute and the other tracks' solo are ignored. The file lasts as long as the mix, so stems exported one by one line up when each is exported after loading has finished.
 
 ```tsx
-<ExportWavButton
-  label="Export Track 1"
-  filename="track-1"
-  mode="individual"
-  trackIndex={0}
-/>
-```
+import { usePlaylistTimeline } from '@waveform-playlist/browser';
+import { ExportWavButton } from '@waveform-playlist/browser/tone';
 
-**Export Without Effects (Raw Audio):**
-
-```tsx
-<ExportWavButton
-  label="Export Raw"
-  filename="raw-export"
-  applyEffects={false}
-/>
+function ExportFirstTrack() {
+  const { tracks } = usePlaylistTimeline();
+  return <ExportWavButton label="Export Stem" filename="stem" trackId={tracks[0]?.id} />;
+}
 ```
 
 **Export With Tone.js Effects:**

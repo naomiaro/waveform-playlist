@@ -2293,10 +2293,16 @@ interface SegmentedVUMeterProps {
 function useExportWav(): UseExportWavReturn;
 
 interface UseExportWavReturn {
-  /** Pass usePlaylistTimeline().tracks (loaded clips only: an export during loading renders what has loaded). */
-  exportWav: (tracks: readonly ClipTrack[], trackStates: readonly TrackState[], options?: ExportOptions) => Promise<ExportResult>;
+  /** Pass usePlaylistTimeline().tracks (loaded clips only: an export during loading renders what has loaded).
+   *  trackStates[i] is the mix of tracks[i]; a track with no entry is rendered with its own fields (the values
+   *  it was created with). An export refused at once (no tracks, unknown trackId) rejects and sets `error`
+   *  without changing isExporting or progress. The mix leaves out every muted track, soloed or not. */
+  exportWav: (tracks: readonly ClipTrack[], trackStates: readonly (TrackState | undefined)[], options?: ExportOptions) => Promise<ExportResult>;
+  /** True while any export started from this hook call is running */
   isExporting: boolean;
+  /** Progress (0-1) of the export started last from this hook call */
   progress: number;
+  /** Message of the last export from this hook call that failed; cleared when an export starts */
   error: string | null;
 }
 
@@ -2321,11 +2327,14 @@ type OfflineTrackEffectsFunction = (
 ) => OfflineEffectsCleanup | Promise<OfflineEffectsCleanup>;
 
 interface ExportOptions {
+  /** One track's file is named `<filename>_<track name>`; control characters and / \ : * ? " < > | in the name become _ */
   filename?: string;
-  mode?: 'master' | 'individual';
-  trackIndex?: number;
+  /** The one track to export, as it sounds alone (its mute and the others' solo
+   *  ignored; the master chain applies when effectsFunction is given). Left out
+   *  (undefined), the mix. Any other value that is not a track's id rejects. */
+  trackId?: string;
   autoDownload?: boolean;
-  applyEffects?: boolean;        // Default: true
+  /** Fades are always rendered; each chain is rendered when its function is given. */
   effectsFunction?: OfflineEffectsFunction;
   createOfflineTrackEffects?: (trackId: string) => OfflineTrackEffectsFunction | undefined;
   onProgress?: (progress: number) => void;
@@ -2849,6 +2858,12 @@ WaveformPlaylistProvider only (from @waveform-playlist/browser):
          KeyboardShortcuts
 WaveformPlaylistProvider only (from @waveform-playlist/browser/tone):
          ExportWavButton
+           props { label?, filename?, trackId?, bitDepth?, effectsFunction?,
+           createOfflineTrackEffects?, className?, onExportComplete?, onExportError? }
+           (trackId = one track alone, else the mix; fades always, each effects chain when
+           its function is given; without onExportError a failure goes to console.error
+           (a throw from onExportComplete is not a failure: it is an unhandled rejection);
+           its isExporting/progress are its own: call useExportWav() to show them elsewhere)
 Playheads: Playhead, PlayheadWithMarker (from @waveform-playlist/ui-components)
            both take PlayheadProps; see "Custom playhead" below
 Error Handling: PlaylistErrorBoundary (from @waveform-playlist/ui-components)

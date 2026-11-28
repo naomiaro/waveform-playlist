@@ -2139,31 +2139,40 @@ Export the playlist to WAV format using offline rendering.
 
 ```typescript
 function useExportWav(): {
-  exportWav: (tracks: readonly ClipTrack[], trackStates: readonly TrackState[], options?: ExportOptions) => Promise<ExportResult>;
-  isExporting: boolean;
-  progress: number;
-  error: string | null;
+  exportWav: (
+    tracks: readonly ClipTrack[],
+    trackStates: readonly (TrackState | undefined)[],
+    options?: ExportOptions
+  ) => Promise<ExportResult>;
+  isExporting: boolean;   // true while any export started from this hook call is running
+  progress: number;       // 0-1, of the export started last from this hook call
+  error: string | null;   // message of the last failed export; cleared when an export starts
 };
 ```
+
+`trackStates[i]` is the mix of `tracks[i]`; a track with no entry is rendered with its own `muted`, `soloed`, `volume` and `pan`, the values it was created with and not the arrangement's current mix (under the provider, `usePlaylistMixer().trackStates` has an entry for every track). An export refused at once (no tracks, an unknown `trackId`) rejects and sets `error` without changing `isExporting` or `progress`. The state belongs to the hook call: each `useExportWav()` has its own, so `ExportWavButton`'s is not visible to the page. To show it, call `useExportWav()` and draw the button yourself (the example below).
 
 ### ExportOptions
 
 ```typescript
 interface ExportOptions {
-  filename?: string;      // Filename for download (default: 'export')
-  mode?: 'master' | 'individual';  // Export all tracks mixed or single track
-  trackIndex?: number;    // Track index for individual export
+  filename?: string;      // Filename for download (default: 'export'); one track: '<filename>_<track name>', control characters and / \ : * ? " < > | in the name replaced by _
+  trackId?: string;       // The one track to export; left out or undefined, the mix
   bitDepth?: 16 | 32;     // WAV bit depth (default: 16)
-  applyEffects?: boolean; // Apply fades and effects (default: true)
-  effectsFunction?: OfflineEffectsFunction;  // Effects chain for export (native + WAM)
+  effectsFunction?: OfflineEffectsFunction;  // Master effects chain for export (native + WAM)
+  createOfflineTrackEffects?: (trackId: string) => OfflineTrackEffectsFunction | undefined;  // Each track's chain
   autoDownload?: boolean; // Trigger automatic download (default: true)
   onProgress?: (progress: number) => void;
 }
 ```
 
+- **The mix** (no `trackId`): every audible track. A muted track is left out, soloed or not; when a track is soloed, only soloed tracks are audible. Two channels when any audible track is stereo (a stereo clip or the stereo pan law), else one.
+- **One track** (`trackId`): that track as it sounds on its own, with its volume, pan and track effects, through the master chain when `effectsFunction` is given; its mute and the other tracks' solo are ignored. The file lasts as long as the mix (to the end of the last clip on any track, plus 0.1 s), so stems exported one by one line up (when each is exported after loading has finished: `tracks` hold loaded clips only). Any value that is not the id of one of `tracks` (`null` included; only a left-out or `undefined` `trackId` means the mix) rejects with `No track with id "<id>" to export`.
+- **Fades** are always rendered. **Effects** are rendered when their functions are given: leave out `effectsFunction` and `createOfflineTrackEffects` for an export without effects.
+
 ### Effects Function
 
-When an `effectsFunction` is provided and `applyEffects` is true, export renders through the effects chain — native Tone.js effects and hosted WAM plugins alike. WAM entries are re-instantiated on the offline context from their URL-cached factories with the live instance's state transferred; a WAM plugin that fails to re-instantiate fails the export. The function may return a cleanup callback synchronously or asynchronously.
+When an `effectsFunction` is provided, export renders through the effects chain — native Tone.js effects and hosted WAM plugins alike. WAM entries are re-instantiated on the offline context from their URL-cached factories with the live instance's state transferred; a WAM plugin that fails to re-instantiate fails the export. The function may return a cleanup callback synchronously or asynchronously.
 
 ```typescript
 type OfflineEffectsCleanup = void | (() => void);
@@ -2199,7 +2208,6 @@ function ExportButton() {
     try {
       const result = await exportWav(tracks, trackStates, {
         filename: 'my-mix',
-        mode: 'master',
         bitDepth: 16,
       });
       console.log('Exported:', result.duration, 'seconds');

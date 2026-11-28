@@ -34,6 +34,10 @@ For measuring a page from an ad-hoc script or an MCP browser (render counts, aud
 - **Clip drag/trim live on `/examples/multi-clip`** (`<WaveformEditor />`); `/examples/stem-tracks` renders NO clip headers (`[data-clip-id]` never appears) — it's the track-reorder page. Don't wait on a header selector there.
 - **The MediaElement player's `<audio>` element is not in the document** (`new Audio()`), so `document.querySelectorAll('audio')` finds nothing. To assert the playback rate in e2e, read the `AudioPosition` text and `performance.now()` together inside one `page.evaluate`, wait a second in the page, read again and compare the ratio (`playbackSpeed` in `e2e/media-element.spec.ts`).
 
+## Making a page fail on purpose
+
+- **A WAV export:** `URL.createObjectURL = () => { throw … }` in the page fails `downloadBlob` inside `exportWav` and a page's own download (`e2e/effects.spec.ts`, "a failed export…"). Only on a page without WAM: WAM hosting makes its worklets from blob URLs too (skill `browser-probes`). Replacing `window.OfflineAudioContext` after load did not fail the export on `/examples/effects`: in Tone's default context mode, `standardized-audio-context` reads the constructor once, at import. (In native-context mode `renderToneOffline` constructs `OfflineAudioContext` at each render, so the replacement would probably reach it there; not run.)
+
 ## Assertions that do not flake
 
 - Always `await expect(locator).toBeVisible()` before `boundingBox()` — returns null if element isn't laid out

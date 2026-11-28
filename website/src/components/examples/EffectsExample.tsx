@@ -141,6 +141,20 @@ const ExportOptionsWrapper = styled.div`
   flex-wrap: wrap;
 `;
 
+// A line of its own under the export controls, always there and of one
+// height: a failure changes its text, never the layout around it.
+const ExportStatus = styled.div`
+  flex-basis: 100%;
+  height: 1.5rem;
+  line-height: 1.5rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ifm-color-danger, #d08070);
+`;
+
 const ExportSelect = styled.select`
   padding: 0.375rem 0.5rem;
   border: 1px solid var(--ifm-color-emphasis-300, #ddd);
@@ -397,19 +411,25 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
 }) => {
   // Export options state
   const [exportMode, setExportMode] = useState<'master' | 'individual' | 'all'>('master');
-  const [selectedTrackIndex, setSelectedTrackIndex] = useState<number>(0);
+  const [chosenTrackId, setChosenTrackId] = useState<string | null>(null);
   const [applyEffectsToExport, setApplyEffectsToExport] = useState(true);
   const [isExportingZip, setIsExportingZip] = useState(false);
+  // The last export that failed, shown under the export controls
+  const [exportError, setExportError] = useState<string | null>(null);
   const [zipProgress, setZipProgress] = useState(0);
   const { tracks: contextTracks } = usePlaylistTimeline();
   const { trackStates } = usePlaylistMixer();
   const { exportWav } = useExportWav();
+  // The track to export alone: the one chosen, else the first
+  const selectedTrack =
+    contextTracks.find((track) => track.id === chosenTrackId) ?? contextTracks[0];
   const arrangement = useArrangement();
   // Dropped files that could not be decoded: their tracks are removed, the list stays
   const failedDrops = useFailedDrops(arrangement);
 
-  // Get the offline effects functions when needed
-  // Both are stable: they read the chains when the export runs.
+  // The offline effects functions, left out when "Apply Effects" is off
+  // (fades are always exported). Both are stable: they read the chains when
+  // the export runs.
   const offlineEffectsFunction = applyEffectsToExport ? createOfflineMasterEffects() : undefined;
   const createOfflineTrackEffects = applyEffectsToExport
     ? trackEffectsManager.createOfflineTrackEffectsFunction
@@ -421,20 +441,19 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
 
     setIsExportingZip(true);
     setZipProgress(0);
+    setExportError(null);
 
     try {
       const zip = new JSZip();
       const totalTracks = contextTracks.length;
 
       for (let i = 0; i < totalTracks; i++) {
-        const trackName = trackStates[i]?.name || `track-${i + 1}`;
-        // Sanitize filename
-        const safeFilename = trackName.replace(/[^a-z0-9_-]/gi, '_');
+        const trackName = trackStates[i]?.name || 'track';
+        // Sanitize filename; the position keeps two tracks of one name apart
+        const safeFilename = `${i + 1}-${trackName.replace(/[^a-z0-9_-]/gi, '_')}`;
 
         const result = await exportWav(contextTracks, trackStates, {
-          mode: 'individual',
-          trackIndex: i,
-          applyEffects: applyEffectsToExport,
+          trackId: contextTracks[i].id,
           effectsFunction: offlineEffectsFunction,
           createOfflineTrackEffects,
           autoDownload: false,
@@ -456,11 +475,18 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting tracks as ZIP:', error);
+      setExportError(`ZIP export failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsExportingZip(false);
       setZipProgress(0);
     }
-  }, [contextTracks, trackStates, exportWav, applyEffectsToExport, offlineEffectsFunction, createOfflineTrackEffects]);
+  }, [contextTracks, trackStates, exportWav, offlineEffectsFunction, createOfflineTrackEffects]);
+
+  const clearExportError = useCallback(() => setExportError(null), []);
+  const showExportError = useCallback(
+    (error: Error) => setExportError(`Export failed: ${error.message}`),
+    []
+  );
 
   // Handle dropped/selected audio files: one track per file, named after the
   // file without its extension; the arrangement loads each one
@@ -540,7 +566,11 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
         <ExportOptionsWrapper>
           <ExportSelect
             value={exportMode}
-            onChange={(e) => setExportMode(e.target.value as 'master' | 'individual' | 'all')}
+            onChange={(e) => {
+              setExportMode(e.target.value as 'master' | 'individual' | 'all');
+              // A failure of the other mode's export is no longer about what is chosen
+              setExportError(null);
+            }}
           >
             <option value="master">Full Mix</option>
             <option value="individual">Individual Track</option>
@@ -549,12 +579,16 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
 
           {exportMode === 'individual' && (
             <ExportSelect
-              value={selectedTrackIndex}
-              onChange={(e) => setSelectedTrackIndex(parseInt(e.target.value, 10))}
+              value={selectedTrack?.id ?? ''}
+              onChange={(e) => {
+                setChosenTrackId(e.target.value);
+                // A failure of another track's export is not about this one
+                setExportError(null);
+              }}
             >
-              {trackStates.map((state, index) => (
-                <option key={index} value={index}>
-                  {state?.name || `Track ${index + 1}`}
+              {contextTracks.map((track, index) => (
+                <option key={track.id} value={track.id}>
+                  {track.name || `Track ${index + 1}`}
                 </option>
               ))}
             </ExportSelect>
@@ -579,15 +613,18 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
           ) : (
             <ExportWavButton
               label={exportMode === 'master' ? 'Export Mix' : 'Export Track'}
-              filename={exportMode === 'master' ? 'mix' : `${trackStates[selectedTrackIndex]?.name || `track-${selectedTrackIndex + 1}`}`}
-              mode={exportMode}
-              trackIndex={exportMode === 'individual' ? selectedTrackIndex : undefined}
-              applyEffects={applyEffectsToExport}
+              filename={exportMode === 'master' ? 'mix' : 'track'}
+              trackId={exportMode === 'individual' ? selectedTrack?.id : undefined}
               effectsFunction={offlineEffectsFunction}
               createOfflineTrackEffects={createOfflineTrackEffects}
+              onExportComplete={clearExportError}
+              onExportError={showExportError}
             />
           )}
         </ExportOptionsWrapper>
+        <ExportStatus role="alert" data-export-status title={exportError ?? undefined}>
+          {exportError}
+        </ExportStatus>
       </TimeControlsBar>
 
       <StyledDropZone

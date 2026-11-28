@@ -564,8 +564,6 @@ const WamControls: React.FC<WamControlsProps> = ({
         <ExportWavButton
           label="Export Mix"
           filename="wam-mix"
-          mode="master"
-          applyEffects
           effectsFunction={offlineMaster}
           createOfflineTrackEffects={createOfflineTrackEffects}
         />

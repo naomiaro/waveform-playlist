@@ -321,6 +321,89 @@ test.describe('Effects Example', () => {
       await expect(exportDropdown).toHaveValue('all');
     });
 
+    // A failed export is shown on the page, in a status line that is always
+    // there and of one height, so nothing below it moves when it appears (#817).
+    test('a failed export, by the button and as a ZIP, is shown under the export controls', async ({
+      page,
+    }) => {
+      const statusLine = page.locator('[data-export-status]');
+      const dropZone = page.getByText('Drop audio files or click to browse', { exact: true });
+      /** Top of an element in page coordinates: a click can scroll the page. */
+      const pageTop = (locator: typeof statusLine) =>
+        locator.evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
+      const height = (locator: typeof statusLine) =>
+        locator.evaluate((el) => el.getBoundingClientRect().height);
+
+      await expect(statusLine).toHaveText('');
+      const lineHeight = await height(statusLine);
+      expect(lineHeight).toBeGreaterThan(0);
+      const dropZoneTop = await pageTop(dropZone);
+
+      // Every download fails from here on: the button's (inside exportWav)
+      // and the ZIP's, both made with an object URL.
+      await page.evaluate(() => {
+        URL.createObjectURL = () => {
+          throw new Error('downloads are unavailable');
+        };
+      });
+
+      await page.getByRole('button', { name: 'Export Mix', exact: true }).click();
+      const failure = 'Export failed: downloads are unavailable';
+      await expect(statusLine).toHaveText(failure);
+      await expect(statusLine).toBeVisible();
+      await expect(statusLine).toHaveAttribute('role', 'alert');
+      // The whole message is in the tooltip when the line cuts it off.
+      await expect(statusLine).toHaveAttribute('title', failure);
+      expect(await height(statusLine)).toBe(lineHeight);
+      expect(await pageTop(dropZone)).toBe(dropZoneTop);
+
+      // Another mode clears the message of the last one.
+      await page.locator('select:has-text("Full Mix")').selectOption('All Tracks (ZIP)');
+      await expect(statusLine).toHaveText('');
+
+      await page.getByRole('button', { name: 'Export ZIP', exact: true }).click();
+      await expect(statusLine).toHaveText('ZIP export failed: downloads are unavailable');
+      expect(await pageTop(dropZone)).toBe(dropZoneTop);
+    });
+
+    // One track chosen by id is exported as it sounds alone (#817): its mute
+    // is ignored. A steady sine on a fifth track, muted, is exported alone; the
+    // drums of the other four would make the file change over time, and the
+    // mute, if applied, would make it silent.
+    test('a muted track exported alone is its own audio', async ({ page }) => {
+      // The master reverb's tail would change the file over time.
+      await expect(page.getByRole('heading', { name: 'Reverb', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Clear All', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Reverb', exact: true })).toHaveCount(0);
+
+      await page.locator('input[type="file"]').setInputFiles({
+        name: 'steady.wav',
+        mimeType: 'audio/wav',
+        buffer: sineWav(3),
+      });
+      const rows = page.locator('[data-track-row]');
+      await expect(rows).toHaveCount(5, { timeout: 10000 });
+      await expect(rows.nth(4).locator('[data-clip-placeholder="true"]')).toHaveCount(0, {
+        timeout: 10000,
+      });
+      const mute = page.getByRole('button', { name: 'Mute', exact: true }).nth(4);
+      await mute.click();
+      await expect(mute).toHaveAttribute('aria-pressed', 'true');
+
+      await page.locator('select:has-text("Full Mix")').selectOption('Individual Track');
+      const trackSelect = page.locator('select:has(option:text-is("steady"))');
+      await trackSelect.selectOption({ label: 'steady' });
+
+      const [download] = await Promise.all([
+        page.waitForEvent('download', { timeout: 120_000 }),
+        page.getByRole('button', { name: 'Export Track', exact: true }).click(),
+      ]);
+      const { channels, change } = changeOverATenthOfASecond(readFileSync(await download.path()));
+      expect(channels).toBe(1);
+      expect(change).toBeLessThan(0.001);
+      expect(download.suggestedFilename()).toBe('track_steady.wav');
+    });
+
     // Tone's Chorus, Tremolo, AutoPanner and AutoFilter have an LFO that runs
     // only after start(); never started, each is a fixed delay, gain, pan and
     // filter (#820). A steady stereo sine, soloed, is exported through each

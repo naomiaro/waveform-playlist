@@ -353,7 +353,7 @@ const clip = createClipFromSeconds({
   │   ├── useCreateArrangement.ts       # Makes the engine's Arrangement once per component instance
   │   ├── useDragSensors.ts             # @dnd-kit sensor config
   │   ├── useDynamicEffects.ts          # Master effects chain
-  │   ├── useExportWav.ts               # WAV export via Tone.Offline
+  │   ├── useExportWav.ts               # WAV export via renderToneOffline (a Tone.Offline variant)
   │   ├── useKeyboardShortcuts.ts       # Flexible keyboard shortcut system
   │   ├── useLoopState.ts               # Loop state (owned by the hook, handed to the engine)
   │   ├── useMasterVolume.ts            # Master volume (owned by the hook, handed to the engine)
@@ -1165,7 +1165,7 @@ Business logic is extracted into reusable custom hooks that can be used by any c
 - `useDynamicEffects` - Master effects chain with runtime parameter updates
 - `useTrackDynamicEffects` - Per-track effects management
 - `useAudioEffects` - Audio effects management
-- `useExportWav` - WAV export via Tone.Offline
+- `useExportWav` - WAV export via `renderToneOffline` (a `Tone.Offline` variant, `utils/renderToneOffline.ts`)
 - `useSelectionState` - Selection start/end (owned by the hook, handed to the engine)
 - `useLoopState` - Loop enabled/start/end (owned by the hook, handed to the engine)
 - `useSelectedTrack` - Selected track ID (owned by the hook, handed to the engine)
