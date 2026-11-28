@@ -59,6 +59,7 @@
     "engine-split-left-id-keep-adapter",
     "escape-cancels-drag-core",
     "escape-cancels-drag-dawcore",
+    "export-wav-track-id",
     "faust-minification-hint",
     "gain-scaled-waveforms",
     "inline-track-width-menu-position",
