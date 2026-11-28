@@ -2085,7 +2085,6 @@ interface UseIntegratedRecordingReturn {
    *  permission named them before any stream (WebKit did not, in our runs):
    *  then offer the list and open the one chosen with changeDevice(id). */
   hasLabels: boolean;
-  hasPermission: boolean;
   /** The open microphone: the id its stream reports (getSettings().deviceId),
    *  null while none is open or opening. Chromium reported 'default' for the
    *  default one. A picker shows it only when `devices` holds it. */
@@ -2139,7 +2138,9 @@ function useMicrophoneAccess(): UseMicrophoneAccessReturn;
 interface UseMicrophoneAccessReturn {
   /** The open microphone's stream; null after stopStream(), an unplug (its
    *  track ends: `error` says so), a hide or unmount, and while a request is
-   *  opening one (a request stops the open stream first). */
+   *  opening one (a request stops the open stream first). A microphone is
+   *  open when stream !== null. A request made before a hide opens nothing:
+   *  its grant is stopped, its refusal sets no error. */
   stream: MediaStream | null;
   devices: MicrophoneDevice[]; // { deviceId, label, groupId }; follows devicechange
   /** `devices` names the real microphones: false before a first grant, and
@@ -2147,7 +2148,6 @@ interface UseMicrophoneAccessReturn {
    *  Changes only when the list is read again (mount, devicechange, a grant),
    *  not when a read fails. */
   hasLabels: boolean;
-  hasPermission: boolean;
   isLoading: boolean;
   /** Opens a microphone: `deviceId` by exact id, else the one a `deviceId` in
    *  `audioConstraints` names, else the default. Recording

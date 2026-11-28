@@ -1296,13 +1296,13 @@ interface UseIntegratedRecordingReturn {
   progress: RecordingProgressSource;
 
   // Device management
+  // The open microphone; null while none is open (stream !== null: one is open).
   stream: MediaStream | null;
   devices: MicrophoneDevice[];
   // devices names the real microphones (false before a first grant). When it is
   // true before one is open (Chromium holding the permission), a picker can
   // offer them and changeDevice(id) opens only that one.
   hasLabels: boolean;
-  hasPermission: boolean;
   // The open microphone, read from the stream (getSettings().deviceId);
   // null while none is open or opening. Chromium reported 'default' for the
   // default one.
@@ -1348,7 +1348,7 @@ function RecordingControls() {
     progress,
     devices,
     hasLabels,
-    hasPermission,
+    stream,
     selectedDevice,
     startRecording,
     stopRecording,
@@ -1358,7 +1358,7 @@ function RecordingControls() {
   } = useIntegratedRecording(arrangement, selectedTrackId, { currentTime });
 
   // Before a first grant the browser names no device: open the default one.
-  if (!hasPermission && !hasLabels) {
+  if (!stream && !hasLabels) {
     return <button onClick={requestMicAccess}>Enable Microphone</button>;
   }
   // A <select> whose value matches no option would show its first device.
@@ -1969,10 +1969,9 @@ From `@waveform-playlist/recording`:
 
 ```typescript
 function useMicrophoneAccess(): {
-  stream: MediaStream | null;
+  stream: MediaStream | null; // the open microphone; null while none is open
   devices: MicrophoneDevice[];
   hasLabels: boolean; // devices names the real microphones (false before a first grant)
-  hasPermission: boolean;
   isLoading: boolean;
   error: Error | null;
   requestAccess: (deviceId?: string, audioConstraints?: MediaTrackConstraints) => Promise<void>;

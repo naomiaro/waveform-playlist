@@ -42,14 +42,14 @@ import {
 } from '@waveform-playlist/recording';
 
 function RecordButton() {
-  const { stream, hasPermission, requestAccess } = useMicrophoneAccess();
+  const { stream, requestAccess } = useMicrophoneAccess();
   const { isRecording, progress, startRecording, stopRecording } = useRecording(stream);
   // `progress` is a source ({ duration, peaks }), not state: useRecording does
   // not re-render as the take grows. This reads it 10 times a second.
   const { duration } = useRecordingProgress(progress);
 
   const handleRecord = async () => {
-    if (!hasPermission) {
+    if (!stream) {
       await requestAccess();
       return;
     }
@@ -164,10 +164,9 @@ Stopping adds a new `AudioClip` to the track that was selected when the take STA
 Manages microphone permission, device enumeration, and hot-plug detection.
 
 **Returns (`UseMicrophoneAccessReturn`):**
-- `stream: MediaStream | null`
+- `stream: MediaStream | null` — the open microphone, `null` while none is open (before a grant, while a request opens one, after `stopStream()`, a failed request, an unplug or a hide); `stream !== null` says a microphone is open
 - `devices: MicrophoneDevice[]` — `{ deviceId, label, groupId }`
 - `hasLabels: boolean` — `devices` names the real microphones. Browsers hide them until microphone permission is granted (usually one entry with an empty `deviceId`). In our runs (headless, fake devices) Chromium holding the permission named them before any stream was open, so a picker can offer them and `requestAccess(deviceId)` opens only the one chosen; Firefox and WebKit named them only once a stream was open
-- `hasPermission: boolean`
 - `isLoading: boolean`
 - `requestAccess: (deviceId?: string, audioConstraints?: MediaTrackConstraints) => Promise<void>`
 - `stopStream: () => void`
@@ -227,7 +226,7 @@ Batteries-included hook: wires `useMicrophoneAccess` + `useMicrophoneLevel` + `u
   - `samplesPerPixel?: number` (default: `1024`)
   - `latencyOffset?: number` — seconds; overrides the auto-computed `outputLatency + lookAhead` compensation applied to the clip's start. `0` disables compensation; omit to auto-compute
 
-**Returns (`UseIntegratedRecordingReturn`):** recording state (`isRecording`, `isPaused`, `recordingTrackId`: the track the running take was started on, `null` when none is running), the two live sources (`meter`: microphone levels; `progress`: the take's elapsed time and per-channel preview peaks), microphone state (`stream`, `devices`, `hasLabels`, `hasPermission`, and `selectedDevice`: the id the open stream reports, `null` while no microphone is open; `'default'` in Chromium for the default microphone), controls (`startRecording` — resolves `true` when capture actually started, `false` with `error` set when the take is refused, `stopRecording`, `pauseRecording`, `resumeRecording`, `requestMicAccess`, `changeDevice`), and a combined `error`.
+**Returns (`UseIntegratedRecordingReturn`):** recording state (`isRecording`, `isPaused`, `recordingTrackId`: the track the running take was started on, `null` when none is running), the two live sources (`meter`: microphone levels; `progress`: the take's elapsed time and per-channel preview peaks), microphone state (`stream`, `null` while no microphone is open, `devices`, `hasLabels`, and `selectedDevice`: the id the open stream reports, `null` while no microphone is open; `'default'` in Chromium for the default microphone), controls (`startRecording` — resolves `true` when capture actually started, `false` with `error` set when the take is refused, `stopRecording`, `pauseRecording`, `resumeRecording`, `requestMicAccess`, `changeDevice`), and a combined `error`.
 
 **Recording into a `@waveform-playlist/browser` playlist:** call `useRecordingSession({ isRecording, trackId: recordingTrackId })` (from `@waveform-playlist/browser`) in the component that calls `useIntegratedRecording`; the view's `<WaveformRecordingPreview>` only draws the take. For an overdub, also call `useEditorControls().setRecordingActive(true, trackId)` *before* `play()` — while the session is active the end-of-timeline auto-stop is suppressed (the take can run past existing audio) and the recorded-over track plays muted for the take (punch-in replaces what it holds; `arrangement.setTrackRecording`, which leaves the track's own mute in the arrangement's mix alone): the mixer and the track's Mute button show it, the built-in `<TrackMuteButton />` is disabled, and `useTrack().isRecording` is true for it. A mute set on the track during the take stays after it. Both reset automatically when the recording ends; check `startRecording()`'s boolean and release the session on `false`. `play()` does nothing before the playlist's first ready, so a take started during the first load records without playback.
 

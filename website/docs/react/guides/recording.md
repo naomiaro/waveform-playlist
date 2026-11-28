@@ -29,12 +29,14 @@ import {
 } from '@waveform-playlist/recording';
 
 function RecordButton() {
-  const { requestAccess, hasPermission, stream } = useMicrophoneAccess();
+  const { requestAccess, stream } = useMicrophoneAccess();
   const { isRecording, startRecording, stopRecording } = useRecording(stream);
 
   const handleRecord = async () => {
-    if (!hasPermission) {
+    if (!stream) {
+      // This render's startRecording has no stream yet: the next press records.
       await requestAccess();
+      return;
     }
 
     if (isRecording) {
@@ -75,7 +77,7 @@ import { useMicrophoneAccess } from '@waveform-playlist/recording';
 
 function MicrophoneSetup() {
   const {
-    hasPermission,
+    stream,
     isLoading,
     error,
     requestAccess,
@@ -92,8 +94,8 @@ function MicrophoneSetup() {
 
   return (
     <div>
-      <p>Microphone access: {hasPermission ? 'Granted' : 'Not granted'}</p>
-      {!hasPermission ? (
+      <p>Microphone: {stream ? 'Open' : 'Not open'}</p>
+      {!stream ? (
         <button onClick={() => requestAccess()}>Grant Microphone Access</button>
       ) : (
         <button onClick={stopStream}>Stop Microphone</button>
@@ -145,7 +147,7 @@ A picker shows `selectedDevice` only when `devices` holds it: React gives a `<se
 const {
   devices,
   hasLabels,
-  hasPermission,
+  stream,
   selectedDevice,
   isRecording,
   requestMicAccess,
@@ -154,7 +156,7 @@ const {
 
 // Before a first grant the browser names no device: open the default one.
 // Once the devices are named, choosing one opens only that microphone.
-if (!hasPermission && !hasLabels) {
+if (!stream && !hasLabels) {
   return <button onClick={requestMicAccess}>Enable microphone</button>;
 }
 
@@ -251,7 +253,7 @@ const { error, audioBuffer } = useRecording(stream);
 
 `useIntegratedRecording` adds that take to the track it was started on, as `stopRecording()` does.
 
-`useMicrophoneAccess` follows the same event, recording or not: when the microphone's track ends, `stream` becomes `null`, `hasPermission` becomes `false` and `error` says "The microphone was disconnected or its permission was revoked. Request microphone access again." (`useIntegratedRecording` reports this one). The hooks never open another microphone by themselves, also when one is available: call `requestAccess()` / `requestMicAccess()` again, or `changeDevice(deviceId)` for a specific one. `devices` follows what is plugged in, and `selectedDevice` of `useIntegratedRecording` is `null` until a microphone is open again (see [Choosing a Microphone](#choosing-a-microphone)).
+`useMicrophoneAccess` follows the same event, recording or not: when the microphone's track ends, `stream` becomes `null` and `error` says "The microphone was disconnected or its permission was revoked. Request microphone access again." (`useIntegratedRecording` reports this one). The hooks never open another microphone by themselves, also when one is available: call `requestAccess()` / `requestMicAccess()` again, or `changeDevice(deviceId)` for a specific one. `devices` follows what is plugged in, and `selectedDevice` of `useIntegratedRecording` is `null` until a microphone is open again (see [Choosing a Microphone](#choosing-a-microphone)).
 
 `useRecording` given an ended stream of your own refuses to start: `startRecording()` resolves `false` with an `error`, in place of recording silence.
 
@@ -260,7 +262,7 @@ const { error, audioBuffer } = useRecording(stream);
 React runs the hooks' effect cleanups when the component unmounts, when an `<Activity>` around it is hidden, and on Fast Refresh. The cleanups stop the recording worklet and the microphone stream, and the hooks' state says so:
 
 - `useRecording`: `isRecording` and `isPaused` are `false`, and `audioBuffer` holds what was received until then (the worklet's last partial block, about 16 ms, and anything it had sent that had not arrived yet are not in it; `progress` keeps the last duration it published). `useIntegratedRecording` adds it to the take's track, also on an unmount.
-- `useMicrophoneAccess`: `stream` is `null` and `hasPermission` is `false`, as after `stopStream()`. Call `requestAccess()` again when the component is shown (`requestMicAccess()` of `useIntegratedRecording`). That opens the default microphone (or the one the `audioConstraints` option names), which `selectedDevice` then names; a microphone chosen earlier is opened again with `changeDevice(deviceId)`. The hooks keep no memory of it: keep the id in your app to offer it again.
+- `useMicrophoneAccess`: `stream` is `null` and `isLoading` is `false`, as after `stopStream()`. A request that was waiting for the browser when the component was hidden opens nothing: the microphone the browser grants it is stopped, also when that happens after the component is shown again, and a refusal sets no `error`. Call `requestAccess()` again when the component is shown (`requestMicAccess()` of `useIntegratedRecording`). That opens the default microphone (or the one the `audioConstraints` option names), which `selectedDevice` then names; a microphone chosen earlier is opened again with `changeDevice(deviceId)`. The hooks keep no memory of it: keep the id in your app to offer it again.
 
 ### Without `navigator.mediaDevices`
 
@@ -473,13 +475,15 @@ function RecordToPlaylist({ selectedTrackId }: { selectedTrackId: string | null 
     startRecording,
     stopRecording,
     requestMicAccess,
-    hasPermission,
+    stream,
     error,
   } = useIntegratedRecording(arrangement, selectedTrackId);
 
   const handleRecord = async () => {
-    if (!hasPermission) {
+    if (!stream) {
+      // Records on the next press, once the stream is open.
       await requestMicAccess();
+      return;
     }
 
     if (isRecording) {
@@ -745,7 +749,7 @@ function RecordingControls({
     isRecording,
     meter,
     progress,
-    hasPermission,
+    stream,
     startRecording,
     stopRecording,
     requestMicAccess,
@@ -757,8 +761,10 @@ function RecordingControls({
   useRecordingSession({ isRecording, trackId: recordingTrackId });
 
   const handleRecord = async () => {
-    if (!hasPermission) {
+    if (!stream) {
+      // Records on the next press, once the stream is open.
       await requestMicAccess();
+      return;
     }
 
     if (isRecording) {
@@ -781,7 +787,7 @@ function RecordingControls({
         )}
       </button>
       <button onClick={onAddTrack}>+ Add Track</button>
-      {hasPermission && (
+      {stream && (
         <SegmentedVUMeter meter={meter} />
       )}
       {error && <span role="alert">{error.message}</span>}
