@@ -837,6 +837,9 @@ Export the playlist to a WAV file.
 **Example:**
 
 ```tsx
+import { useState } from 'react';
+import { ExportWavButton } from '@waveform-playlist/browser/tone';
+
 function ExportMix() {
   const [exportError, setExportError] = useState<string | null>(null);
   return (

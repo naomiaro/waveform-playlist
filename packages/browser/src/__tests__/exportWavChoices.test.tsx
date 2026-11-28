@@ -167,6 +167,20 @@ describe('one track chosen by id', () => {
     expect(result.current.isExporting).toBe(false);
   });
 
+  it('an export with no tracks rejects and sets the error without starting', async () => {
+    const { result } = renderHook(() => useExportWav());
+    let thrown: unknown;
+    await act(async () => {
+      await result.current.exportWav([], [], { autoDownload: false }).catch((error: unknown) => {
+        thrown = error;
+      });
+    });
+    expect((thrown as Error).message).toBe('No tracks to export');
+    expect(result.current.error).toBe('No tracks to export');
+    expect(result.current.isExporting).toBe(false);
+    expect(built.volumesDb).toEqual([]);
+  });
+
   it("downloads as the filename followed by the track's name", async () => {
     const { result } = renderHook(() => useExportWav());
     await act(async () => {

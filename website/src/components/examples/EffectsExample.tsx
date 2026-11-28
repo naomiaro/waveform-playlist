@@ -432,8 +432,8 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
 
       for (let i = 0; i < totalTracks; i++) {
         const trackName = trackStates[i]?.name || `track-${i + 1}`;
-        // Sanitize filename
-        const safeFilename = trackName.replace(/[^a-z0-9_-]/gi, '_');
+        // Sanitize filename; the position keeps two tracks of one name apart
+        const safeFilename = `${i + 1}-${trackName.replace(/[^a-z0-9_-]/gi, '_')}`;
 
         const result = await exportWav(contextTracks, trackStates, {
           trackId: contextTracks[i].id,

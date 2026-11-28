@@ -2167,7 +2167,7 @@ interface ExportOptions {
 ```
 
 - **The mix** (no `trackId`): every audible track. A muted track is left out, soloed or not; when a track is soloed, only soloed tracks are audible. Two channels when any audible track is stereo (a stereo clip or the stereo pan law), else one.
-- **One track** (`trackId`): that track as it sounds on its own, with its volume, pan and track effects, through the master chain when `effectsFunction` is given; its mute and the other tracks' solo are ignored. Any value that is not the id of one of `tracks` (`null` included; only a left-out `trackId` means the mix) rejects with `No track with id "<id>" to export`.
+- **One track** (`trackId`): that track as it sounds on its own, with its volume, pan and track effects, through the master chain when `effectsFunction` is given; its mute and the other tracks' solo are ignored. Any value that is not the id of one of `tracks` (`null` included; only a left-out or `undefined` `trackId` means the mix) rejects with `No track with id "<id>" to export`.
 - **Fades** are always rendered. **Effects** are rendered when their functions are given: leave out `effectsFunction` and `createOfflineTrackEffects` for an export without effects.
 
 ### Effects Function
