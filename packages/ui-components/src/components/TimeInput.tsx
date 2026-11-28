@@ -17,7 +17,10 @@ export interface TimeInputProps {
  *
  * Uses BaseInput for consistent theming. Displays time in the specified
  * format and parses user input on blur. `onChange` fires only when the text
- * was edited, so moving focus through the input never rounds the value.
+ * was edited, so moving focus through the input never rounds the value, and
+ * only when the text is a time (`parseTime`): text it cannot read is dropped
+ * and the input shows `value` again. In the clock formats `1.5` and `1:30`
+ * are read as well as `00:01:30`.
  */
 export const TimeInput: React.FC<TimeInputProps> = ({
   id,
@@ -46,7 +49,10 @@ export const TimeInput: React.FC<TimeInputProps> = ({
     setDraft(null);
     // Nothing was typed in this format, so there is nothing to report.
     if (activeDraft === null) return;
-    onChange?.(parseTime(activeDraft.text, format));
+    const parsed = parseTime(activeDraft.text, format);
+    // Unreadable text is not a time: report nothing, so the value stays.
+    if (parsed === null) return;
+    onChange?.(parsed);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

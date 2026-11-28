@@ -170,13 +170,16 @@ export interface AnnotationTextProps {
 
 const NO_CONTROLS: AnnotationAction[] = [];
 
+/**
+ * m:ss.mmm. The time is rounded once, as a whole, and then split, so 59.9996 s
+ * is `1:00.000`, never `0:60.000`. A negative, `NaN` or infinite time is 0.
+ */
 const formatTime = (seconds: number): string => {
-  if (isNaN(seconds) || !isFinite(seconds)) {
-    return '0:00.000';
-  }
-  const mins = Math.floor(seconds / 60);
-  const secs = (seconds % 60).toFixed(3);
-  return `${mins}:${secs.padStart(6, '0')}`;
+  const safe = Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+  const [wholeText, millis] = safe.toFixed(3).split('.');
+  const whole = Number(wholeText);
+  const secs = String(whole % 60).padStart(2, '0');
+  return `${Math.floor(whole / 60)}:${secs}.${millis}`;
 };
 
 const getIconClass = (classString: string) => {

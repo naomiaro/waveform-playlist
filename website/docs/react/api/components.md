@@ -654,7 +654,7 @@ Dropdown for selecting time display format.
 
 ### SelectionTimeInputs
 
-Either provider. Two text inputs for the start and the end of the selection; an edit sets the selection when the input loses focus.
+Either provider. Two text inputs for the start and the end of the selection; an edit sets the selection when the input loses focus (or on Enter). In the clock formats an edit may also be typed as `1.5` (seconds) or `1:30` (minutes and seconds); text that is not a time changes nothing, and the input shows the selection again.
 
 ```tsx
 <SelectionTimeInputs />

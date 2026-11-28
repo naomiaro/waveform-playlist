@@ -260,6 +260,18 @@ describe('<daw-annotation-list>', () => {
     });
   });
 
+  it('rounds the milliseconds into the seconds and minutes (#815)', async () => {
+    track.insertAdjacentHTML(
+      'beforeend',
+      '<daw-annotation id="c" start="59.9996" end="61.9999">Third line</daw-annotation>'
+    );
+    await flush();
+    await list.updateComplete;
+    const times = list.shadowRoot!.querySelectorAll('.annotation-row-times');
+    expect(times[2].textContent).toContain('1:00.000 – 1:02.000');
+    expect(times[2].textContent).not.toContain('.1000');
+  });
+
   describe('time-display="bars"', () => {
     it("time-display absent renders today's m:ss.mmm format (no change)", () => {
       const times = list.shadowRoot!.querySelectorAll('.annotation-row-times');

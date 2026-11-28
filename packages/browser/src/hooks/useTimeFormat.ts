@@ -9,7 +9,8 @@ export interface TimeFormatControls {
   timeFormat: TimeFormat;
   setTimeFormat: (format: TimeFormat) => void;
   formatTime: (seconds: number) => string;
-  parseTime: (timeString: string) => number;
+  /** Seconds, or `null` when the text is not a time in the current format (see ui-components' `parseTime`). */
+  parseTime: (timeString: string) => number | null;
 }
 
 /**
@@ -24,7 +25,12 @@ export interface TimeFormatControls {
  *   onChange={setTimeFormat}
  * />
  * <span>{formatTime(currentTime)}</span>
- * <input onChange={(e) => seekTo(parseTime(e.target.value))} />
+ * <input
+ *   onBlur={(e) => {
+ *     const seconds = parseTime(e.target.value);
+ *     if (seconds !== null) seekTo(seconds);
+ *   }}
+ * />
  * ```
  */
 export function useTimeFormat(): TimeFormatControls {

@@ -287,29 +287,46 @@ const CustomSelectionInputs: React.FC = () => {
   const { timeFormat } = usePlaylistSettings();
   const format = timeFormat as TimeFormat;
 
-  const handleStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Each field is uncontrolled while it is edited and commits on blur (or
+  // Enter), like the library's TimeInput; `key` shows the new time after the
+  // selection changes. The field always shows the formatted selection after a
+  // commit; text that is not a time (parseTime gives null) changes nothing.
+  const startText = formatTime(selectionStart, format);
+  const endText = formatTime(selectionEnd, format);
+
+  const commitStart = (e: React.FocusEvent<HTMLInputElement>) => {
     const newStart = parseTime(e.target.value, format);
-    setSelection(newStart, selectionEnd);
+    e.target.value = startText;
+    if (newStart !== null) setSelection(newStart, selectionEnd);
   };
 
-  const handleEndChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const commitEnd = (e: React.FocusEvent<HTMLInputElement>) => {
     const newEnd = parseTime(e.target.value, format);
-    setSelection(selectionStart, newEnd);
+    e.target.value = endText;
+    if (newEnd !== null) setSelection(selectionStart, newEnd);
+  };
+
+  const blurOnEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') e.currentTarget.blur();
   };
 
   return (
     <Flex gap="2" align="center">
       <TextField.Root
-        value={formatTime(selectionStart, format)}
-        onChange={handleStartChange}
+        key={startText}
+        defaultValue={startText}
+        onBlur={commitStart}
+        onKeyDown={blurOnEnter}
         placeholder="Start"
         size="2"
         style={{ width: '140px' }}
       />
       <Text size="2" color="gray">to</Text>
       <TextField.Root
-        value={formatTime(selectionEnd, format)}
-        onChange={handleEndChange}
+        key={endText}
+        defaultValue={endText}
+        onBlur={commitEnd}
+        onKeyDown={blurOnEnter}
         placeholder="End"
         size="2"
         style={{ width: '140px' }}
