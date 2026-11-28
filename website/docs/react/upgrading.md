@@ -5100,6 +5100,31 @@ const { stream, requestAccess } = useMicrophoneAccess();
 if (stream === null) return <button onClick={() => requestAccess()}>Enable microphone</button>;
 ```
 
+## Under `StrictMode`, a microphone request behind a run-once ref opens nothing
+
+**Package:** `@waveform-playlist/recording`. Development builds only.
+
+`useMicrophoneAccess` now stops a request that was still waiting for the browser when its effect was cleaned up (a hide, Fast Refresh, an unmount), so that a hidden component reopens no microphone. In development, `<StrictMode>` runs each effect, cleans it up and runs it again; a request made in the first run is stopped by that cleanup. An effect that skips its second run with a ref therefore opens no microphone. Before, the first request's microphone was kept.
+
+**Find:** a mount effect that calls `requestAccess()` (or `requestMicAccess()` of `useIntegratedRecording`) behind a ref that makes it run once.
+
+**Replace with:** the same effect without the guard. React advises the same: [don't use refs to prevent an effect from running twice](https://react.dev/learn/synchronizing-with-effects#dont-use-refs-to-prevent-effects-from-firing).
+
+```tsx
+// Before
+const asked = useRef(false);
+useEffect(() => {
+  if (asked.current) return;
+  asked.current = true;
+  requestAccess();
+}, [requestAccess]);
+
+// After
+useEffect(() => {
+  requestAccess();
+}, [requestAccess]);
+```
+
 ## Recording types nothing read are removed
 
 **Package:** `@waveform-playlist/recording`.
