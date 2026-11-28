@@ -5040,20 +5040,34 @@ In plain JavaScript a leftover prop is ignored (`isOverlay` aside, above); for `
 When the selected microphone left the device list, `useIntegratedRecording` asked for the first remaining one itself. It does not any more: the hooks open a microphone only when the app asks.
 
 - When the open microphone is unplugged (or its permission revoked), `stream` becomes `null`, `hasPermission` becomes `false` and `error` says "The microphone was disconnected or its permission was revoked. Request microphone access again." This is `useMicrophoneAccess`'s behaviour, so it holds without `useIntegratedRecording` too. Before, the ended stream stayed in `stream` when no other microphone was there.
-- `selectedDevice` still moves to a device that is in the list, as a name for a picker; nothing is opened for it.
-- `requestMicAccess()` resets `selectedDevice` to the first device of the list (it opens the default microphone). A microphone chosen with `changeDevice()` before is chosen again with `changeDevice()`.
+- `selectedDevice` is the microphone that is open: the id its stream reports (`getSettings().deviceId`), and `null` while none is open. Before, it named the first device of the list once access was granted, until `changeDevice()` chose another, whether or not that device was the one open, and it kept naming a device after a `changeDevice()` that failed. After `requestMicAccess()` it names the microphone that was opened: the default (`'default'` in Chromium), or the one the `audioConstraints` option names. A microphone chosen earlier is opened again with `changeDevice(id)`; the hook keeps no memory of it.
+- New: `hasLabels` (also on `useMicrophoneAccess`) is `true` when `devices` names the real microphones. Chromium holding the permission named them before any microphone was open in our runs, so a picker can offer them and `changeDevice(id)` opens only the one chosen. Firefox and WebKit (Safari's engine) named them only once a microphone was open, so there the first open is still `requestMicAccess()`.
 
-**Find:** components that use `useIntegratedRecording` or `useMicrophoneAccess` and show a "enable microphone" control only before the first grant.
+**Find:** components that use `useIntegratedRecording` or `useMicrophoneAccess` and show a "enable microphone" control only before the first grant; pickers that read `selectedDevice` as always naming a device, or fall back to `devices[0]`.
 
-**Replace with:** show it whenever `hasPermission` is `false`, which is now also the state after an unplug.
+**Replace with:** show the control while no device is named and nothing is open (`!hasPermission && !hasLabels`); otherwise the picker, with an option for a `selectedDevice` that `devices` does not hold (`null` included): a `<select>` whose value matches no option shows its first device.
 
 ```tsx
-// Before: after an unplug the hook opened another microphone by itself
-// After: the app asks
+// Before: after an unplug the hook opened another microphone by itself, and
+// the picker showed the first device of the list
 {!hasPermission ? (
   <button onClick={requestMicAccess}>Enable microphone</button>
 ) : (
   <select value={selectedDevice ?? ''} onChange={(e) => changeDevice(e.target.value)}>
+    {devices.map((d) => (
+      <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
+    ))}
+  </select>
+)}
+
+// After: the app asks, and the picker shows the open microphone or none
+const listed = devices.some((d) => d.deviceId === selectedDevice);
+
+{!hasPermission && !hasLabels ? (
+  <button onClick={requestMicAccess}>Enable microphone</button>
+) : (
+  <select value={(listed && selectedDevice) || ''} onChange={(e) => changeDevice(e.target.value)}>
+    {!listed && <option value="" disabled>Choose a microphone</option>}
     {devices.map((d) => (
       <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
     ))}

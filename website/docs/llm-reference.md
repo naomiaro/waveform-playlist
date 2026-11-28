@@ -2080,7 +2080,15 @@ interface UseIntegratedRecordingReturn {
   error: Error | null;
   stream: MediaStream | null;
   devices: MicrophoneDevice[];
+  /** `devices` names the real microphones (false before a first grant, when the
+   *  list is usually one entry with an empty deviceId). Chromium holding the
+   *  permission named them before any stream (WebKit did not, in our runs):
+   *  then offer the list and open the one chosen with changeDevice(id). */
+  hasLabels: boolean;
   hasPermission: boolean;
+  /** The open microphone: the id its stream reports (getSettings().deviceId),
+   *  null while none is open or opening. Chromium reported 'default' for the
+   *  default one. A picker shows it only when `devices` holds it. */
   selectedDevice: string | null;
   /** Resolves true when the capture pipeline actually started — check before
    *  starting synchronized playback (overdub). Resolves false and sets `error`
@@ -2119,6 +2127,34 @@ interface UseRecordingReturn {
   stopRecording: () => Promise<AudioBuffer | null>;
   pauseRecording: () => void;
   resumeRecording: () => void;
+  error: Error | null;
+}
+```
+
+### useMicrophoneAccess
+
+```typescript
+function useMicrophoneAccess(): UseMicrophoneAccessReturn;
+
+interface UseMicrophoneAccessReturn {
+  /** The open microphone's stream; null after stopStream(), an unplug (its
+   *  track ends: `error` says so), a hide or unmount, and while a request is
+   *  opening one (a request stops the open stream first). */
+  stream: MediaStream | null;
+  devices: MicrophoneDevice[]; // { deviceId, label, groupId }; follows devicechange
+  /** `devices` names the real microphones: false before a first grant, and
+   *  true on mount when Chromium already holds the permission (our runs).
+   *  Changes only when the list is read again (mount, devicechange, a grant),
+   *  not when a read fails. */
+  hasLabels: boolean;
+  hasPermission: boolean;
+  isLoading: boolean;
+  /** Opens a microphone: `deviceId` by exact id, else the one a `deviceId` in
+   *  `audioConstraints` names, else the default. Recording
+   *  defaults: echoCancellation, noiseSuppression and autoGainControl off,
+   *  latency 0; `audioConstraints` overrides them. Opens nothing by itself. */
+  requestAccess: (deviceId?: string, audioConstraints?: MediaTrackConstraints) => Promise<void>;
+  stopStream: () => void;
   error: Error | null;
 }
 ```

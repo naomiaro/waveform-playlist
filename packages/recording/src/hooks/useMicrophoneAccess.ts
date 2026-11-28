@@ -9,6 +9,8 @@ import { UseMicrophoneAccessReturn, MicrophoneDevice } from '../types';
 export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [devices, setDevices] = useState<MicrophoneDevice[]>([]);
+  // Whether `devices` names the real microphones (core's `hasLabels`).
+  const [hasLabels, setHasLabels] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -30,8 +32,9 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
   // helper (redaction-aware fallback labels, SSR/insecure-context safe).
   const enumerateDevices = useCallback(async () => {
     try {
-      const { devices: audioInputs } = await enumerateMicrophones();
+      const { devices: audioInputs, hasLabels: labelled } = await enumerateMicrophones();
       setDevices(audioInputs);
+      setHasLabels(labelled);
     } catch (err) {
       console.warn('[waveform-playlist] Failed to enumerate devices:', String(err));
       setError(err instanceof Error ? err : new Error('Failed to enumerate devices'));
@@ -181,6 +184,7 @@ export function useMicrophoneAccess(): UseMicrophoneAccessReturn {
   return {
     stream,
     devices,
+    hasLabels,
     hasPermission,
     isLoading,
     requestAccess,

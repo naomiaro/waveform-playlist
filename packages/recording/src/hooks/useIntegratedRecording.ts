@@ -3,7 +3,7 @@
  * the take added to the arrangement that owns the tracks (#812).
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { useRecordingWithTakeEnded } from './useRecording';
 import { useMicrophoneAccess } from './useMicrophoneAccess';
 import { useMicrophoneLevel } from './useMicrophoneLevel';
@@ -90,7 +90,21 @@ export interface UseIntegratedRecordingReturn {
   // Microphone state
   stream: MediaStream | null;
   devices: MicrophoneDevice[];
+  /** `useMicrophoneAccess`'s `hasLabels`: `devices` names the real
+   *  microphones, so a picker can offer them before one is open and open only
+   *  the one chosen, with `changeDevice(id)`. */
+  hasLabels: boolean;
   hasPermission: boolean;
+  /**
+   * The id of the microphone that is open: the device the stream's track
+   * reports (`getSettings().deviceId`), `null` while no stream is open (also
+   * while a request is opening one: it closes the open stream first). It is
+   * read from the stream, so it names the microphone that records; a picker
+   * shows it only when `devices` holds it. For a stream opened without an id
+   * (`requestMicAccess()`), Chromium reported `'default'`, the id of its list's
+   * default entry, and Firefox and WebKit the device's own id (headless runs
+   * with fake devices).
+   */
   selectedDevice: string | null;
 
   // Recording controls
@@ -132,7 +146,6 @@ export function useIntegratedRecording(
   // True once this hook has resumed the audio context. Nothing draws it, so
   // it is a ref: as state it gave startRecording a new identity.
   const audioResumedRef = useRef(false);
-  const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [hookError, setHookError] = useState<Error | null>(null);
 
   // Capture timeline position when recording starts (not at stop time)
@@ -165,7 +178,18 @@ export function useIntegratedRecording(
   const finishTakeRef = useRef<(buffer: AudioBuffer | null) => void>(() => {});
 
   // Microphone access
-  const { stream, devices, hasPermission, requestAccess, error: micError } = useMicrophoneAccess();
+  const {
+    stream,
+    devices,
+    hasLabels,
+    hasPermission,
+    requestAccess,
+    error: micError,
+  } = useMicrophoneAccess();
+  // The microphone that is open, read from its owner (#945). The hook keeps
+  // no choice of its own: one it kept named another device than the open one
+  // (the first of the list, a changeDevice that failed).
+  const selectedDevice = useMemo(() => openDeviceId(stream), [stream]);
 
   // Microphone level (for VU meter)
   const {
@@ -341,19 +365,6 @@ export function useIntegratedRecording(
     finishTakeRef.current(buffer);
   }, [stopRec]);
 
-  // What the picker shows: the first device of the list until the app chooses
-  // one, and again when the one it showed has left the list. This only names
-  // a device. The hook opens a microphone when the app asks for one
-  // (requestMicAccess, changeDevice) and never by itself (maintainer, #944):
-  // a microphone that is unplugged ends its stream, useMicrophoneAccess
-  // clears it, and the app asks again.
-  useEffect(() => {
-    if (!hasPermission || devices.length === 0) return;
-    if (selectedDevice === null || !devices.some((d) => d.deviceId === selectedDevice)) {
-      setSelectedDevice(devices[0].deviceId);
-    }
-  }, [hasPermission, devices, selectedDevice]);
-
   // Mirror isRecording for the device-switch guards below — reading the
   // state directly would churn the callbacks every recording toggle.
   const isRecordingRef = useRef(isRecording);
@@ -371,12 +382,11 @@ export function useIntegratedRecording(
     try {
       setHookError(null);
       // This opens the default device (or the one audioConstraints names),
-      // whatever was chosen before: the selection is reset with it, so the
-      // picker does not keep naming an earlier choice that is not the open
-      // microphone (after a hide, or a changeDevice that failed). The effect
-      // above selects the first of the list again; a specific microphone is
-      // chosen with changeDevice(), by exact id (maintainer, #944).
-      setSelectedDevice(null);
+      // whatever was chosen before; selectedDevice then names it. A specific
+      // microphone is opened with changeDevice(), by exact id (maintainer,
+      // #944). The hook opens a microphone only when the app asks, never by
+      // itself: an unplugged one ends its stream, useMicrophoneAccess clears
+      // it, and the app asks again.
       await requestAccess(undefined, audioConstraintsRef.current);
       await resumeGlobalAudioContext();
       audioResumedRef.current = true;
@@ -395,7 +405,6 @@ export function useIntegratedRecording(
       }
       try {
         setHookError(null);
-        setSelectedDevice(deviceId);
         resetPeak();
         await requestAccess(deviceId, audioConstraintsRef.current);
         await resumeGlobalAudioContext();
@@ -421,6 +430,7 @@ export function useIntegratedRecording(
     // Microphone state
     stream,
     devices,
+    hasLabels,
     hasPermission,
     selectedDevice,
 
@@ -432,4 +442,11 @@ export function useIntegratedRecording(
     requestMicAccess,
     changeDevice,
   };
+}
+
+/** The device the stream's microphone track reports; `null` without one. */
+function openDeviceId(stream: MediaStream | null): string | null {
+  const track = stream?.getAudioTracks()[0];
+  // getSettings is missing in very old browsers; an empty id names nothing.
+  return track?.getSettings?.().deviceId || null;
 }

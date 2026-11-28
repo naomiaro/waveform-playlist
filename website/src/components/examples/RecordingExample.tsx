@@ -235,6 +235,7 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
     meter: inputMeter,
     progress: recordingProgress,
     devices,
+    hasLabels,
     hasPermission,
     selectedDevice,
     stream,
@@ -268,14 +269,8 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
   // Output meter for master bus
   const { meter: outputMeter } = useOutputMeter({ channelCount: 2, isPlaying });
 
-  // Auto-request mic access on mount
-  useEffect(() => {
-    if (!hasPermission) {
-      requestMicAccess().catch(() => {
-        // Error already surfaced via useIntegratedRecording's error state
-      });
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // No microphone is opened on load: the visitor enables one, or chooses one
+  // from the list when the browser already names the devices (#945).
 
   // Re-entrancy guard for record start: isRecording state only commits after
   // startRecording's internal awaits (context resume, worklet load), so a
@@ -619,14 +614,17 @@ const RecordingControlsInner: React.FC<RecordingControlsInnerProps> = ({
 
         {/* Mic selector */}
         <ToolbarSection>
-          {!hasPermission ? (
+          {/* Before a first grant the browser names no device: Enable Mic opens
+              the default one (the browser's prompt). Once the devices are named,
+              choosing one opens only that microphone. */}
+          {!hasPermission && !hasLabels ? (
             <Button size="1" variant="soft" color="blue" onClick={requestMicAccess}>
               <MicrophoneIcon size={14} weight="light" /> Enable Mic
             </Button>
           ) : (
             <MicrophoneSelector
               devices={devices}
-              selectedDeviceId={selectedDevice || undefined}
+              selectedDeviceId={selectedDevice}
               onDeviceChange={changeDevice}
               disabled={isRecording}
               hint={

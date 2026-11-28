@@ -1298,7 +1298,14 @@ interface UseIntegratedRecordingReturn {
   // Device management
   stream: MediaStream | null;
   devices: MicrophoneDevice[];
+  // devices names the real microphones (false before a first grant). When it is
+  // true before one is open (Chromium holding the permission), a picker can
+  // offer them and changeDevice(id) opens only that one.
+  hasLabels: boolean;
   hasPermission: boolean;
+  // The open microphone, read from the stream (getSettings().deviceId);
+  // null while none is open or opening. Chromium reported 'default' for the
+  // default one.
   selectedDevice: string | null;
 
   // Controls
@@ -1340,7 +1347,9 @@ function RecordingControls() {
     meter,
     progress,
     devices,
+    hasLabels,
     hasPermission,
+    selectedDevice,
     startRecording,
     stopRecording,
     requestMicAccess,
@@ -1348,13 +1357,18 @@ function RecordingControls() {
     error,
   } = useIntegratedRecording(arrangement, selectedTrackId, { currentTime });
 
-  if (!hasPermission) {
+  // Before a first grant the browser names no device: open the default one.
+  if (!hasPermission && !hasLabels) {
     return <button onClick={requestMicAccess}>Enable Microphone</button>;
   }
+  // A <select> whose value matches no option would show its first device.
+  const listed = devices.some((d) => d.deviceId === selectedDevice);
 
   return (
     <div>
-      <select onChange={(e) => changeDevice(e.target.value)}>
+      {/* Shows the open microphone when the list has it; choosing one opens only that one. */}
+      <select value={(listed && selectedDevice) || ''} onChange={(e) => changeDevice(e.target.value)}>
+        {!listed && <option value="" disabled>Choose a microphone</option>}
         {devices.map(d => <option key={d.deviceId} value={d.deviceId}>{d.label}</option>)}
       </select>
       <button onClick={isRecording ? stopRecording : startRecording}>
@@ -1957,6 +1971,7 @@ From `@waveform-playlist/recording`:
 function useMicrophoneAccess(): {
   stream: MediaStream | null;
   devices: MicrophoneDevice[];
+  hasLabels: boolean; // devices names the real microphones (false before a first grant)
   hasPermission: boolean;
   isLoading: boolean;
   error: Error | null;
