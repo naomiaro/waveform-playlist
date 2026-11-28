@@ -1305,8 +1305,10 @@ interface UseIntegratedRecordingReturn {
   /** Resolves true when the capture pipeline actually started; false (and sets error)
    *  when the take is refused. */
   startRecording: () => Promise<boolean>;
-  /** Stops the take and adds it to the track it was started on: one undo step. */
-  stopRecording: () => void;
+  /** Stops the take and adds it to the track it was started on: one undo step.
+   *  A take that ends by itself (microphone unplugged, component hidden or
+   *  unmounted mid-take) is added the same way. */
+  stopRecording: () => Promise<void>;
   pauseRecording: () => void;
   resumeRecording: () => void;
   requestMicAccess: () => Promise<void>;
@@ -1375,7 +1377,7 @@ function ElapsedTime({ progress }: { progress: RecordingProgressSource }) {
 
 ### useRecordingSession
 
-`WaveformPlaylistProvider` only. Tells the playlist that a take is being recorded into a track, for as long as `isRecording` is true. The provider then keeps playback running past the end of the audio and marks the track in the arrangement as the one the take is recording onto (`arrangement.setTrackRecording`), which plays it muted for the take, so what it already holds does not play under a punch-in that replaces it. `usePlaylistMixer().trackStates` and the track's Mute button show it muted, its built-in `<TrackMuteButton />` is disabled and `useTrack().isRecording` is true for it. The take's mute is no undo step and does not change the track's own mute (`arrangement.getMixer()`), so a mute changed during the take stays after it. The take's mute is cleared when the take ends, the track changes or the component unmounts; the provider also clears it when it unmounts itself. An `<Activity>` hide of the component ends the session the same way, and the reveal mutes the track again.
+`WaveformPlaylistProvider` only. Tells the playlist that a take is being recorded into a track, for as long as `isRecording` is true. The provider then keeps playback running past the end of the audio and marks the track in the arrangement as the one the take is recording onto (`arrangement.setTrackRecording`), which plays it muted for the take, so what it already holds does not play under a punch-in that replaces it. `usePlaylistMixer().trackStates` and the track's Mute button show it muted, its built-in `<TrackMuteButton />` is disabled and `useTrack().isRecording` is true for it. The take's mute is no undo step and does not change the track's own mute (`arrangement.getMixer()`), so a mute changed during the take stays after it. The take's mute is cleared when the take ends, the track changes or the component unmounts; the provider also clears it when it unmounts itself. An `<Activity>` hide of the component ends the session the same way. When the component also calls `useIntegratedRecording`, that hide ends the take too (it is added to its track), so `isRecording` is `false` at the reveal; with `isRecording` from elsewhere still `true`, the reveal mutes the track again.
 
 ```typescript
 function useRecordingSession(options: RecordingSessionOptions): void;

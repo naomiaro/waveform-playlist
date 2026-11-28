@@ -223,10 +223,13 @@ describe('useIntegratedRecording', () => {
     const audioTrack = stream.getAudioTracks()[0] as unknown as {
       addEventListener: ReturnType<typeof vi.fn>;
     };
-    const onEnded = audioTrack.addEventListener.mock.calls.find(([type]) => type === 'ended')![1];
+    // Every `ended` listener runs: the stream's owner and the take.
+    const onEnded = audioTrack.addEventListener.mock.calls
+      .filter(([type]) => type === 'ended')
+      .map(([, listener]) => listener as () => void);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     await act(async () => {
-      onEnded();
+      onEnded.forEach((listener) => listener());
       await new Promise((resolve) => setTimeout(resolve, 50));
     });
 

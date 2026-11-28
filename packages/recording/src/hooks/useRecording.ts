@@ -18,9 +18,29 @@ function emptyPeaks(bits: 8 | 16): Int8Array | Int16Array {
   return bits === 8 ? new Int8Array(0) : new Int16Array(0);
 }
 
+/**
+ * Called with the take when it ends without a call to `stopRecording()`: the
+ * microphone track ended, or the hook's effect cleanup ran mid-take (unmount,
+ * Fast Refresh, a hidden `<Activity>`). `null` when no samples were captured.
+ */
+export type TakeEndedListener = (buffer: AudioBuffer | null) => void;
+
 export function useRecording(
   stream: MediaStream | null,
   options: RecordingOptions = {}
+): UseRecordingReturn {
+  return useRecordingWithTakeEnded(stream, options);
+}
+
+/**
+ * `useRecording`, plus a listener for a take that ends by itself. Internal:
+ * `useIntegratedRecording` uses it to add such a take to its track (#822).
+ * The package exports `useRecording` only.
+ */
+export function useRecordingWithTakeEnded(
+  stream: MediaStream | null,
+  options: RecordingOptions = {},
+  onTakeEnded?: TakeEndedListener
 ): UseRecordingReturn {
   const { channelCount = 1, samplesPerPixel = 1024, bits = 16 } = options;
 
@@ -74,10 +94,19 @@ export function useRecording(
   // Set by the unmount cleanup so a startRecording continuation that was
   // parked on an await doesn't build an ownerless capture graph.
   const isUnmountedRef = useRef<boolean>(false);
+  // Counts the effect's setups. A startRecording that was parked on an await
+  // across a cleanup and a new setup (Fast Refresh, an <Activity> hidden and
+  // shown) finds isUnmountedRef reset; the count tells it the cleanup ran, and
+  // with it the cleanup of whoever owns the stream, which stops it.
+  const mountEpochRef = useRef(0);
   // Elapsed seconds, and the preview peaks accumulated so far. Written by the
   // duration loop and the worklet handler; published together, at most once
   // per animation frame, by publishProgress.
   const durationRef = useRef<number>(0);
+  // Read when a take ends by itself, which can be long after the render that
+  // passed the listener.
+  const onTakeEndedRef = useRef(onTakeEnded);
+  onTakeEndedRef.current = onTakeEnded;
   const peaksRef = useRef<(Int8Array | Int16Array)[]>(progress.getSnapshot().peaks);
 
   const publishProgress = useCallback(() => {
@@ -129,7 +158,19 @@ export function useRecording(
       setError(new Error('No microphone stream available'));
       return false;
     }
+    // An ended track delivers silence and fires no further event.
+    // useMicrophoneAccess clears such a stream; one the app passes in itself
+    // can still be ended. Refuse, in place of a silent take.
+    if (stream.getAudioTracks()[0]?.readyState === 'ended') {
+      setError(
+        new Error(
+          'The microphone stream has ended (the device was disconnected or its permission revoked). Request microphone access again.'
+        )
+      );
+      return false;
+    }
     isStartingRef.current = true;
+    const mountEpoch = mountEpochRef.current;
 
     try {
       setError(null);
@@ -149,7 +190,9 @@ export function useRecording(
       // nodes exist. A continuation past this point would start an ownerless
       // session: the rAF loop reschedules forever and chunks accumulate with
       // nothing left to stop them.
-      if (isUnmountedRef.current) return false;
+      // The same after a cleanup followed by a new setup: the take would read
+      // a stream its owner stopped in that cleanup (#822).
+      if (isUnmountedRef.current || mountEpoch !== mountEpochRef.current) return false;
 
       // Create MediaStreamSource from Tone's context
       // Each hook creates its own source to avoid cross-context issues in Firefox
@@ -255,9 +298,12 @@ export function useRecording(
       if (audioTrack) {
         const onEnded = () => {
           console.warn('[waveform-playlist] Audio track ended (mic unplugged or revoked)');
-          // Stop recording to clean up worklet, rAF loop, and UI state
-          stopRecordingRef.current?.();
+          // Stop recording to clean up worklet, rAF loop, and UI state. The
+          // take up to here is kept: it is in `audioBuffer`, and goes to the
+          // listener.
+          const stopped = stopRecordingRef.current?.();
           setError(new Error('Microphone disconnected during recording'));
+          stopped?.then((buffer) => onTakeEndedRef.current?.(buffer));
         };
         onTrackEndedRef.current = onEnded;
         audioTrack.addEventListener('ended', onEnded);
@@ -309,6 +355,21 @@ export function useRecording(
     stopPromiseRef.current = stopPromise;
     return stopPromise;
   }, []);
+
+  // The AudioBuffer of the chunks received so far; null when there are none
+  // (stop called immediately after start): a 0-length AudioBuffer throws.
+  const buildTakeBuffer = useCallback((): AudioBuffer | null => {
+    const context = getGlobalContext();
+    const rawContext = context.rawContext as AudioContext;
+    const numChannels = recordedChunksRef.current.length || channelCount;
+    const channelData = recordedChunksRef.current.map((chunks) => concatenateAudioData(chunks));
+    const totalSamples = channelData[0]?.length ?? 0;
+    if (totalSamples === 0) {
+      console.warn('[waveform-playlist] Recording stopped with 0 samples captured — discarding');
+      return null;
+    }
+    return createAudioBuffer(rawContext, channelData, rawContext.sampleRate, numChannels);
+  }, [channelCount]);
 
   // The actual stop handshake — only ever invoked via stopRecording's
   // re-entrancy gate above.
@@ -387,20 +448,8 @@ export function useRecording(
       }
 
       // Create final AudioBuffer from accumulated per-channel chunks
-      const context = getGlobalContext();
-      const rawContext = context.rawContext as AudioContext;
-      const numChannels = recordedChunksRef.current.length || channelCount;
-      const channelData = recordedChunksRef.current.map((chunks) => concatenateAudioData(chunks));
-      const totalSamples = channelData[0]?.length ?? 0;
-
-      // Guard: if no samples were captured (e.g., stop called immediately after start),
-      // return null instead of creating a 0-length AudioBuffer which throws
-      if (totalSamples === 0) {
-        console.warn('[waveform-playlist] Recording stopped with 0 samples captured — discarding');
-        return null;
-      }
-
-      const buffer = createAudioBuffer(rawContext, channelData, rawContext.sampleRate, numChannels);
+      const buffer = buildTakeBuffer();
+      if (!buffer) return null;
 
       setAudioBuffer(buffer);
       durationRef.current = buffer.duration;
@@ -420,9 +469,11 @@ export function useRecording(
       setIsRecording(false);
       setIsPaused(false);
     }
-  }, [channelCount, publishProgress]);
+  }, [buildTakeBuffer, publishProgress]);
   stopRecordingRef.current = stopRecording;
   finishStopRecordingRef.current = finishStopRecording;
+  const buildTakeBufferRef = useRef(buildTakeBuffer);
+  buildTakeBufferRef.current = buildTakeBuffer;
 
   // Pause recording — guards read refs, not state: a pause in the same tick
   // as start/resume closes over stale state and silently no-ops while the
@@ -461,6 +512,7 @@ export function useRecording(
     // instance, so a flag left true by the probe-unmount's cleanup would
     // make startRecording abort forever.
     isUnmountedRef.current = false;
+    mountEpochRef.current += 1;
     return () => {
       // Abort any startRecording continuation parked on an await — it must
       // not build the capture graph after unmount.
@@ -491,8 +543,40 @@ export function useRecording(
       }
       if (animationFrameRef.current !== null) {
         cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
       }
       // Don't close the global AudioContext - it's shared across the app
+
+      // The same cleanup runs for Fast Refresh and a hidden <Activity>, after
+      // which this hook lives on: the capture graph above is gone, so the take
+      // is over and the state has to say so (#822). A stop already in flight
+      // finishes by itself (its worklet no longer answers, so on its safety
+      // timeout) and delivers the take to its caller.
+      if (!isRecordingRef.current || isStoppingRef.current) return;
+      isRecordingRef.current = false;
+      isPausedRef.current = false;
+      workletNodeRef.current = null;
+      mediaStreamSourceRef.current = null;
+      audioTrackRef.current = null;
+      onTrackEndedRef.current = null;
+      // What was received so far is the take. The worklet's last partial
+      // flush and any message it had posted that was not delivered yet are
+      // not in it: a cleanup cannot wait for the stop handshake and its drain.
+      let buffer: AudioBuffer | null = null;
+      try {
+        buffer = buildTakeBufferRef.current();
+      } catch (err) {
+        console.warn('[waveform-playlist] Failed to keep the interrupted take:', String(err));
+      }
+      setIsRecording(false);
+      setIsPaused(false);
+      if (buffer) setAudioBuffer(buffer);
+      try {
+        onTakeEndedRef.current?.(buffer);
+      } catch (err) {
+        // A throw must not leave an effect cleanup.
+        console.warn('[waveform-playlist] Failed to hand over the interrupted take:', String(err));
+      }
     };
   }, []);
 

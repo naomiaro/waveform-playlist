@@ -4,7 +4,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useRecording } from './useRecording';
+import { useRecordingWithTakeEnded } from './useRecording';
 import { useMicrophoneAccess } from './useMicrophoneAccess';
 import { useMicrophoneLevel } from './useMicrophoneLevel';
 import { takeNotSaved, takeRefusal, withTake } from './takeTarget';
@@ -103,8 +103,13 @@ export interface UseIntegratedRecordingReturn {
    *  (still loading, failed to load, or a clip that cannot be made from it). */
   startRecording: () => Promise<boolean>;
   /** Stop the take and add it to the track it was started on, with one
-   *  `arrangement.updateTrack()`: one undo step. */
-  stopRecording: () => void;
+   *  `arrangement.updateTrack()`: one undo step. Resolves when the take is on
+   *  its track (or was refused, with `error` set); it never rejects.
+   *
+   *  A take that ends without this call is added the same way: when the
+   *  microphone is unplugged (`error` then says so), and when the component
+   *  using the hook unmounts or is hidden mid-take. */
+  stopRecording: () => Promise<void>;
   pauseRecording: () => void;
   resumeRecording: () => void;
   requestMicAccess: () => Promise<void>;
@@ -124,8 +129,9 @@ export function useIntegratedRecording(
 ): UseIntegratedRecordingReturn {
   const { currentTime = 0, audioConstraints, latencyOffset, ...recordingOptions } = options;
 
-  // Track if we're currently monitoring (for auto-resume audio context)
-  const [isMonitoring, setIsMonitoring] = useState(false);
+  // True once this hook has resumed the audio context. Nothing draws it, so
+  // it is a ref: as state it gave startRecording a new identity.
+  const audioResumedRef = useRef(false);
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [hookError, setHookError] = useState<Error | null>(null);
 
@@ -150,6 +156,13 @@ export function useIntegratedRecording(
   selectedTrackIdRef.current = selectedTrackId;
   const currentTimeRef = useRef(currentTime);
   currentTimeRef.current = currentTime;
+  // The app usually writes the constraints inline, a new object each render.
+  const audioConstraintsRef = useRef(audioConstraints);
+  audioConstraintsRef.current = audioConstraints;
+
+  // Assigned below, where finishTake is made; useRecording reads it when a
+  // take ends by itself.
+  const finishTakeRef = useRef<(buffer: AudioBuffer | null) => void>(() => {});
 
   // Microphone access
   const { stream, devices, hasPermission, requestAccess, error: micError } = useMicrophoneAccess();
@@ -173,7 +186,15 @@ export function useIntegratedRecording(
     pauseRecording,
     resumeRecording,
     error: recError,
-  } = useRecording(stream, recordingOptions);
+  } = useRecordingWithTakeEnded(stream, recordingOptions, (buffer) =>
+    // The take ended without our stopRecording(): keep it (#822).
+    finishTakeRef.current(buffer)
+  );
+  // The start below can wait on the audio context first. It then calls the
+  // startRec of the latest render: the one it closed over may hold a stream
+  // that a cleanup has stopped meanwhile (a hide and a reveal).
+  const startRecRef = useRef(startRec);
+  startRecRef.current = startRec;
 
   // Start recording handler. Reads selectedTrackId from its ref, and the
   // tracks from the arrangement as they are now: a track the app added in the
@@ -201,9 +222,9 @@ export function useIntegratedRecording(
     try {
       setHookError(null);
       // Resume audio context if needed
-      if (!isMonitoring) {
+      if (!audioResumedRef.current) {
         await resumeGlobalAudioContext();
-        setIsMonitoring(true);
+        audioResumedRef.current = true;
       }
 
       // Capture timeline position NOW — before recording starts.
@@ -213,7 +234,7 @@ export function useIntegratedRecording(
       recordingTrackIdRef.current = selectedTrackIdRef.current;
       setRecordingTrackId(selectedTrackIdRef.current);
 
-      const started = await startRec();
+      const started = await startRecRef.current();
       if (!started) setRecordingTrackId(null);
       return started;
     } catch (err) {
@@ -223,25 +244,26 @@ export function useIntegratedRecording(
     } finally {
       isStartingRef.current = false;
     }
-  }, [arrangement, isMonitoring, startRec]);
+  }, [arrangement]);
 
-  // Stop recording and add the take to the track it was started on
-  const stopRecording = useCallback(async () => {
-    let buffer: AudioBuffer | null;
-    try {
-      buffer = await stopRec();
-    } catch (err) {
-      setHookError(err instanceof Error ? err : new Error(String(err)));
-      return;
-    } finally {
+  // Add a finished take to the track it was started on. Called once per take
+  // by whichever saw it end: stopRecording below, or useRecording when the
+  // take ended by itself. Synchronous, so an effect cleanup can call it.
+  const finishTake = useCallback(
+    (buffer: AudioBuffer | null) => {
+      // The track the take was started on, not the one selected now (#756).
+      // Taken out of the ref: a Stop pressed while an unplug is being handled
+      // receives the same buffer, and must not add it a second time.
+      // Nothing was captured (also a stop while the next take is still
+      // starting, which must leave that take's track alone): nothing to add.
+      if (!buffer) return;
+      const trackId = recordingTrackIdRef.current;
+      recordingTrackIdRef.current = null;
       setRecordingTrackId(null);
-    }
+      if (!trackId) return;
 
-    // The track the take was started on, not the one selected now (#756),
-    // read from the arrangement after the stop handshake (which can take more
-    // than a second): an edit made meanwhile is in its tracks.
-    const trackId = recordingTrackIdRef.current;
-    if (buffer && trackId) {
+      // Read from the arrangement now, after the stop handshake (which can
+      // take more than a second): an edit made meanwhile is in its tracks.
       if (!arrangement.getTracks().some((t) => t.id === trackId)) {
         const err = new Error(
           `Recording completed but track "${trackId}" no longer exists. The recorded audio could not be saved.`
@@ -303,24 +325,34 @@ export function useIntegratedRecording(
         console.warn(`[waveform-playlist] ${notSaved.message}`);
         setHookError(notSaved);
       }
-    }
-  }, [arrangement, stopRec, latencyOffset]);
+    },
+    [arrangement, latencyOffset]
+  );
+  finishTakeRef.current = finishTake;
 
-  // Auto-select first device when available, or fallback if selected device was unplugged
+  // Stop recording and add the take to the track it was started on
+  const stopRecording = useCallback(async (): Promise<void> => {
+    let buffer: AudioBuffer | null = null;
+    try {
+      buffer = await stopRec();
+    } catch (err) {
+      setHookError(err instanceof Error ? err : new Error(String(err)));
+    }
+    finishTakeRef.current(buffer);
+  }, [stopRec]);
+
+  // What the picker shows: the first device of the list until the app chooses
+  // one, and again when the one it showed has left the list. This only names
+  // a device. The hook opens a microphone when the app asks for one
+  // (requestMicAccess, changeDevice) and never by itself (maintainer, #944):
+  // a microphone that is unplugged ends its stream, useMicrophoneAccess
+  // clears it, and the app asks again.
   useEffect(() => {
     if (!hasPermission || devices.length === 0) return;
-
-    if (selectedDevice === null) {
-      // First-time selection
+    if (selectedDevice === null || !devices.some((d) => d.deviceId === selectedDevice)) {
       setSelectedDevice(devices[0].deviceId);
-    } else if (!devices.some((d) => d.deviceId === selectedDevice)) {
-      // Selected device was removed — fall back to first available
-      const fallbackId = devices[0].deviceId;
-      setSelectedDevice(fallbackId);
-      resetPeak();
-      requestAccess(fallbackId, audioConstraints);
     }
-  }, [hasPermission, devices, selectedDevice, resetPeak, requestAccess, audioConstraints]);
+  }, [hasPermission, devices, selectedDevice]);
 
   // Mirror isRecording for the device-switch guards below — reading the
   // state directly would churn the callbacks every recording toggle.
@@ -338,13 +370,20 @@ export function useIntegratedRecording(
     }
     try {
       setHookError(null);
-      await requestAccess(undefined, audioConstraints);
+      // This opens the default device (or the one audioConstraints names),
+      // whatever was chosen before: the selection is reset with it, so the
+      // picker does not keep naming an earlier choice that is not the open
+      // microphone (after a hide, or a changeDevice that failed). The effect
+      // above selects the first of the list again; a specific microphone is
+      // chosen with changeDevice(), by exact id (maintainer, #944).
+      setSelectedDevice(null);
+      await requestAccess(undefined, audioConstraintsRef.current);
       await resumeGlobalAudioContext();
-      setIsMonitoring(true);
+      audioResumedRef.current = true;
     } catch (err) {
       setHookError(err instanceof Error ? err : new Error(String(err)));
     }
-  }, [requestAccess, audioConstraints]);
+  }, [requestAccess]);
 
   // Change device
   const changeDevice = useCallback(
@@ -358,14 +397,14 @@ export function useIntegratedRecording(
         setHookError(null);
         setSelectedDevice(deviceId);
         resetPeak();
-        await requestAccess(deviceId, audioConstraints);
+        await requestAccess(deviceId, audioConstraintsRef.current);
         await resumeGlobalAudioContext();
-        setIsMonitoring(true);
+        audioResumedRef.current = true;
       } catch (err) {
         setHookError(err instanceof Error ? err : new Error(String(err)));
       }
     },
-    [requestAccess, audioConstraints, resetPeak]
+    [requestAccess, resetPeak]
   );
 
   return {

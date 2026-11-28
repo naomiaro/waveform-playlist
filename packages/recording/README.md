@@ -9,7 +9,7 @@ Audio recording support for waveform-playlist using AudioWorklet — mic capture
 - **Sample-accurate VU metering** — a dedicated meter worklet measures peak/RMS on every sample, not just once per animation frame
 - **Multi-channel recording** — auto-detects the microphone's actual channel count from the `MediaStream`
 - **Overdub with latency compensation** — record against existing playback; the finalized clip's timeline position accounts for output latency and Tone.js scheduling lookahead, with an optional manual override
-- **Device selection & hot-plug** — enumerate microphones, switch devices between takes (refused while actively recording — a mid-recording switch would silently record silence), auto-fallback if the active device disconnects
+- **Device selection & hot-plug** — enumerate microphones, switch devices between takes (refused while actively recording — a mid-recording switch would silently record silence), no microphone is opened by the hooks themselves: when the open one is unplugged, `stream` is cleared and the app asks again
 - **Pause/resume** — pauses the worklet itself, not just the UI
 - **Hooks only** — no bundled UI components; wire the state into your own controls or `@waveform-playlist/ui-components`'s `SegmentedVUMeter`
 
@@ -188,7 +188,7 @@ The core AudioWorklet-based recording hook.
 **Returns (`UseRecordingReturn`):**
 - `isRecording: boolean`, `isPaused: boolean`
 - `progress: RecordingProgressSource` — a source of `{ duration: number; peaks: (Int8Array | Int16Array)[] }` (seconds elapsed; one peaks entry per channel, growing live). Published once per animation frame while recording; the hook does not re-render for it. After a stop, `duration` is the recorded buffer's length
-- `audioBuffer: AudioBuffer | null` — set after `stopRecording()` resolves
+- `audioBuffer: AudioBuffer | null` — set after `stopRecording()` resolves, and when a take ends by itself (microphone unplugged, component hidden mid-take)
 - `startRecording: () => Promise<boolean>` — resolves `true` when the capture pipeline actually started (`false`: no stream, already recording, worklet failure); check it before starting synchronized playback
 - `stopRecording: () => Promise<AudioBuffer | null>` — awaits the worklet's final flush before resolving, so the last samples are never dropped
 - `pauseRecording: () => void`, `resumeRecording: () => void` — pause/resume the worklet itself, not just the UI
@@ -232,7 +232,7 @@ Batteries-included hook: wires `useMicrophoneAccess` + `useMicrophoneLevel` + `u
 
 ### Types
 
-`RecordingState`, `RecordingData`, `MicrophoneDevice`, `RecordingOptions`, `UseRecordingReturn`, `UseMicrophoneAccessReturn` are all exported from the package root for consumers building their own UI around these hooks.
+`MicrophoneDevice`, `RecordingOptions`, `UseRecordingReturn`, `UseMicrophoneAccessReturn` are all exported from the package root for consumers building their own UI around these hooks.
 
 ## Architecture
 

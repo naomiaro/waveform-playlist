@@ -21,8 +21,6 @@ export type {
 
 // Types
 export type {
-  RecordingState,
-  RecordingData,
   MicrophoneDevice,
   RecordingOptions,
   UseRecordingReturn,

@@ -137,7 +137,7 @@ The clip's `offsetSamples` skips this combined latency period. `durationSamples`
 
 ## Device Hot-Plug Detection
 
-**Pattern:** `useMicrophoneAccess` listens for `navigator.mediaDevices.devicechange` to re-enumerate devices on plug/unplug. `useIntegratedRecording` auto-falls back to the first available device if the selected device disappears from the list.
+**Pattern:** `useMicrophoneAccess` listens for `navigator.mediaDevices.devicechange` to re-enumerate devices on plug/unplug (no listener where `navigator.mediaDevices` is undefined: an insecure origin). It does not use core's `watchMicrophoneDevices()`: that only warns on a failed enumeration, and the hook reports one in `error`. `useIntegratedRecording` opens nothing when the selected device disappears from the list; it only moves `selectedDevice` to a device that is there (see the #822 section).
 
 **Enumeration lives in core:** the actual device listing is `enumerateMicrophones()` from `@waveform-playlist/core` (framework-agnostic, permission-free, redaction-aware `hasLabels` flag, injectable `mediaDevices`). Non-React consumers (dawcore pages, vanilla JS) should use it — or `watchMicrophoneDevices()` for a hot-plug subscription — directly instead of this hook.
 
@@ -152,6 +152,20 @@ The clip's `offsetSamples` skips this combined latency period. `durationSamples`
 ## Unmount Detaches the Worklet Handler
 
 `useRecording`'s unmount cleanup sets `port.onmessage = null` after posting `stop`. `progress` is a source that a subscriber can hold after the hook is gone, and while paused a queued message publishes to it directly.
+
+## A Take That Ends Without `stopRecording()` Is Kept (#822)
+
+Three things end a take: the app's `stopRecording()`, the microphone track's `ended` event, and `useRecording`'s effect cleanup (unmount, Fast Refresh, a hidden `<Activity>`). All three reach `finishTake(buffer)` in `useIntegratedRecording`, the one place a buffer becomes a clip. The last two arrive through `useRecordingWithTakeEnded(stream, options, onTakeEnded)`, which is `useRecording` plus that listener and is not exported from the package (dawcore's `RecordingController` keeps an unplugged take the same way).
+
+- **`finishTake` takes the track id out of `recordingTrackIdRef`.** A Stop pressed while the unplug's stop handshake is in flight gets the same buffer from the shared stop promise; the second caller finds no track id and adds nothing. A `null` buffer returns before the ref is read: a stop with nothing recording (also one that arrives while the next take is still starting) must not clear the track that take captured.
+- **The cleanup cannot wait for the stop handshake,** so it builds the buffer from the chunks already received (the worklet's last partial flush is missing, and so is any message it had posted that was not delivered yet: the normal stop drains those), resets `isRecordingRef`, the node refs and the `isRecording` / `isPaused` state, and calls the listener synchronously. It publishes nothing to `progress` (a subscriber can outlive the hook). When a stop is already in flight (`isStoppingRef`) the cleanup leaves the flags alone: that stop ends on its 1 s timeout and delivers the take to its caller.
+- **A `startRecording` parked on an await across a cleanup and a new setup returns `false`** (`mountEpochRef`, counted in the effect's setup). `isUnmountedRef` is reset by that setup, and the stream the start was given was stopped by its owner's cleanup.
+- **`useIntegratedRecording.startRecording` calls `startRec` through a ref** for the same reason one level up: it can wait on `resumeGlobalAudioContext()` first, and the `startRec` it closed over holds the stream of that render.
+- **`requestMicAccess()` opens the default device and resets `selectedDevice`** (to `null`; the selection effect picks the first of the list again). The hook keeps no memory of a device chosen with `changeDevice()` (maintainer, #944): a first version asked for it again, by exact id and then as an `ideal` preference, and needed a flag for "chosen by the app", a second one for "its stream has arrived", and review rounds for each; an `ideal` device id is also weighed against the other constraints (`channelCount`, the recording defaults), so the browser may open another device. A specific microphone is `changeDevice(id)`, by exact id, from the current `devices`.
+- **`useMicrophoneAccess`'s cleanup clears `stream` and `hasPermission`** as `stopStream()` does (maintainer, #822: no microphone is reopened by the hook; the app calls `requestAccess()` again).
+- **No hook opens a microphone by itself (maintainer, #944).** Until then `useIntegratedRecording` asked for the first remaining device when the selected one left the list. Now `useMicrophoneAccess` puts an `ended` listener (`once`) on the tracks of the stream it installs and, if that stream is still its own, clears `stream` and `hasPermission` and sets `error`; our own `track.stop()` fires no `ended`. The app asks again. `useIntegratedRecording`'s selection effect only names a device of the list (the first, when nothing is selected or the selected one left). In tests, fire EVERY `ended` listener of the track, in the order added (the stream's owner, then the take): `find(...)` returns the owner's and the take is never stopped.
+- **`selectedDevice` is still state written by an effect.** With no request made from that effect it could be derived (the app's choice while it is in the list, else the first device); not done on #944.
+- **Tests:** `takeEndsWithoutStop.test.tsx`; `helpers/activity.tsx` mounts a hook inside an `<Activity>` to hide and show it.
 
 ## Hook Test Setup
 

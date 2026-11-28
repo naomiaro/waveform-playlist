@@ -4491,7 +4491,7 @@ While a take records onto a track (`useRecordingSession`, or `setRecordingActive
 - `useTrack().isRecording` is true for that track, for a mute control of your own;
 - the take's mute is cleared when the take ends or the take's track changes, and when the provider unmounts or is hidden by `<Activity>` while a take is recording. One track is recorded onto at a time: naming one clears any other.
 
-Edges: a take started during the first load records without playback (Play does nothing before the first ready); an `<Activity>` hide of the component that calls `useRecordingSession` ends the session and the reveal mutes the track again; removing the take's track during a take as an undo step, and undoing that removal after the take, brings the track back with its own mute (the end of the take clears its take mute). A mute control of your own that toggles from the reported value during a take (`setMuted(!muted)`, `setTrackMute(id, !trackStates[i].muted)`) sets the track's own mute to false, since `muted` is true for the take: the track stays muted for the take and comes out of it unmuted.
+Edges: a take started during the first load records without playback (Play does nothing before the first ready); an `<Activity>` hide of the component that calls `useRecordingSession` ends the session (when it also calls `useIntegratedRecording` the take ends too and is added to its track; with `isRecording` from elsewhere still `true`, the reveal mutes the track again); removing the take's track during a take as an undo step, and undoing that removal after the take, brings the track back with its own mute (the end of the take clears its take mute). A mute control of your own that toggles from the reported value during a take (`setMuted(!muted)`, `setTrackMute(id, !trackStates[i].muted)`) sets the track's own mute to false, since `muted` is true for the take: the track stays muted for the take and comes out of it unmuted.
 
 **Find:** a mute control of your own in a track panel or a mixer strip; code that reads `trackStates[i].muted` during a take, or `arrangement.getMixer().get(id).muted` to learn whether a track is heard; code that mutes or unmutes the take's track during a take, or that saves a track's mute before a take to set it back after.
 
@@ -5031,6 +5031,61 @@ In plain JavaScript a leftover prop is ignored (`isOverlay` aside, above); for `
 <Playlist tracksWidth={width}>{rows}</Playlist>
 <ClipBoundary clipId={id} edge="left" />
 <SpectrogramChannel index={0} length={w} waveHeight={80} clipId={id} onCanvasRegister={reg} onCanvasUnregister={unreg} />
+```
+
+## `useIntegratedRecording` no longer switches microphone by itself
+
+**Package:** `@waveform-playlist/recording`.
+
+When the selected microphone left the device list, `useIntegratedRecording` asked for the first remaining one itself. It does not any more: the hooks open a microphone only when the app asks.
+
+- When the open microphone is unplugged (or its permission revoked), `stream` becomes `null`, `hasPermission` becomes `false` and `error` says "The microphone was disconnected or its permission was revoked. Request microphone access again." This is `useMicrophoneAccess`'s behaviour, so it holds without `useIntegratedRecording` too. Before, the ended stream stayed in `stream` when no other microphone was there.
+- `selectedDevice` still moves to a device that is in the list, as a name for a picker; nothing is opened for it.
+- `requestMicAccess()` resets `selectedDevice` to the first device of the list (it opens the default microphone). A microphone chosen with `changeDevice()` before is chosen again with `changeDevice()`.
+
+**Find:** components that use `useIntegratedRecording` or `useMicrophoneAccess` and show a "enable microphone" control only before the first grant.
+
+**Replace with:** show it whenever `hasPermission` is `false`, which is now also the state after an unplug.
+
+```tsx
+// Before: after an unplug the hook opened another microphone by itself
+// After: the app asks
+{!hasPermission ? (
+  <button onClick={requestMicAccess}>Enable microphone</button>
+) : (
+  <select value={selectedDevice ?? ''} onChange={(e) => changeDevice(e.target.value)}>
+    {devices.map((d) => (
+      <option key={d.deviceId} value={d.deviceId}>{d.label}</option>
+    ))}
+  </select>
+)}
+```
+
+## Recording types nothing read are removed
+
+**Package:** `@waveform-playlist/recording`.
+
+| Removed | What it did | Replace with |
+| --- | --- | --- |
+| `RecordingState` (type) | nothing: no hook returned it | the fields of `UseRecordingReturn` (`isRecording`, `isPaused`, `progress`) |
+| `RecordingData` (type) | nothing: no hook returned it | `UseRecordingReturn['audioBuffer']` and `progress` |
+| `deviceId` of `RecordingOptions` | nothing: `useRecording` records the stream it is given | `requestAccess(deviceId)` of `useMicrophoneAccess`, or `changeDevice(deviceId)` of `useIntegratedRecording` |
+| `audioConstraints` of `RecordingOptions` | nothing, for the same reason | `requestAccess(deviceId, audioConstraints)`, or the `audioConstraints` option of `useIntegratedRecording`, which stays |
+
+In plain JavaScript a leftover option is ignored, as it was before. TypeScript reports each one.
+
+**Find:** `RecordingState`, `RecordingData`, and `deviceId` or `audioConstraints` in the options of `useRecording(stream, { … })`.
+
+**Replace with:**
+
+```tsx
+// Before: neither option reached the microphone
+const { stream } = useMicrophoneAccess();
+const recording = useRecording(stream, { deviceId, audioConstraints: { echoCancellation: true } });
+// After: the stream is asked for with them
+const { stream, requestAccess } = useMicrophoneAccess();
+const recording = useRecording(stream);
+await requestAccess(deviceId, { echoCancellation: true });
 ```
 
 ## `useMediaElementTrack()`: `fadeIn` and `fadeOut` are removed
