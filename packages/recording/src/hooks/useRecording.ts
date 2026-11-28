@@ -159,13 +159,9 @@ export function useRecordingWithTakeEnded(
 
   // Start recording. Resolves true when the capture pipeline started.
   const startRecording = useCallback(async (): Promise<boolean> => {
-    const refuseEndedStream = (): boolean => {
+    const refuseEndedStream = (message: string): boolean => {
       if (stream?.getAudioTracks()[0]?.readyState !== 'ended') return false;
-      setError(
-        new Error(
-          'The microphone stream has ended (the device was disconnected or its permission revoked). Request microphone access again.'
-        )
-      );
+      setError(new Error(message));
       return true;
     };
     if (isRecordingRef.current || startingEpochRef.current === mountEpochRef.current) return false;
@@ -176,7 +172,12 @@ export function useRecordingWithTakeEnded(
     // An ended track delivers silence and fires no further event.
     // useMicrophoneAccess clears such a stream; one the app passes in itself
     // can still be ended. Refuse, in place of a silent take.
-    if (refuseEndedStream()) return false;
+    if (
+      refuseEndedStream(
+        'The microphone stream has ended (the device was disconnected or its permission revoked). Request microphone access again.'
+      )
+    )
+      return false;
     const mountEpoch = mountEpochRef.current;
     startingEpochRef.current = mountEpoch;
 
@@ -205,7 +206,12 @@ export function useRecordingWithTakeEnded(
       // microphone (a stopped track fires no `ended`), or it was unplugged
       // before the take's own listener exists. Refuse, in place of a take
       // that records silence and does not end by itself (#947).
-      if (refuseEndedStream()) return false;
+      if (
+        refuseEndedStream(
+          'The microphone changed or was disconnected while recording was starting. Start recording again.'
+        )
+      )
+        return false;
 
       // Create MediaStreamSource from Tone's context
       // Each hook creates its own source to avoid cross-context issues in Firefox

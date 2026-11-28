@@ -748,8 +748,8 @@ describe('useIntegratedRecording: asking for the microphone again', () => {
 // The start was given the old stream, which is ended by then; it refuses with
 // an error in place of a take that records silence and never ends by itself.
 describe('useIntegratedRecording: the microphone changes while a start is waiting', () => {
-  const ENDED =
-    'The microphone stream has ended (the device was disconnected or its permission revoked). Request microphone access again.';
+  const ENDED_WHILE_STARTING =
+    'The microphone changed or was disconnected while recording was starting. Start recording again.';
   const recordingNodesBuilt = () =>
     env.context.createAudioWorkletNode.mock.calls.filter(([name]) => name === 'recording-processor')
       .length;
@@ -789,7 +789,7 @@ describe('useIntegratedRecording: the microphone changes while a start is waitin
 
       expect(started).toBe(false);
       expect(result.current.isRecording).toBe(false);
-      expect(result.current.error?.message).toBe(ENDED);
+      expect(result.current.error?.message).toBe(ENDED_WHILE_STARTING);
       expect(recordingNodesBuilt()).toBe(0);
       // The new microphone records.
       await act(async () => {

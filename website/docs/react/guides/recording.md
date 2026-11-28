@@ -249,12 +249,23 @@ function RecordingControls() {
 }
 ```
 
-To start a take from an effect, ignore the result once the effect has been cleaned up. A start still getting ready when a cleanup runs resolves `false`; under StrictMode in development that is the first run's start, and the second run's start records. Acting on the first `false` (releasing a session, showing a failure) would do so under a running take. `startRecording` of `useRecording` changes with the stream (and its options), so the effect below starts again when they change.
+To start a take from an effect, start it on a value of your own (`shouldRecord` below), call the latest `startRecording` through a ref, and ignore the result once the effect has been cleaned up:
+
+- `startRecording` of `useRecording` changes with the stream and the hook's options (`channelCount`, `samplesPerPixel`, `bits`). An effect that depends on it starts again on each change, also during a take, and that start resolves `false` at once.
+- A start still getting ready when the component's effects are cleaned up (an unmount, a hide, Fast Refresh, StrictMode's development cleanup) resolves `false`. Under StrictMode that is the first run's start; the second run's start records.
+
+Acting on either `false` (releasing a session, showing a failure) would do so under a running take.
 
 ```tsx
+const startRef = useRef(startRecording);
+useLayoutEffect(() => {
+  startRef.current = startRecording;
+});
+
 useEffect(() => {
+  if (!shouldRecord) return;
   let active = true;
-  startRecording().then((started) => {
+  startRef.current().then((started) => {
     if (active && !started) {
       // the take did not start: release what was set up for it
     }
@@ -262,7 +273,7 @@ useEffect(() => {
   return () => {
     active = false;
   };
-}, [startRecording]);
+}, [shouldRecord]);
 ```
 
 ### Mic Disconnect Detection
