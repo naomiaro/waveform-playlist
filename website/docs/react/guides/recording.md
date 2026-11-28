@@ -249,6 +249,22 @@ function RecordingControls() {
 }
 ```
 
+To start a take from an effect, ignore the result once the effect has been cleaned up. A start still getting ready when a cleanup runs resolves `false`; under StrictMode in development that is the first run's start, and the second run's start records. Acting on the first `false` (releasing a session, showing a failure) would do so under a running take. `startRecording` of `useRecording` changes with the stream (and its options), so the effect below starts again when they change.
+
+```tsx
+useEffect(() => {
+  let active = true;
+  startRecording().then((started) => {
+    if (active && !started) {
+      // the take did not start: release what was set up for it
+    }
+  });
+  return () => {
+    active = false;
+  };
+}, [startRecording]);
+```
+
 ### Mic Disconnect Detection
 
 `useRecording` automatically detects when the microphone is unplugged or permission is revoked during recording. When the `MediaStreamTrack` 'ended' event fires, the hook stops the take and sets an `error` state. What was recorded until then is kept: it is in `audioBuffer`.
