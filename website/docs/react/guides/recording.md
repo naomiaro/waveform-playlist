@@ -254,7 +254,7 @@ To start a take from an effect, start it on a value of your own (`shouldRecord` 
 - `startRecording` of `useRecording` changes with the stream and the hook's options (`channelCount`, `samplesPerPixel`, `bits`). An effect that depends on it starts again on each change, also during a take, and that start resolves `false` at once.
 - A start still getting ready when the component's effects are cleaned up (an unmount, a hide, Fast Refresh, StrictMode's development cleanup) resolves `false`. Under StrictMode that is the first run's start; the second run's start records.
 
-Acting on either `false` (releasing a session, showing a failure) would do so under a running take.
+Acting on such a `false` (releasing a session, showing a failure) can do so under a running take: StrictMode's second run, or the take a re-run was refused for. The `active` flag drops the ones a cleanup made stale. While `shouldRecord` stays `true`, the effect starts a new take when a hidden `<Activity>` is shown again (or on Fast Refresh): set it back to `false` when the take ends.
 
 ```tsx
 const startRef = useRef(startRecording);
