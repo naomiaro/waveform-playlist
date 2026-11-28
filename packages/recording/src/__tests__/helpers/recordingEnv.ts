@@ -148,8 +148,12 @@ function requestedDeviceId(constraints?: MediaStreamConstraints): string | undef
 }
 
 export function createMockStream(id: string, deviceId = 'dev-a'): MediaStream {
+  // As a browser track: `stop()` ends it (and fires no `ended` event).
   const track = {
-    stop: vi.fn(),
+    readyState: 'live' as MediaStreamTrackState,
+    stop: vi.fn(() => {
+      track.readyState = 'ended';
+    }),
     kind: 'audio',
     getSettings: () => ({ channelCount: 1, deviceId }),
     addEventListener: vi.fn(),

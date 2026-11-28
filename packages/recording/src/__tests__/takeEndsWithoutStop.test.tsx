@@ -40,13 +40,18 @@ const clipsOf = (arrangement: Arrangement, id: string) =>
  */
 function endedListener(stream: MediaStream): () => void {
   const track = stream.getAudioTracks()[0] as unknown as {
+    readyState: MediaStreamTrackState;
     addEventListener: ReturnType<typeof vi.fn>;
   };
   const listeners = track.addEventListener.mock.calls
     .filter(([type]) => type === 'ended')
     .map(([, listener]) => listener as () => void);
   expect(listeners.length).toBeGreaterThan(0);
-  return () => listeners.forEach((listener) => listener());
+  return () => {
+    // The browser ends the track before it fires the event.
+    track.readyState = 'ended';
+    listeners.forEach((listener) => listener());
+  };
 }
 
 /** The browser reports a new device list. Call inside an async `act`. */
@@ -737,6 +742,78 @@ describe('useIntegratedRecording: asking for the microphone again', () => {
       expect(recordingNodesBuilt()).toBe(1);
     });
   }
+});
+
+// #947 review: the microphone changes while a start waits on the worklet load.
+// The start was given the old stream, which is ended by then; it refuses with
+// an error in place of a take that records silence and never ends by itself.
+describe('useIntegratedRecording: the microphone changes while a start is waiting', () => {
+  const ENDED =
+    'The microphone stream has ended (the device was disconnected or its permission revoked). Request microphone access again.';
+  const recordingNodesBuilt = () =>
+    env.context.createAudioWorkletNode.mock.calls.filter(([name]) => name === 'recording-processor')
+      .length;
+
+  const startParkedInWorkletLoad = async () => {
+    const arrangement = arrangementOf('track-1');
+    const view = renderHook(() => useIntegratedRecording(arrangement, 'track-1'));
+    await act(async () => {
+      await view.result.current.requestMicAccess();
+    });
+    const opened = view.result.current.stream!;
+    let release!: () => void;
+    workletsModule.addRecordingWorkletModule.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (release = resolve))
+    );
+    let starting!: Promise<boolean>;
+    act(() => {
+      starting = view.result.current.startRecording();
+    });
+    return { ...view, opened, starting, release: () => release() };
+  };
+
+  for (const how of ['requestMicAccess', 'changeDevice'] as const) {
+    it(`a ${how}() during the start makes it refuse`, async () => {
+      const { result, opened, starting, release } = await startParkedInWorkletLoad();
+      await act(async () => {
+        if (how === 'requestMicAccess') await result.current.requestMicAccess();
+        else await result.current.changeDevice('dev-a');
+      });
+      expect(result.current.stream).not.toBe(opened);
+
+      let started: boolean | undefined;
+      await act(async () => {
+        release();
+        started = await starting;
+      });
+
+      expect(started).toBe(false);
+      expect(result.current.isRecording).toBe(false);
+      expect(result.current.error?.message).toBe(ENDED);
+      expect(recordingNodesBuilt()).toBe(0);
+      // The new microphone records.
+      await act(async () => {
+        expect(await result.current.startRecording()).toBe(true);
+      });
+    });
+  }
+
+  it('an unplug during the start makes it refuse', async () => {
+    const { result, opened, starting, release } = await startParkedInWorkletLoad();
+    act(() => endedListener(opened)());
+    expect(result.current.stream).toBeNull();
+
+    let started: boolean | undefined;
+    await act(async () => {
+      release();
+      started = await starting;
+    });
+
+    expect(started).toBe(false);
+    expect(result.current.isRecording).toBe(false);
+    expect(recordingNodesBuilt()).toBe(0);
+    expect(result.current.error).not.toBeNull();
+  });
 });
 
 describe('useRecording: a take-ended listener that throws', () => {
