@@ -141,6 +141,20 @@ const ExportOptionsWrapper = styled.div`
   flex-wrap: wrap;
 `;
 
+// A line of its own under the export controls, always there and of one
+// height: a failure changes its text, never the layout around it.
+const ExportStatus = styled.div`
+  flex-basis: 100%;
+  height: 1.5rem;
+  line-height: 1.5rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--ifm-color-danger, #d08070);
+`;
+
 const ExportSelect = styled.select`
   padding: 0.375rem 0.5rem;
   border: 1px solid var(--ifm-color-emphasis-300, #ddd);
@@ -400,6 +414,8 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
   const [chosenTrackId, setChosenTrackId] = useState<string | null>(null);
   const [applyEffectsToExport, setApplyEffectsToExport] = useState(true);
   const [isExportingZip, setIsExportingZip] = useState(false);
+  // The last export that failed, shown under the export controls
+  const [exportError, setExportError] = useState<string | null>(null);
   const [zipProgress, setZipProgress] = useState(0);
   const { tracks: contextTracks } = usePlaylistTimeline();
   const { trackStates } = usePlaylistMixer();
@@ -425,13 +441,14 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
 
     setIsExportingZip(true);
     setZipProgress(0);
+    setExportError(null);
 
     try {
       const zip = new JSZip();
       const totalTracks = contextTracks.length;
 
       for (let i = 0; i < totalTracks; i++) {
-        const trackName = trackStates[i]?.name || `track-${i + 1}`;
+        const trackName = trackStates[i]?.name || 'track';
         // Sanitize filename; the position keeps two tracks of one name apart
         const safeFilename = `${i + 1}-${trackName.replace(/[^a-z0-9_-]/gi, '_')}`;
 
@@ -458,11 +475,18 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting tracks as ZIP:', error);
+      setExportError(`ZIP export failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setIsExportingZip(false);
       setZipProgress(0);
     }
   }, [contextTracks, trackStates, exportWav, offlineEffectsFunction, createOfflineTrackEffects]);
+
+  const clearExportError = useCallback(() => setExportError(null), []);
+  const showExportError = useCallback(
+    (error: Error) => setExportError(`Export failed: ${error.message}`),
+    []
+  );
 
   // Handle dropped/selected audio files: one track per file, named after the
   // file without its extension; the arrangement loads each one
@@ -585,9 +609,12 @@ const EffectsControls: React.FC<EffectsControlsProps> = ({
               trackId={exportMode === 'individual' ? selectedTrack?.id : undefined}
               effectsFunction={offlineEffectsFunction}
               createOfflineTrackEffects={createOfflineTrackEffects}
+              onExportComplete={clearExportError}
+              onExportError={showExportError}
             />
           )}
         </ExportOptionsWrapper>
+        <ExportStatus role="alert">{exportError}</ExportStatus>
       </TimeControlsBar>
 
       <StyledDropZone

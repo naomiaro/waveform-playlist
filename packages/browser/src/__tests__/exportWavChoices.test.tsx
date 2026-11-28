@@ -192,6 +192,16 @@ describe('one track chosen by id', () => {
     expect(built.downloads).toEqual(['take_name-B.wav']);
   });
 
+  it('the characters file systems refuse in a track name become underscores in the file name', async () => {
+    const { result } = renderHook(() => useExportWav());
+    const named = { ...track('A'), name: 'Drums / Kit: "Take" <1>|2*?\\' } as ClipTrack;
+    await act(async () => {
+      await result.current.exportWav([named], [state()], { trackId: 'A', filename: 'take' });
+    });
+    // Spaces stay; / \ : * ? " < > | become _.
+    expect(built.downloads).toEqual(['take_Drums _ Kit_ _Take_ _1__2___.wav']);
+  });
+
   it('without a track id the mix is exported; muted tracks, soloed or not, are left out', async () => {
     const { result } = renderHook(() => useExportWav());
     const tracks = [track('A'), track('B'), track('C')];
@@ -294,30 +304,43 @@ describe('isExporting while exports overlap', () => {
     expect(result.current.progress).toBe(1);
   });
 
-  it('an export refused at once while another runs changes neither isExporting nor progress', async () => {
-    built.hold = true;
-    const { result } = renderHook(() => useExportWav());
-    let failed!: Promise<unknown>;
-    let running!: Promise<unknown>;
-    await act(async () => {
-      running = result.current.exportWav([track('A')], [state()], { autoDownload: false });
-      // The running export has reported 0.1 and waits in its render.
-      await vi.waitFor(() => expect(built.held).toHaveLength(1));
-      failed = result.current
-        .exportWav([track('A')], [state()], { trackId: 'nope', autoDownload: false })
-        .catch(() => undefined);
-      await failed;
-    });
-    expect(result.current.isExporting).toBe(true);
-    // The running export's 0.1, not a 0 from the refused one.
-    expect(result.current.progress).toBe(0.1);
-    expect(result.current.error).toBe('No track with id "nope" to export');
+  const refusals: Array<{ name: string; tracks: ClipTrack[]; trackId?: string; message: string }> =
+    [
+      {
+        name: 'an unknown id',
+        tracks: [track('A')],
+        trackId: 'nope',
+        message: 'No track with id "nope" to export',
+      },
+      { name: 'no tracks', tracks: [], message: 'No tracks to export' },
+    ];
+  it.each(refusals)(
+    'an export refused at once ($name) while another runs changes neither isExporting nor progress',
+    async ({ tracks: refusedTracks, trackId, message }) => {
+      built.hold = true;
+      const { result } = renderHook(() => useExportWav());
+      let failed!: Promise<unknown>;
+      let running!: Promise<unknown>;
+      await act(async () => {
+        running = result.current.exportWav([track('A')], [state()], { autoDownload: false });
+        // The running export has reported 0.1 and waits in its render.
+        await vi.waitFor(() => expect(built.held).toHaveLength(1));
+        failed = result.current
+          .exportWav(refusedTracks, [], { trackId, autoDownload: false })
+          .catch(() => undefined);
+        await failed;
+      });
+      expect(result.current.isExporting).toBe(true);
+      // The running export's 0.1, not a 0 from the refused one.
+      expect(result.current.progress).toBe(0.1);
+      expect(result.current.error).toBe(message);
 
-    await act(async () => {
-      // Every held render, so a mutant that renders the failed one too cannot hang.
-      built.held.forEach((release) => release());
-      await running;
-    });
-    expect(result.current.isExporting).toBe(false);
-  });
+      await act(async () => {
+        // Every held render, so a mutant that renders the failed one too cannot hang.
+        built.held.forEach((release) => release());
+        await running;
+      });
+      expect(result.current.isExporting).toBe(false);
+    }
+  );
 });

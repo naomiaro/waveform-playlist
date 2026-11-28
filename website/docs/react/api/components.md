@@ -817,7 +817,7 @@ Export the playlist to a WAV file.
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `label` | `string` | `'Export WAV'` | Button label |
-| `filename` | `string` | `'export'` | Downloaded file name (without extension). A single track's file is `<filename>_<track name>.wav` |
+| `filename` | `string` | `'export'` | Downloaded file name (without extension). A single track's file is `<filename>_<track name>.wav`, with `/ \ : * ? " < > \|` in the track name replaced by `_` |
 | `trackId` | `string` | - | The one track to export. Left out, the mix is exported |
 | `bitDepth` | `16 \| 32` | `16` | WAV bit depth (16-bit PCM or 32-bit float) |
 | `effectsFunction` | `OfflineEffectsFunction` | - | Master effects chain for the offline render, e.g. `createOfflineEffectsFunction()` of `useDynamicEffects()` |
@@ -858,7 +858,7 @@ function ExportMix() {
 
 **Single Track Export:**
 
-The track named by `trackId` is exported as it sounds on its own: with its volume, pan and track effects, and through the master chain when `effectsFunction` is given; its mute and the other tracks' solo are ignored.
+The track named by `trackId` is exported as it sounds on its own: with its volume, pan and track effects, and through the master chain when `effectsFunction` is given; its mute and the other tracks' solo are ignored. The file lasts as long as the mix, so stems exported one by one line up.
 
 ```tsx
 import { usePlaylistTimeline } from '@waveform-playlist/browser';

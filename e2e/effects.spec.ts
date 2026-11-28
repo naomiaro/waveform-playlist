@@ -321,6 +321,32 @@ test.describe('Effects Example', () => {
       await expect(exportDropdown).toHaveValue('all');
     });
 
+    // A failed export is shown on the page, in a status line that is always
+    // there, so the controls below do not move when it appears (#817).
+    test('a failed export, by the button and as a ZIP, is shown under the export controls', async ({
+      page,
+    }) => {
+      const status = page.getByRole('alert').filter({ hasText: /export failed/i });
+      const statusLine = page.locator('[role="alert"]').last();
+      const heightBefore = (await statusLine.boundingBox())?.height;
+      // Every download fails from here on: the button's (inside exportWav)
+      // and the ZIP's, both made with an object URL.
+      await page.evaluate(() => {
+        URL.createObjectURL = () => {
+          throw new Error('downloads are unavailable');
+        };
+      });
+
+      await page.getByRole('button', { name: 'Export Mix', exact: true }).click();
+      await expect(status).toHaveText(/^Export failed: /);
+      await expect(status).toBeVisible();
+      expect((await statusLine.boundingBox())?.height).toBe(heightBefore);
+
+      await page.locator('select:has-text("Full Mix")').selectOption('All Tracks (ZIP)');
+      await page.getByRole('button', { name: 'Export ZIP', exact: true }).click();
+      await expect(status).toHaveText(/^ZIP export failed: /);
+    });
+
     // One track chosen by id is exported as it sounds alone (#817): its mute
     // is ignored. A steady sine on a fifth track, muted, is exported alone; the
     // drums of the other four would make the file change over time, and the

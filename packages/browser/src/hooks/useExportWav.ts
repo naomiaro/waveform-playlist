@@ -45,7 +45,8 @@ export type OfflineTrackEffectsFunction = (
 export interface ExportOptions extends WavEncoderOptions {
   /**
    * Filename for download (without extension). A single track's file is
-   * named `<filename>_<track name>`.
+   * named `<filename>_<track name>`, with `/ \ : * ? " < > |` in the track
+   * name replaced by `_`.
    */
   filename?: string;
   /**
@@ -246,7 +247,7 @@ export function useExportWav(): UseExportWavReturn {
         // Auto download if requested
         if (autoDownload) {
           const exportFilename =
-            chosenIndex === -1 ? filename : `${filename}_${tracks[chosenIndex].name}`;
+            chosenIndex === -1 ? filename : `${filename}_${fileSafe(tracks[chosenIndex].name)}`;
           downloadBlob(blob, `${exportFilename}.wav`);
         }
 
@@ -273,6 +274,14 @@ export function useExportWav(): UseExportWavReturn {
     progress,
     error,
   };
+}
+
+/** Characters that Windows, macOS or Linux refuse in a file name. */
+const UNSAFE_FILE_NAME_CHARACTERS = /[/\\:*?"<>|]/g;
+
+/** A track name made usable in a file name: each refused character becomes `_`. */
+function fileSafe(name: string): string {
+  return name.replace(UNSAFE_FILE_NAME_CHARACTERS, '_');
 }
 
 /**
