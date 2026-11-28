@@ -165,7 +165,9 @@ export function useIntegratedRecording(
   // one made after it, and resolves false without touching its state (#947,
   // as in useRecording).
   const startingEpochRef = useRef<number | null>(null);
-  // Moved on by the effect cleanup below.
+  // Moved on by the effect cleanup below. It must move with useRecording's
+  // and useMicrophoneAccess's epochs (the same component's cleanups, in the
+  // same commit): keep this effect's dependencies empty, as theirs are stable.
   const mountEpochRef = useRef(0);
   useEffect(() => {
     const epoch = mountEpochRef.current;
