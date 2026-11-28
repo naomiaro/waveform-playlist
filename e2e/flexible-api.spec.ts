@@ -16,6 +16,29 @@ test.describe('Flexible API Example', () => {
     await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
   });
 
+  // The page's own selection fields (Radix) commit on blur or Enter (#815):
+  // they parsed every keystroke, and text that was not a time moved the edge to 0.
+  test('the selection fields commit a typed time and ignore text that is not one', async ({
+    page,
+  }) => {
+    const start = page.getByPlaceholder('Start', { exact: true });
+    const end = page.getByPlaceholder('End', { exact: true });
+    await expect(start).toHaveValue('00:00:00.000');
+
+    await end.fill('0:03.25');
+    await end.press('Enter');
+    await expect(end).toHaveValue('00:00:03.250');
+
+    await start.fill('1.5');
+    await start.press('Enter');
+    await expect(start).toHaveValue('00:00:01.500');
+
+    await start.fill('abc');
+    await start.press('Enter');
+    await expect(start).toHaveValue('00:00:01.500');
+    await expect(end).toHaveValue('00:00:03.250');
+  });
+
   test('the time display follows the skip buttons while stopped', async ({ page }) => {
     const time = page.getByTestId('time-display');
     await expect(time).toHaveText('00:00:00.000');

@@ -432,6 +432,43 @@ test.describe('Annotations Example', () => {
       await expect(startInput).toHaveValue('00:00:00.000');
       await expect(endInput).toHaveValue('00:00:00.000');
     });
+
+    // #717: '1.5' typed in an hh:mm:ss.uuu field became 00:00:00.000.
+    test('a time typed in a shorter form sets the selection edge', async ({ page }) => {
+      const startInput = page.getByRole('textbox', { name: 'Start of audio selection' });
+      const endInput = page.getByRole('textbox', { name: 'End of audio selection' });
+
+      await endInput.fill('3.25');
+      await endInput.press('Enter');
+      await expect(endInput).toHaveValue('00:00:03.250');
+
+      await startInput.fill('1.5');
+      await startInput.press('Enter');
+      await expect(startInput).toHaveValue('00:00:01.500');
+      await expect(endInput).toHaveValue('00:00:03.250');
+
+      await endInput.fill('0:04');
+      await endInput.press('Enter');
+      await expect(endInput).toHaveValue('00:00:04.000');
+    });
+
+    // #815: text that is not a time moved the edge to 0.
+    test('text that is not a time leaves the selection as it was', async ({ page }) => {
+      const startInput = page.getByRole('textbox', { name: 'Start of audio selection' });
+      const endInput = page.getByRole('textbox', { name: 'End of audio selection' });
+      await endInput.fill('00:00:03.250');
+      await endInput.press('Enter');
+      await startInput.fill('00:00:01.500');
+      await startInput.press('Enter');
+      await expect(startInput).toHaveValue('00:00:01.500');
+
+      for (const text of ['abc', '00:75:00', '-1', '']) {
+        await startInput.fill(text);
+        await startInput.press('Enter');
+        await expect(startInput).toHaveValue('00:00:01.500');
+        await expect(endInput).toHaveValue('00:00:03.250');
+      }
+    });
   });
 
   test.describe('Documentation', () => {
