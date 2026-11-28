@@ -191,6 +191,33 @@ describe('TimeInput', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it.each(['abc', '', '-1', '00:75:00'])(
+    'reports nothing for text it cannot read (%j) and shows the value again',
+    (text) => {
+      const onChange = vi.fn();
+      const { container } = render(
+        <TimeInput id="t" label="Start" value={7} format="hh:mm:ss.uuu" onChange={onChange} />
+      );
+      const input = inputOf(container);
+      fireEvent.change(input, { target: { value: text } });
+      fireEvent.blur(input);
+      expect(onChange).not.toHaveBeenCalled();
+      expect(input.value).toBe('00:00:07.000');
+    }
+  );
+
+  it('commits a shorter form typed in a clock format (#717)', () => {
+    const onChange = vi.fn();
+    const { container } = render(
+      <TimeInput id="t" label="Start" value={1.5} format="hh:mm:ss.uuu" onChange={onChange} />
+    );
+    const input = inputOf(container);
+    input.focus();
+    fireEvent.change(input, { target: { value: '2.25' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onChange).toHaveBeenCalledWith(2.25);
+  });
+
   it('blurs on Enter', () => {
     const { container } = render(<TimeInput id="t" label="Start" value={1} format="thousandths" />);
     const input = inputOf(container);

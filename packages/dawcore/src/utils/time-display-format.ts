@@ -51,19 +51,52 @@ export function formatDisplayTime(seconds: number, format: TimeDisplayFormat): s
   }
 }
 
-/** Parse a formatted time string back to seconds. Lenient: returns 0 for empty/unparseable input; does not validate segment ranges. */
-export function parseDisplayTime(value: string, format: TimeDisplayFormat): number {
-  if (!value) return 0;
-  let seconds = 0;
-  if (format === 'seconds') {
-    seconds = parseFloat(value) || 0;
-  } else {
-    const parts = value.split(':');
-    if (parts.length !== 3) return 0;
-    const h = parseInt(parts[0], 10) || 0;
-    const m = parseInt(parts[1], 10) || 0;
-    const s = parseFloat(parts[2]) || 0;
-    seconds = h * 3600 + m * 60 + s;
+/**
+ * A non-negative decimal number with nothing around it: `5`, `1.5`, `1.`, `.5`.
+ * Each string has one way to match (the point is not optional inside the
+ * digits), so a long digit string that fails is refused in linear time.
+ */
+const DECIMAL = /^(\d+(\.\d*)?|\.\d+)$/;
+/** A whole number of hours or minutes. */
+const WHOLE = /^\d+$/;
+const SECONDS_PER_UNIT = [3600, 60, 1];
+
+/**
+ * Read `s`, `m:s` or `h:m:s`. Only the last part (the seconds) may have
+ * decimals; the first part may be any size, and each later part must be
+ * under 60. The same rule as `parseTime` in `@waveform-playlist/ui-components`
+ * (`src/utils/timeFormat.ts`): keep the two in step.
+ */
+function parseClock(text: string): number | null {
+  const parts = text.split(':');
+  if (parts.length > 3) return null;
+  const units = SECONDS_PER_UNIT.slice(3 - parts.length);
+  let total = 0;
+  for (let i = 0; i < parts.length; i++) {
+    const isLast = i === parts.length - 1;
+    if (!(isLast ? DECIMAL : WHOLE).test(parts[i])) return null;
+    const value = Number(parts[i]);
+    if (i > 0 && value >= 60) return null;
+    total += value * units[i];
   }
-  return Math.max(0, seconds);
+  return Number.isFinite(total) ? total : null;
+}
+
+/**
+ * Parse text typed for a time back to seconds, or `null` when it is not a
+ * time: empty text, a negative number, letters, a number followed by
+ * anything else, a number too large to be finite, or a value that is not a
+ * string. Spaces around the text are ignored. `seconds` reads a plain
+ * number; the clock formats also read `1.5` (seconds) and `1:30` (minutes and
+ * seconds) besides `01:02:03.500`. Segment ranges are checked: `00:75:00` is
+ * not a time.
+ */
+export function parseDisplayTime(value: string, format: TimeDisplayFormat): number | null {
+  // Plain-JS callers can pass anything.
+  if (typeof value !== 'string') return null;
+  const text = value.trim();
+  if (format !== 'seconds') return parseClock(text);
+  if (!DECIMAL.test(text)) return null;
+  const seconds = Number(text);
+  return Number.isFinite(seconds) ? seconds : null;
 }

@@ -1203,27 +1203,39 @@ Control time format display.
 ### Signature
 
 ```typescript
+import type { TimeFormat } from '@waveform-playlist/ui-components';
+
 function useTimeFormat(): {
-  timeFormat: string;
-  setTimeFormat: (format: string) => void;
+  timeFormat: TimeFormat; // starts as 'hh:mm:ss.uuu'
+  setTimeFormat: (format: TimeFormat) => void;
   formatTime: (seconds: number) => string;
+  /** Seconds, or `null` when the text is not a time in the current format. */
+  parseTime: (timeString: string) => number | null;
 };
 ```
 
+The hook keeps its own format state; it is not the provider's time format (read that with `usePlaylistSettings().timeFormat`).
+
 ### Available Formats
+
+What `formatTime(123.456)` returns in each format. A negative, `NaN` or infinite time prints as zero in the format (`0`, `0.000`, `00:00:00.000`), and hours do not wrap at 24.
 
 | Format | Example |
 |--------|---------|
-| `seconds` | 123.456 |
-| `thousandths` | 2:03.456 |
-| `hh:mm:ss` | 0:02:03 |
-| `hh:mm:ss.u` | 0:02:03.4 |
-| `hh:mm:ss.uu` | 0:02:03.45 |
-| `hh:mm:ss.uuu` | 0:02:03.456 |
+| `seconds` | 123 |
+| `thousandths` | 123.456 |
+| `hh:mm:ss` | 00:02:03 |
+| `hh:mm:ss.u` | 00:02:03.5 |
+| `hh:mm:ss.uu` | 00:02:03.46 |
+| `hh:mm:ss.uuu` | 00:02:03.456 |
+
+`parseTime` reads a plain number in `seconds` and `thousandths`. In the clock formats it also reads `1.5` (seconds) and `1:30` (minutes and seconds) besides `00:02:03.456`. It returns `null` for empty text, letters, a negative number, a number followed by other text, and minutes or seconds of 60 or more after a larger part.
 
 ### Example
 
 ```tsx
+import type { TimeFormat } from '@waveform-playlist/ui-components';
+
 function TimeDisplay() {
   // The resting cursor position; it does not advance during playback
   const { currentTime } = useCurrentTime();
@@ -1232,9 +1244,9 @@ function TimeDisplay() {
   return (
     <div>
       <span>{formatTime(currentTime)}</span>
-      <select onChange={(e) => setTimeFormat(e.target.value)}>
-        <option value="thousandths">0:00.000</option>
-        <option value="hh:mm:ss">0:00:00</option>
+      <select onChange={(e) => setTimeFormat(e.target.value as TimeFormat)}>
+        <option value="thousandths">0.000</option>
+        <option value="hh:mm:ss">00:00:00</option>
         <option value="seconds">Seconds</option>
       </select>
     </div>

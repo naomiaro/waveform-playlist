@@ -170,13 +170,23 @@ export interface AnnotationTextProps {
 
 const NO_CONTROLS: AnnotationAction[] = [];
 
+/** A whole number in plain digits: `String()` switches to exponent notation at 1e21. */
+const digits = (whole: number): string =>
+  whole < 1e21 ? String(whole) : whole.toLocaleString('en-US', { useGrouping: false });
+
+/**
+ * m:ss.mmm. The seconds are rounded as they always were,
+ * `(seconds % 60).toFixed(3)`; a rounding that reaches 60 carries into the
+ * minutes, so 59.9996 s is `1:00.000`, never `0:60.000`. A negative, `NaN` or
+ * infinite time is 0.
+ */
 const formatTime = (seconds: number): string => {
-  if (isNaN(seconds) || !isFinite(seconds)) {
-    return '0:00.000';
-  }
-  const mins = Math.floor(seconds / 60);
-  const secs = (seconds % 60).toFixed(3);
-  return `${mins}:${secs.padStart(6, '0')}`;
+  const safe = Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+  const remainder = safe % 60;
+  const rounded = remainder.toFixed(3);
+  const carry = Number(rounded) >= 60;
+  const minutes = Math.round((safe - remainder) / 60) + (carry ? 1 : 0);
+  return `${digits(minutes)}:${(carry ? '0.000' : rounded).padStart(6, '0')}`;
 };
 
 const getIconClass = (classString: string) => {

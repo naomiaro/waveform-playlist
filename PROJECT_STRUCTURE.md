@@ -1573,7 +1573,7 @@ function MyPlaylist() {
 ```typescript
 import {
   useTimeFormat,
-} from "@waveform-playlist/browser/hooks";
+} from "@waveform-playlist/browser";
 
 const { formatTime } = useTimeFormat();
 ```

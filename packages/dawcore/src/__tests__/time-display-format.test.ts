@@ -61,14 +61,47 @@ describe('time-display-format', () => {
     }
   });
 
-  it('returns 0 for garbage or empty input', () => {
-    expect(parseDisplayTime('', 'hh:mm:ss.sss')).toBe(0);
-    expect(parseDisplayTime('not-a-time', 'seconds')).toBe(0);
-    expect(parseDisplayTime('1:2', 'hh:mm:ss')).toBe(0); // needs 3 segments
+  it('returns null for text that is not a time', () => {
+    expect(parseDisplayTime('', 'hh:mm:ss.sss')).toBeNull();
+    expect(parseDisplayTime('   ', 'seconds')).toBeNull();
+    expect(parseDisplayTime('not-a-time', 'seconds')).toBeNull();
+    expect(parseDisplayTime('1.5abc', 'seconds')).toBeNull();
+    expect(parseDisplayTime('1:30', 'seconds')).toBeNull();
+    expect(parseDisplayTime('ab:00:05', 'hh:mm:ss')).toBeNull();
+    expect(parseDisplayTime('1:00:00:00', 'hh:mm:ss')).toBeNull();
+    expect(parseDisplayTime('1.5:00', 'hh:mm:ss.sss')).toBeNull();
   });
 
-  it('clamps negative parse results to 0', () => {
-    expect(parseDisplayTime('-10', 'seconds')).toBe(0);
+  it('returns null for minutes or seconds of 60 or more after a larger part', () => {
+    expect(parseDisplayTime('00:75:00', 'hh:mm:ss')).toBeNull();
+    expect(parseDisplayTime('1:60', 'hh:mm:ss.sss')).toBeNull();
+  });
+
+  it('returns null for a negative time', () => {
+    expect(parseDisplayTime('-10', 'seconds')).toBeNull();
+    expect(parseDisplayTime('-00:00:05', 'hh:mm:ss')).toBeNull();
+  });
+
+  it('returns null for a number too large to be finite, and for a value that is not a string', () => {
+    expect(parseDisplayTime('1'.repeat(400), 'seconds')).toBeNull();
+    expect(parseDisplayTime('1'.repeat(400), 'hh:mm:ss')).toBeNull();
+    expect(parseDisplayTime(undefined as unknown as string, 'seconds')).toBeNull();
+  });
+
+  it('refuses a long digit string with a bad ending in linear time (CodeQL on #951)', () => {
+    const text = '9'.repeat(50_000) + 'x';
+    const started = performance.now();
+    expect(parseDisplayTime(text, 'seconds')).toBeNull();
+    expect(parseDisplayTime(text, 'hh:mm:ss')).toBeNull();
+    expect(performance.now() - started).toBeLessThan(200);
+  });
+
+  it('reads the shorter forms in the clock formats', () => {
+    expect(parseDisplayTime('1.5', 'hh:mm:ss.sss')).toBe(1.5);
+    expect(parseDisplayTime('1:30', 'hh:mm:ss')).toBe(90);
+    expect(parseDisplayTime('1:2', 'hh:mm:ss')).toBe(62);
+    expect(parseDisplayTime('120:00', 'hh:mm:ss')).toBe(7200);
+    expect(parseDisplayTime(' 1:02:03.5 ', 'hh:mm:ss.sss')).toBe(3723.5);
   });
 
   it('truncates instead of rounding across the minute boundary', () => {

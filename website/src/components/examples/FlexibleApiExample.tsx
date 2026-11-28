@@ -280,6 +280,42 @@ const CustomTrackControls: React.FC = () => {
   );
 };
 
+// A Radix text field for one time. Like the library's TimeInput, only the text
+// being typed is state, with the format it was typed in (a format change
+// abandons the edit); otherwise the field shows `value`. It commits on blur
+// (or Enter), and text that is not a time (parseTime gives null) changes
+// nothing: the field shows `value` again.
+const TimeField: React.FC<{
+  value: number;
+  format: TimeFormat;
+  placeholder: string;
+  onCommit: (seconds: number) => void;
+}> = ({ value, format, placeholder, onCommit }) => {
+  const [draft, setDraft] = useState<{ text: string; format: TimeFormat } | null>(null);
+  const activeDraft = draft?.format === format ? draft : null;
+
+  const commit = () => {
+    setDraft(null);
+    if (activeDraft === null) return;
+    const seconds = parseTime(activeDraft.text, format);
+    if (seconds !== null) onCommit(seconds);
+  };
+
+  return (
+    <TextField.Root
+      value={activeDraft?.text ?? formatTime(value, format)}
+      onChange={(e) => setDraft({ text: e.target.value, format })}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+      }}
+      placeholder={placeholder}
+      size="2"
+      style={{ width: '140px' }}
+    />
+  );
+};
+
 // Custom Selection Time Inputs using Radix UI
 const CustomSelectionInputs: React.FC = () => {
   const { selectionStart, selectionEnd } = useSelection();
@@ -287,32 +323,20 @@ const CustomSelectionInputs: React.FC = () => {
   const { timeFormat } = usePlaylistSettings();
   const format = timeFormat as TimeFormat;
 
-  const handleStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newStart = parseTime(e.target.value, format);
-    setSelection(newStart, selectionEnd);
-  };
-
-  const handleEndChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newEnd = parseTime(e.target.value, format);
-    setSelection(selectionStart, newEnd);
-  };
-
   return (
     <Flex gap="2" align="center">
-      <TextField.Root
-        value={formatTime(selectionStart, format)}
-        onChange={handleStartChange}
+      <TimeField
+        value={selectionStart}
+        format={format}
         placeholder="Start"
-        size="2"
-        style={{ width: '140px' }}
+        onCommit={(start) => setSelection(start, selectionEnd)}
       />
       <Text size="2" color="gray">to</Text>
-      <TextField.Root
-        value={formatTime(selectionEnd, format)}
-        onChange={handleEndChange}
+      <TimeField
+        value={selectionEnd}
+        format={format}
         placeholder="End"
-        size="2"
-        style={{ width: '140px' }}
+        onCommit={(end) => setSelection(selectionStart, end)}
       />
     </Flex>
   );

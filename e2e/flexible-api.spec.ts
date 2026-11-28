@@ -16,6 +16,70 @@ test.describe('Flexible API Example', () => {
     await page.waitForSelector('[data-playlist-state="ready"]', { timeout: 30000 });
   });
 
+  // The page's own selection fields (Radix) commit on blur or Enter (#815):
+  // they parsed every keystroke, and text that was not a time moved the edge to 0.
+  test('the selection fields commit a typed time and ignore text that is not one', async ({
+    page,
+  }) => {
+    const start = page.getByPlaceholder('Start', { exact: true });
+    const end = page.getByPlaceholder('End', { exact: true });
+    await expect(start).toHaveValue('00:00:00.000');
+
+    await end.fill('0:03.25');
+    await end.press('Enter');
+    await expect(end).toHaveValue('00:00:03.250');
+
+    await start.fill('1.5');
+    await start.press('Enter');
+    await expect(start).toHaveValue('00:00:01.500');
+
+    await start.fill('abc');
+    await start.press('Enter');
+    await expect(start).toHaveValue('00:00:01.500');
+    await expect(end).toHaveValue('00:00:03.250');
+  });
+
+  // Review of #951: the fields were keyed by their own text, so a collapsed
+  // selection (a click on the waveform) gave both the same key and React kept
+  // a stale input; and a commit that reordered the edges remounted the field
+  // Tab had just focused.
+  test('the selection fields stay two fields after a click on the waveform, and keep focus', async ({
+    page,
+  }) => {
+    const start = page.getByPlaceholder('Start', { exact: true });
+    const end = page.getByPlaceholder('End', { exact: true });
+    const row = page.locator('[data-track-row]').first();
+    await row.scrollIntoViewIfNeeded();
+    let box: { x: number; y: number; width: number; height: number } | null = null;
+    await expect(async () => {
+      box = await row.boundingBox();
+      expect(box).toBeTruthy();
+    }).toPass();
+
+    await page.mouse.click(box!.x + 300, box!.y + box!.height - 10);
+    await expect(start).not.toHaveValue('00:00:00.000');
+    await page.mouse.click(box!.x + 500, box!.y + box!.height - 10);
+    await expect(start).toHaveCount(1);
+    await expect(end).toHaveCount(1);
+    await expect(start).toHaveValue(await end.inputValue());
+
+    // The clicks left a collapsed selection after 3 s: the start goes first.
+    await start.fill('1');
+    await start.press('Enter');
+    await end.fill('0:03');
+    await end.press('Enter');
+    await expect(start).toHaveValue('00:00:01.000');
+    await expect(end).toHaveValue('00:00:03.000');
+
+    // 5 is after the end: the provider orders the edges, so the end changes
+    // while Tab has just moved focus to it.
+    await start.fill('5');
+    await start.press('Tab');
+    await expect(start).toHaveValue('00:00:03.000');
+    await expect(end).toHaveValue('00:00:05.000');
+    await expect(end).toBeFocused();
+  });
+
   test('the time display follows the skip buttons while stopped', async ({ page }) => {
     const time = page.getByTestId('time-display');
     await expect(time).toHaveText('00:00:00.000');

@@ -7,10 +7,17 @@ import type { DawAnnotationElement } from './daw-annotation';
 import type { DawAnnotationSelectDetail, DawTimeUpdateDetail } from '../events';
 import { computePlayingAnnotationId } from '../utils/annotation-playing';
 
-/** m:ss.mmm for annotation timestamps (finer than the ruler's m:ss). */
+/**
+ * m:ss.mmm for annotation timestamps (finer than the ruler's m:ss). Milliseconds
+ * that round up to 1000 carry into the seconds, so 59.9996 s is `1:00.000`,
+ * never `0:59.1000`. A negative, `NaN` or infinite time is 0.
+ */
 function formatAnnotationTime(seconds: number): string {
-  const whole = Math.floor(seconds);
-  const ms = Math.round((seconds - whole) * 1000);
+  const safe = Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+  const floor = Math.floor(safe);
+  const rounded = Math.round((safe - floor) * 1000);
+  const whole = rounded === 1000 ? floor + 1 : floor;
+  const ms = rounded === 1000 ? 0 : rounded;
   const s = whole % 60;
   const m = (whole - s) / 60;
   return m + ':' + String(s).padStart(2, '0') + '.' + String(ms).padStart(3, '0');

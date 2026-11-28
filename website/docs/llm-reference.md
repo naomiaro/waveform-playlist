@@ -833,6 +833,35 @@ interface TrackDragPreview {
 }
 ```
 
+### Time formats
+
+*`TimeFormat`, `formatTime` and `parseTime` from `@waveform-playlist/ui-components`; `useTimeFormat` from `@waveform-playlist/browser`*
+
+```typescript
+type TimeFormat = 'seconds' | 'thousandths' | 'hh:mm:ss' | 'hh:mm:ss.u' | 'hh:mm:ss.uu' | 'hh:mm:ss.uuu';
+
+/** Negative, NaN or infinite → zero in the format. A rounding of the seconds that reaches 60 carries:
+ *  59.9996 'hh:mm:ss.uuu' → '00:01:00.000'.
+ *  Hours do not wrap at 24. */
+function formatTime(seconds: number, format: TimeFormat): string;
+
+/** null when the text is not a time: empty, letters, a negative number, a number followed by other
+ *  text, a number too large to be finite, more than three ':' parts, minutes/seconds >= 60 after a larger part, decimals before the
+ *  last part. Surrounding spaces ignored. 'seconds'/'thousandths': a plain number. Clock formats
+ *  also read '1.5' (s) and '1:30' (m:s); the first part may be any size. */
+function parseTime(timeStr: string, format: TimeFormat): number | null;
+
+/** Its own format state (starts 'hh:mm:ss.uuu'), not the provider's timeFormat. */
+function useTimeFormat(): {
+  timeFormat: TimeFormat;
+  setTimeFormat: (format: TimeFormat) => void;
+  formatTime: (seconds: number) => string;
+  parseTime: (timeString: string) => number | null;
+};
+```
+
+`TimeInput` / `SelectionTimeInputs` call `onChange` / `onSelectionChange` on blur only after an edit, and only when `parseTime` returns a number; otherwise the input shows the value again.
+
 ---
 
 ## Arrangement Hooks
