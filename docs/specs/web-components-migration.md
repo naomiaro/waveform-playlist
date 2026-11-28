@@ -346,6 +346,7 @@ editor.selection: {start, end}       // Selection range
 editor.selectedTrackId: string|null  // Selected track
 editor.effects: EffectState[]        // Read-only. Master effects chain (see Effects section for shape)
 editor.spectrogramConfig: SpectrogramConfig | null  // Global spectrogram defaults (null = built-in defaults)
+editor.formatTrackControlLabel?: DawTrackControlLabelFormatter // Accessible mixer names; (control, trackName) => localized name or undefined for English
 editor.canUndo: boolean              // Has undo history
 editor.canRedo: boolean              // Has redo history
 editor.undoLimit: number             // Max undo steps (default 100) — not implemented (#466)

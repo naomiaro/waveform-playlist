@@ -17,9 +17,6 @@ const isPlaying = (page: Page) =>
     () => (document.querySelector('daw-editor') as unknown as { isPlaying: boolean }).isPlaying
   );
 
-/** The first track's controls: locators pierce open shadow roots. */
-const firstControls = (page: Page) => page.locator('daw-track-controls').first();
-
 test.describe('dawcore shortcuts and focused shadow-DOM controls', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(`${BASE}/multiclip.html`);
@@ -50,7 +47,7 @@ test.describe('dawcore shortcuts and focused shadow-DOM controls', () => {
   });
 
   test('Space on the focused Mute button toggles mute and does not play', async ({ page }) => {
-    const mute = firstControls(page).getByRole('button', { name: 'M', exact: true });
+    const mute = page.getByRole('button', { name: 'Mute, Kick', exact: true });
     await expect(mute).toBeVisible();
     await expect(mute).not.toHaveClass(/muted-active/);
     await mute.focus();
@@ -63,7 +60,7 @@ test.describe('dawcore shortcuts and focused shadow-DOM controls', () => {
   });
 
   test('Space on a focused slider does not play', async ({ page }) => {
-    const slider = firstControls(page).locator('input[type="range"]').first();
+    const slider = page.getByRole('slider', { name: 'Volume, Kick', exact: true });
     await expect(slider).toBeVisible();
     await slider.focus();
     await expect(slider).toBeFocused();
