@@ -17,10 +17,10 @@ export interface ExportWavButtonProps {
    */
   filename?: string;
   /**
-   * The id of the one track to export. Left out, the mix is exported (two
-   * channels when any audible track is stereo, else one). Given, that track
-   * alone, as it sounds on its own: its mute and the other tracks' solo are
-   * ignored.
+   * The id of the one track to export. Left out, the mix of the audible tracks
+   * is exported (two channels when any of them is stereo, else one). Given,
+   * that track alone, as it sounds on its own: its mute and the other tracks'
+   * solo are ignored, and the master chain (`effectsFunction`) applies too.
    */
   trackId?: string;
   /** Bit depth: 16 or 32 */
@@ -42,7 +42,8 @@ export interface ExportWavButtonProps {
   onExportComplete?: (blob: Blob) => void;
   /**
    * Callback when export fails. Without it, the failure is written to the
-   * console with `console.error`.
+   * console with `console.error`. A throw from `onExportComplete` is not a
+   * failed export: it is the app's own error, an unhandled rejection.
    */
   onExportError?: (error: Error) => void;
 }
@@ -78,10 +79,11 @@ export const ExportWavButton: React.FC<ExportWavButtonProps> = ({
       if (onExportError) {
         onExportError(failure);
       } else {
+        // The error itself as the second argument: its stack and `cause` stay.
         console.error(
-          '[waveform-playlist] The WAV export failed: ' +
-            failure.message +
-            '. Pass `onExportError` to ExportWavButton to show this in your app.'
+          '[waveform-playlist] The WAV export failed. ' +
+            'Pass `onExportError` to ExportWavButton to show this in your app.',
+          failure
         );
       }
       return;

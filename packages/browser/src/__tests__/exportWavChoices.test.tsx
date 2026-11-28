@@ -164,6 +164,7 @@ describe('one track chosen by id', () => {
     expect((thrown as Error).message).toBe('No track with id "nope" to export');
     expect(result.current.error).toBe('No track with id "nope" to export');
     expect(built.volumesDb).toEqual([]);
+    expect(result.current.isExporting).toBe(false);
   });
 
   it("downloads as the filename followed by the track's name", async () => {
@@ -177,7 +178,7 @@ describe('one track chosen by id', () => {
     expect(built.downloads).toEqual(['take_name-B.wav']);
   });
 
-  it('without a track id the mix is exported, muted and unsoloed tracks left out', async () => {
+  it('without a track id the mix is exported; muted tracks, soloed or not, are left out', async () => {
     const { result } = renderHook(() => useExportWav());
     const tracks = [track('A'), track('B'), track('C')];
     const states = [
@@ -188,8 +189,9 @@ describe('one track chosen by id', () => {
     await act(async () => {
       await result.current.exportWav(tracks, states, { filename: 'mix' });
     });
-    // A and B are soloed (B's solo outranks its mute, as live); C is not.
-    expect(built.volumesDb).toEqual([0, gainToDb(0.5), gainToDb(0.25)]);
+    // A and B are soloed, so C is not heard; B is muted, and a muted track is
+    // silent soloed or not (as live), so it is not built either.
+    expect(built.volumesDb).toEqual([0, gainToDb(0.5)]);
     expect(built.downloads).toEqual(['mix.wav']);
   });
 });
@@ -228,6 +230,19 @@ describe('fades and effect chains', () => {
     // Fades are rendered beside the chains too.
     expect(built.fadeCalls).toContain('ramp 1 @ 0.5');
   });
+
+  it('a track chain is inserted without a master chain', async () => {
+    const trackChain = vi.fn();
+    const { result } = renderHook(() => useExportWav());
+    await act(async () => {
+      await result.current.exportWav([track('A')], [state()], {
+        autoDownload: false,
+        createOfflineTrackEffects: () => trackChain,
+      });
+    });
+    expect(trackChain).toHaveBeenCalledTimes(1);
+    expect(trackChain.mock.lastCall?.[2]).toBe(true);
+  });
 });
 
 describe('isExporting while exports overlap', () => {
@@ -265,20 +280,23 @@ describe('isExporting while exports overlap', () => {
     expect(result.current.progress).toBe(1);
   });
 
-  it('a failed export among overlapping ones does not end the others', async () => {
+  it('an export refused at once while another runs changes neither isExporting nor progress', async () => {
     built.hold = true;
     const { result } = renderHook(() => useExportWav());
     let failed!: Promise<unknown>;
     let running!: Promise<unknown>;
     await act(async () => {
       running = result.current.exportWav([track('A')], [state()], { autoDownload: false });
+      // The running export has reported 0.1 and waits in its render.
+      await vi.waitFor(() => expect(built.held).toHaveLength(1));
       failed = result.current
         .exportWav([track('A')], [state()], { trackId: 'nope', autoDownload: false })
         .catch(() => undefined);
       await failed;
-      await vi.waitFor(() => expect(built.held).toHaveLength(1));
     });
     expect(result.current.isExporting).toBe(true);
+    // The running export's 0.1, not a 0 from the refused one.
+    expect(result.current.progress).toBe(0.1);
     expect(result.current.error).toBe('No track with id "nope" to export');
 
     await act(async () => {

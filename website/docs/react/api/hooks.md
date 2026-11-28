@@ -2150,7 +2150,7 @@ function useExportWav(): {
 };
 ```
 
-`trackStates[i]` is the mix of `tracks[i]`; a track with no entry is rendered with its own `muted`, `soloed`, `volume` and `pan`. The state belongs to the hook call: each `useExportWav()` has its own, so `ExportWavButton`'s is not visible to the page. To show it, call `useExportWav()` and draw the button yourself (the example below).
+`trackStates[i]` is the mix of `tracks[i]`; a track with no entry is rendered with its own `muted`, `soloed`, `volume` and `pan`, the values it was created with and not the arrangement's current mix (under the provider, `usePlaylistMixer().trackStates` has an entry for every track). An export refused at once (no tracks, an unknown `trackId`) rejects and sets `error` without changing `isExporting` or `progress`. The state belongs to the hook call: each `useExportWav()` has its own, so `ExportWavButton`'s is not visible to the page. To show it, call `useExportWav()` and draw the button yourself (the example below).
 
 ### ExportOptions
 
@@ -2166,8 +2166,8 @@ interface ExportOptions {
 }
 ```
 
-- **The mix** (no `trackId`): every audible track. When a track is soloed, only soloed tracks are audible; a muted track that is not soloed is left out. Two channels when any audible track is stereo (a stereo clip or the stereo pan law), else one.
-- **One track** (`trackId`): that track as it sounds on its own, with its volume, pan and effects; its mute and the other tracks' solo are ignored. An id that is not among `tracks` rejects with `No track with id "<id>" to export`.
+- **The mix** (no `trackId`): every audible track. A muted track is left out, soloed or not; when a track is soloed, only soloed tracks are audible. Two channels when any audible track is stereo (a stereo clip or the stereo pan law), else one.
+- **One track** (`trackId`): that track as it sounds on its own, with its volume, pan and track effects, through the master chain when `effectsFunction` is given; its mute and the other tracks' solo are ignored. Any value that is not the id of one of `tracks` (`null` included; only a left-out `trackId` means the mix) rejects with `No track with id "<id>" to export`.
 - **Fades** are always rendered. **Effects** are rendered when their functions are given: leave out `effectsFunction` and `createOfflineTrackEffects` for an export without effects.
 
 ### Effects Function

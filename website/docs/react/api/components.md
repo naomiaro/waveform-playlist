@@ -824,35 +824,47 @@ Export the playlist to a WAV file.
 | `createOfflineTrackEffects` | `(trackId: string) => OfflineTrackEffectsFunction \| undefined` | - | Each track's effects chain for the offline render, e.g. `createOfflineTrackEffectsFunction` of `useTrackDynamicEffects()` |
 | `className` | `string` | - | CSS class name |
 | `onExportComplete` | `(blob: Blob) => void` | - | Callback when export succeeds |
-| `onExportError` | `(error: Error) => void` | - | Callback when export fails. Without it, the failure is written to the console (`console.error`) |
+| `onExportError` | `(error: Error) => void` | - | Callback when export fails. Without it, the failure is written to the console (`console.error`, the error as the second argument). A throw from `onExportComplete` is not passed here |
 
 **Behavior:**
 - Shows progress percentage during export
-- Disabled when no tracks loaded
+- Disabled while it exports, and when the playlist has no tracks. A track whose audio is still loading counts as a track: the export then renders the clips that have loaded
 - Automatically triggers download when complete
 - Clip fades are always exported. Effects are exported when their functions are given: leave out `effectsFunction` and `createOfflineTrackEffects` for an export without effects.
-- The mix has two channels when any audible track is stereo (a stereo clip or the stereo pan law), else one.
+- The mix is every audible track: a muted track is left out, soloed or not, and when a track is soloed only soloed tracks are heard. It has two channels when any audible track is stereo (a stereo clip or the stereo pan law), else one.
 - The button keeps its export state to itself. To show `isExporting` or `progress` elsewhere on the page, call [`useExportWav()`](./hooks.md#useexportwav) and draw your own button.
 
 **Example:**
 
 ```tsx
-<ExportWavButton
-  filename="my-mix"
-  bitDepth={16}
-  onExportComplete={(blob) => console.log('Exported:', blob.size, 'bytes')}
-  onExportError={(error) => setExportError(error.message)}
-/>
+function ExportMix() {
+  const [exportError, setExportError] = useState<string | null>(null);
+  return (
+    <>
+      <ExportWavButton
+        filename="my-mix"
+        bitDepth={16}
+        onExportComplete={(blob) => console.log('Exported:', blob.size, 'bytes')}
+        onExportError={(error) => setExportError(error.message)}
+      />
+      {exportError && <p role="alert">{exportError}</p>}
+    </>
+  );
+}
 ```
 
 **Single Track Export:**
 
-The track named by `trackId` is exported as it sounds on its own: with its volume, pan and effects, its mute and the other tracks' solo ignored.
+The track named by `trackId` is exported as it sounds on its own: with its volume, pan and track effects, and through the master chain when `effectsFunction` is given; its mute and the other tracks' solo are ignored.
 
 ```tsx
-const { tracks } = usePlaylistTimeline();
+import { usePlaylistTimeline } from '@waveform-playlist/browser';
+import { ExportWavButton } from '@waveform-playlist/browser/tone';
 
-<ExportWavButton label="Export Stem" filename="stem" trackId={tracks[0]?.id} />
+function ExportFirstTrack() {
+  const { tracks } = usePlaylistTimeline();
+  return <ExportWavButton label="Export Stem" filename="stem" trackId={tracks[0]?.id} />;
+}
 ```
 
 **Export With Tone.js Effects:**

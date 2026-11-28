@@ -49,10 +49,12 @@ export interface ExportOptions extends WavEncoderOptions {
    */
   filename?: string;
   /**
-   * The id of the one track to export. Left out, the mix of every audible track
-   * is exported. Given, that track alone is exported as it sounds on its own:
-   * with its volume, pan and effects, its mute and the other tracks' solo
-   * ignored. An id that is not among the tracks rejects the export.
+   * The id of the one track to export. Left out (`undefined`), the mix of every
+   * audible track is exported. Given, that track alone is exported as it
+   * sounds on its own: with its volume, pan and track effects, through the
+   * master chain when `effectsFunction` is given; its mute and the other
+   * tracks' solo are ignored. Any other value that is not the id of one of the
+   * tracks (`null` included) rejects the export.
    */
   trackId?: string;
   /** Whether to trigger automatic download */
@@ -87,7 +89,9 @@ export interface UseExportWavReturn {
   /**
    * Export the playlist to WAV. `trackStates[i]` is the mix of `tracks[i]`; a
    * track with no entry is rendered with its own `muted`, `soloed`, `volume`
-   * and `pan`.
+   * and `pan` (the values it was created with, not the arrangement's current
+   * mix). An export refused at once (no tracks, an unknown `trackId`) rejects
+   * and sets `error` without changing `isExporting` or `progress`.
    */
   exportWav: (
     tracks: readonly ClipTrack[],
@@ -150,6 +154,21 @@ export function useExportWav(): UseExportWavReturn {
         onProgress,
       } = options;
 
+      // An export refused before it starts sets only `error`: it is not
+      // counted, so the exports still running keep `isExporting` and `progress`.
+      const chosenIndex =
+        trackId === undefined ? -1 : tracks.findIndex((track) => track.id === trackId);
+      const refusal =
+        tracks.length === 0
+          ? 'No tracks to export'
+          : trackId !== undefined && chosenIndex === -1
+            ? `No track with id "${trackId}" to export`
+            : null;
+      if (refusal !== null) {
+        setError(refusal);
+        throw new Error(refusal);
+      }
+
       startedRef.current += 1;
       const exportNumber = startedRef.current;
       runningRef.current += 1;
@@ -158,17 +177,6 @@ export function useExportWav(): UseExportWavReturn {
       setError(null);
 
       try {
-        // Validate inputs
-        if (tracks.length === 0) {
-          throw new Error('No tracks to export');
-        }
-
-        const chosenIndex =
-          trackId === undefined ? -1 : tracks.findIndex((track) => track.id === trackId);
-        if (trackId !== undefined && chosenIndex === -1) {
-          throw new Error(`No track with id "${trackId}" to export`);
-        }
-
         // Use AudioContext sample rate — the single source of truth for all audio
         const sampleRate = getGlobalAudioContext().sampleRate;
 
@@ -293,9 +301,11 @@ async function renderOffline(
 
   onProgress(0.1);
 
-  // Derive output channel count from audible tracks only
+  // The audible tracks: a muted track is silent, soloed or not (as in live
+  // playback), and with a solo only soloed tracks are heard. Only these are
+  // built, and only these decide the channel count.
   const audibleTracks = tracksToRender.filter(({ state }) => {
-    if (state.muted && !state.soloed) return false;
+    if (state.muted) return false;
     if (hasSolo && !state.soloed) return false;
     return true;
   });
@@ -333,7 +343,8 @@ async function renderOffline(
             state.pan,
             renderPanLaw(track, state)
           );
-          const trackMute = new Gain(state.muted ? 0 : 1);
+          // Unity: a muted track is not built (`audibleTracks`).
+          const trackMute = new Gain(1);
 
           // Insert the track's effects chain when given (may be async — WAM cloning)
           // PRE-FADER: trackInput → effects → trackVolume, so volume and pan

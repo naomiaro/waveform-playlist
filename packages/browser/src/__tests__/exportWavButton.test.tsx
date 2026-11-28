@@ -94,9 +94,11 @@ describe('ExportWavButton', () => {
     await click();
     expect(consoleError).toHaveBeenCalledTimes(1);
     expect(consoleError.mock.lastCall?.[0]).toBe(
-      '[waveform-playlist] The WAV export failed: the render failed. ' +
+      '[waveform-playlist] The WAV export failed. ' +
         'Pass `onExportError` to ExportWavButton to show this in your app.'
     );
+    // The error itself, so its stack and cause reach the console.
+    expect((consoleError.mock.lastCall?.[1] as Error).message).toBe('the render failed');
   });
 
   it('onExportComplete gets the blob of a finished export', async () => {

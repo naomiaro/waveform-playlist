@@ -184,7 +184,7 @@ Without it installed, `addWamEffect`/`addWamEffectToTrack` throw a friendly inst
 
 `useExportWav()` renders WAM entries into the exported WAV. The offline render happens on a native `OfflineAudioContext` (wrapped in a Tone `OfflineContext`), and the functions returned by `createOfflineEffectsFunction()` / `createOfflineTrackEffectsFunction(trackId)` re-instantiate each WAM plugin on that context from its URL-cached factory, transferring the live instance's state (`getState()`) at export time — the same pattern as dawcore's `exportAudio()`. Bypassed WAM entries stay excluded (disconnection bypass, parity with live playback), and a WAM plugin that fails to re-instantiate fails the export rather than silently rendering without it.
 
-The offline render temporarily swaps Tone's global context while the export graph is built — don't add tracks or mutate effect chains while an export is in flight, or nodes created during that window would land on the offline context. Exports themselves are serialized internally, so overlapping calls to `useExportWav()` can't corrupt the global context.
+The offline render temporarily swaps Tone's global context while the export graph is built — don't add tracks or mutate effect chains while an export is in flight, or nodes created during that window would land on the offline context. Exports themselves are serialized internally, so overlapping `exportWav()` calls can't corrupt the global context.
 
 ## Web Components (`<daw-editor>`) on the Tone backend
 

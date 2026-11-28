@@ -188,6 +188,19 @@ describe('the pan law a track is exported with (#684)', () => {
     expect(built.channels).toEqual([1]);
   });
 
+  it('a muted, soloed track is left out and does not decide the channel count (#817)', async () => {
+    await exportWith(
+      [audioTrackOf('A', 1), audioTrackOf('B', 2)],
+      [
+        { ...state('mono'), soloed: true },
+        { ...state('stereo'), soloed: true, muted: true },
+      ]
+    );
+    // A alone is built: one pan stage, one channel.
+    expect(built.panLaws).toEqual(['mono']);
+    expect(built.channels).toEqual([1]);
+  });
+
   it('a muted track does not decide the channel count', async () => {
     await exportWith(
       [audioTrackOf('A', 1), audioTrackOf('B', 2)],
