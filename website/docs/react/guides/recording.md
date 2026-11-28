@@ -105,6 +105,15 @@ function MicrophoneSetup() {
 }
 ```
 
+To ask from a mount effect, call `requestAccess()` in the effect without a run-once guard (a ref that skips the second run). In development, StrictMode runs the effect, cleans it up and runs it again. The hook stops a request that was still waiting for the browser when a cleanup ran, so a guarded effect opens no microphone; an unguarded one asks again and gets it. React's own advice is the same: [don't use refs to prevent an effect from running twice](https://react.dev/learn/synchronizing-with-effects#dont-use-refs-to-prevent-effects-from-firing).
+
+```tsx
+const { requestAccess } = useMicrophoneAccess();
+useEffect(() => {
+  requestAccess();
+}, [requestAccess]);
+```
+
 ### Audio Constraints
 
 Customize microphone settings:
